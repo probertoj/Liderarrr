@@ -221,9 +221,33 @@ export default function Settings() {
         </div>
       </section>
 
-      {/* 5. Copia de seguridad */}
+      {/* 5. Escritura de etiquetas */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">
+          5 · Escritura de etiquetas <span className="text-xs text-neutral-500">(avanzado)</span>
+        </h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Por defecto Liderarrr <strong>nunca</strong> toca tus ficheros. Si lo activas, podrás escribir los
+          identificadores de MusicBrainz (solo los MBID) en los álbumes identificados con confianza, desde su ficha y
+          con confirmación. Nunca borra otras etiquetas ni toca rarezas.
+        </p>
+        <label className="flex items-center gap-2 text-sm mb-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={s.allow_tag_writing === '1'}
+            onChange={(e) => setS((p) => ({ ...p, allow_tag_writing: e.target.checked ? '1' : '0' }))}
+          />
+          Permitir escribir etiquetas MBID en mis ficheros
+        </label>
+        <p className="text-xs text-amber-400/80">
+          Requiere montar tu carpeta de música en modo escritura: cambia <code>/music:ro</code> por{' '}
+          <code>/music:rw</code> en tu Docker. Con <code>:ro</code> (lo recomendado por defecto) esto no tendrá efecto.
+        </p>
+      </section>
+
+      {/* 6. Copia de seguridad */}
       <section className="card p-5">
-        <h2 className="font-display text-lg mb-1">5 · Copia de seguridad</h2>
+        <h2 className="font-display text-lg mb-1">6 · Copia de seguridad</h2>
         <p className="text-xs text-neutral-500 mb-3">Descarga la base de datos entera (SQLite). Todo vive en local.</p>
         <a
           href="/api/backup/database"

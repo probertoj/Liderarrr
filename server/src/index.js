@@ -34,6 +34,7 @@ import { listeningOverview, ownershipGap, ownedUnplayed, hasScrobbles } from './
 import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing } from './challenges.js';
 import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums } from './editions.js';
+import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
 import * as q from './queries.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -252,6 +253,22 @@ app.get('/api/albums/:id/editions', async (req, reply) => {
 app.get('/api/quality/upgrades', async () => upgradeCandidates());
 app.get('/api/labels', async () => labelsOverview());
 app.get('/api/labels/:name', async (req) => labelAlbums(req.params.name));
+
+// escritura de etiquetas (MBID) — opt-in, solo matched, con preview
+app.get('/api/albums/:id/tag-preview', async (req, reply) => {
+  try {
+    return await previewAlbumTags(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/albums/:id/write-tags', async (req, reply) => {
+  try {
+    return await writeAlbumTags(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 
 // --- escuchas (Last.fm) -----------------------------------------------------
 app.post('/api/scrobbles/import', async (req) => {

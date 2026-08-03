@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle } from 'lucide-react';
 import { api, fmtBytes } from '../api.js';
 import { Cover, StateBadge, Spinner, ErrorMsg, Button, PageTitle } from '../components.jsx';
 
@@ -114,6 +114,8 @@ export default function AlbumDetail() {
 
       <Editions albumId={album.id} />
 
+      {album.match_state === 'matched' && <TagWriter albumId={album.id} />}
+
       <div className="card overflow-hidden mb-6">
         <div className="px-4 py-2.5 border-b border-ink-800 flex items-center gap-2 text-sm text-neutral-400">
           <Music2 size={15} /> Pistas
@@ -139,6 +141,125 @@ export default function AlbumDetail() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// Escritura de etiquetas (MBID): la única parte que toca tus ficheros. Opt-in,
+// con preview del diff y confirmación. Solo se muestra en álbumes 'matched'.
+function TagWriter({ albumId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [writing, setWriting] = useState(false);
+  const [done, setDone] = useState(null);
+  const [err, setErr] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    setErr(null);
+    setDone(null);
+    try {
+      setData(await api.tagPreview(albumId));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const write = async () => {
+    if (!confirm('Se escribirán los identificadores de MusicBrainz en los ficheros de este álbum. ¿Continuar?')) return;
+    setWriting(true);
+    try {
+      const r = await api.writeTags(albumId);
+      setDone(r);
+      await load();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setWriting(false);
+    }
+  };
+
+  const notWritable = data?.tracks?.some((t) => !t.writable);
+
+  return (
+    <div className="card p-4 mb-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+          <Tag size={15} /> Etiquetas MusicBrainz (escritura)
+        </h2>
+        {!data && (
+          <Button onClick={load} disabled={loading}>
+            {loading ? 'Comprobando…' : 'Previsualizar'}
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-neutral-600 mt-1">
+        Escribe los MBID en tus ficheros para que el próximo escaneo los identifique al instante. Nunca borra otras
+        etiquetas ni toca rarezas.
+      </p>
+
+      {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+
+      {data && !data.eligible && <p className="text-sm text-neutral-500 mt-3">{data.reason}</p>}
+
+      {data && data.eligible && (
+        <div className="mt-3">
+          {done && (
+            <div className="mb-3 text-sm text-emerald-400">
+              ✓ Escrito en {done.written} de {done.total} ficheros
+              {done.errors?.length > 0 && <span className="text-amber-400"> · {done.errors.length} con error</span>}
+            </div>
+          )}
+
+          {data.totalChanges === 0 ? (
+            <p className="text-sm text-neutral-500">Los ficheros ya tienen estos MBID. Nada que escribir.</p>
+          ) : (
+            <>
+              <div className="text-sm text-neutral-400 mb-2">
+                {data.totalChanges} cambios en {data.tracks.filter((t) => t.changes.length).length} ficheros:
+              </div>
+              <div className="max-h-52 overflow-y-auto text-xs space-y-1 mb-3">
+                {data.tracks
+                  .filter((t) => t.changes.length)
+                  .slice(0, 3)
+                  .map((t, i) => (
+                    <div key={i} className="text-neutral-500">
+                      {t.changes.map((c, j) => (
+                        <div key={j}>
+                          <span className="text-neutral-400">{c.field.replace('MusicBrainz ', '')}:</span>{' '}
+                          {c.from ? <span className="line-through text-neutral-700">{c.from.slice(0, 8)}…</span> : <span className="text-neutral-700">(vacío)</span>}{' '}
+                          → <span className="text-emerald-400/80">{c.to.slice(0, 8)}…</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                <div className="text-neutral-600">…igual en el resto de pistas.</div>
+              </div>
+
+              {!data.writingEnabled ? (
+                <div className="text-xs text-amber-400/90 flex items-start gap-1.5 bg-amber-950/20 border border-amber-900/40 rounded p-2">
+                  <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                  <span>
+                    La escritura está desactivada. Actívala en{' '}
+                    <Link to="/ajustes" className="underline">Ajustes</Link> (requiere montar la música en modo escritura).
+                  </span>
+                </div>
+              ) : notWritable ? (
+                <div className="text-xs text-amber-400/90 flex items-start gap-1.5">
+                  <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                  Los ficheros son de solo lectura. Monta tu música en modo escritura (`:rw`) para poder etiquetar.
+                </div>
+              ) : (
+                <Button variant="gold" onClick={write} disabled={writing}>
+                  {writing ? 'Escribiendo…' : `Escribir MBID en ${data.tracks.filter((t) => t.changes.length).length} ficheros`}
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -95,7 +95,10 @@ Los datos van a `server/data/` (configurable con `DATA_DIR`).
 ## 🔒 Privacidad y seguridad
 
 - Todo corre y se guarda en tu máquina (SQLite en `/data`). Sin cuentas, sin telemetría.
-- Liderarrr **nunca escribe** en tus ficheros de música (monta la carpeta en `:ro`).
+- Por defecto Liderarrr **nunca escribe** en tus ficheros de música (monta la carpeta en `:ro`).
+  Existe una opción **opt-in** para escribir *solo los identificadores de MusicBrainz* (MBID) en
+  álbumes ya identificados, siempre con previsualización y confirmación, y nunca sobre rarezas. Para
+  usarla hay que activarla en Ajustes **y** montar la música en modo escritura (`:rw`).
 - Credenciales cifradas en disco con `LIDERARRR_SECRET` (AES-256-GCM).
 - Autenticación básica opcional con `LIDERARRR_AUTH="usuario:contraseña"`.
 

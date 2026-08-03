@@ -92,6 +92,8 @@ export const api = {
   upgrades: () => req('/quality/upgrades'),
   labels: () => req('/labels'),
   label: (name) => req(`/labels/${encodeURIComponent(name)}`),
+  tagPreview: (id) => req(`/albums/${id}/tag-preview`),
+  writeTags: (id) => req(`/albums/${id}/write-tags`, { method: 'POST' }),
 };
 
 export const coverUrl = (id) => `/api/cover/${id}`;
