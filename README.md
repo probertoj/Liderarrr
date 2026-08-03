@@ -114,7 +114,7 @@ Gracias en especial:
 
 - A **ForeverRamone**, por PowaFlex y por la idea de la que sale todo esto.
 - A **los hipersónicos**.
-- A **Sanpitopato**.
+- A **Sanpitopato**. Seguimosseguimos. 
 
 Datos por cortesía de [MusicBrainz](https://musicbrainz.org), [AcoustID](https://acoustid.org),
 [Discogs](https://discogs.com) y [Last.fm](https://last.fm). Gracias a
