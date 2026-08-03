@@ -1,19 +1,19 @@
 services:
-  liderarr:
+  liderarrr:
     image: ghcr.io/probertoj/liderarrr:latest
     # Para construir localmente en vez de usar la imagen publicada:
     # build: .
-    container_name: liderarr
+    container_name: liderarrr
     restart: unless-stopped
     ports:
       - '3861:3861'
     volumes:
       - ./data:/data
-      # Monta tu música en SOLO LECTURA. Liderarr nunca escribe en tus ficheros.
+      # Monta tu música en SOLO LECTURA. Liderarrr nunca escribe en tus ficheros.
       - /ruta/a/tu/musica:/music:ro
     environment:
       - TZ=Europe/Madrid
       # Cifra las credenciales en disco (recomendado):
-      # - LIDERARR_SECRET=una-frase-larga-y-secreta
+      # - LIDERARRR_SECRET=una-frase-larga-y-secreta
       # Autenticación básica si esto no está solo en tu red de casa:
-      # - LIDERARR_AUTH=usuario:contraseña
+      # - LIDERARRR_AUTH=usuario:contraseña

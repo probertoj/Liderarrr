@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock } from 'lucide-react';
+import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network } from 'lucide-react';
 import { api } from '../api.js';
 import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar } from '../components.jsx';
 
@@ -120,12 +120,108 @@ export default function ArtistDetail() {
       )}
 
       <p className="text-sm text-neutral-500 mt-4 mb-3">{artist.albums.length} álbumes en tu colección</p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
         {artist.albums.map((a) => (
           <AlbumCard key={a.id} album={{ ...a, album_artist: artist.name }} />
         ))}
       </div>
+
+      {!noMbid && <Relations artistId={id} />}
     </div>
+  );
+}
+
+// Grafo de relaciones de MusicBrainz cruzado con tu colección: miembros, bandas,
+// proyectos paralelos y colaboraciones, con lo que ya tienes o sigues.
+function Relations({ artistId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+  const load = async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      setData(await api.relations(artistId));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="card p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+          <Network size={15} /> Relaciones (MusicBrainz)
+        </h2>
+        {!data && (
+          <Button onClick={load} disabled={loading}>
+            {loading ? 'Cargando…' : 'Ver relaciones'}
+          </Button>
+        )}
+      </div>
+      {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+      {data && !data.hasMbid && <p className="text-sm text-neutral-600 mt-3">Este artista no está en MusicBrainz.</p>}
+      {data && data.hasMbid && data.groups.length === 0 && (
+        <p className="text-sm text-neutral-600 mt-3">MusicBrainz no tiene relaciones para este artista.</p>
+      )}
+      {data?.groups?.map((g) => (
+        <div key={g.key} className="mt-4">
+          <h3 className="text-xs uppercase tracking-wider text-neutral-600 mb-2">{g.label}</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {g.artists.map((a) => (
+              <RelChip key={a.mbid} a={a} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RelChip({ a }) {
+  const [followed, setFollowed] = useState(a.tracked);
+  const [busy, setBusy] = useState(false);
+  const follow = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBusy(true);
+    try {
+      await api.followMbid(a.mbid, 'artist');
+      setFollowed(true);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const inner = (
+    <>
+      {a.name}
+      {a.owned_albums > 0 && <span className="text-emerald-400/80"> · {a.owned_albums}</span>}
+      {a.attributes?.length > 0 && <span className="text-neutral-600"> · {a.attributes.join(', ')}</span>}
+    </>
+  );
+  const cls =
+    'text-xs px-2 py-1 rounded-full border inline-flex items-center gap-1 ' +
+    (a.owned_albums > 0 || followed
+      ? 'border-gold-500/30 bg-gold-500/10 text-gold-200'
+      : 'border-ink-800 bg-ink-850 text-neutral-300');
+
+  // si lo tienes en local, enlaza a su ficha; si no, botón de seguir
+  if (a.artist_id) {
+    return (
+      <Link to={`/artista/${a.artist_id}`} className={cls}>
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <button onClick={follow} disabled={busy} className={cls} title="Seguir en Liderarrr">
+      {inner}
+      {followed ? <Check size={12} className="text-emerald-400" /> : <Plus size={12} />}
+    </button>
   );
 }
 

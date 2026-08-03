@@ -3,7 +3,7 @@ import { Routes, Route, NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle,
   Sparkles, Settings as SettingsIcon, Menu, X, RefreshCw, Star, Compass, CalendarClock,
-  Headphones, Trophy,
+  Headphones, Trophy, ArrowUpCircle, Building2,
 } from 'lucide-react';
 import { api } from './api.js';
 import { Spinner } from './components.jsx';
@@ -22,6 +22,8 @@ const Discover = lazy(() => import('./pages/Discover.jsx'));
 const Calendar = lazy(() => import('./pages/Calendar.jsx'));
 const Listening = lazy(() => import('./pages/Listening.jsx'));
 const Challenges = lazy(() => import('./pages/Challenges.jsx'));
+const Upgrades = lazy(() => import('./pages/Upgrades.jsx'));
+const Labels = lazy(() => import('./pages/Labels.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
 const NAV = [
@@ -33,6 +35,8 @@ const NAV = [
       { to: '/artistas', label: 'Artistas', Icon: Users },
       { to: '/incompletos', label: 'Álbumes incompletos', Icon: PackageOpen },
       { to: '/calidad', label: 'Calidad y disco', Icon: HardDrive },
+      { to: '/upgrades', label: 'Candidatos a upgrade', Icon: ArrowUpCircle },
+      { to: '/sellos', label: 'Sellos', Icon: Building2 },
     ],
   },
   {
@@ -119,7 +123,7 @@ export default function App() {
       >
         <div className="px-5 py-5">
           <div className="font-display text-2xl tracking-wide">
-            Lider<span className="text-gold-400">arr</span>
+            Lider<span className="text-gold-400">arrr</span>
           </div>
           <div className="text-[11px] text-neutral-600 mt-0.5">completismo musical · v{version}</div>
         </div>
@@ -168,6 +172,8 @@ export default function App() {
             <Route path="/proximos" element={<Calendar />} />
             <Route path="/escuchas" element={<Listening />} />
             <Route path="/retos" element={<Challenges />} />
+            <Route path="/upgrades" element={<Upgrades />} />
+            <Route path="/sellos" element={<Labels />} />
             <Route path="/sin-identificar" element={<Unidentified />} />
             <Route path="/rarezas" element={<Rarities />} />
             <Route path="/ajustes" element={<Settings />} />

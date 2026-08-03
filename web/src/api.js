@@ -85,6 +85,13 @@ export const api = {
   challenge: (id) => req(`/challenges/${id}`),
   deleteChallenge: (id) => req(`/challenges/${id}`, { method: 'DELETE' }),
   challengeToLidarr: (id) => req(`/challenges/${id}/radarr`, { method: 'POST' }),
+
+  // fase 4 — refinado
+  editions: (id) => req(`/albums/${id}/editions`),
+  relations: (id) => req(`/artists/${id}/relations`),
+  upgrades: () => req('/quality/upgrades'),
+  labels: () => req('/labels'),
+  label: (name) => req(`/labels/${encodeURIComponent(name)}`),
 };
 
 export const coverUrl = (id) => `/api/cover/${id}`;

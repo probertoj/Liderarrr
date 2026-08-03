@@ -5,7 +5,7 @@ import { CACHE_MAX_AGE } from './cache-versions.js';
 // te identifique. Incumplir cualquiera de las dos te gana un bloqueo. Aquí se
 // serializan TODAS las llamadas por una única cola con hueco de 1100 ms, y todo
 // lo que vuelve se cachea en SQLite (ext_cache, prefijo mb:) para no repetir.
-const UA = 'Liderarr/0.1.0 ( https://github.com/probertoj/Liderarrr )';
+const UA = 'Liderarrr/0.1.0 ( https://github.com/probertoj/Liderarrr )';
 const BASE = 'https://musicbrainz.org/ws/2';
 const GAP_MS = 1100;
 
@@ -137,6 +137,29 @@ export async function recordingReleaseGroups(recordingMbid) {
     }
   }
   return { artist, artist_mbid: (data['artist-credit'] || [])[0]?.artist?.id || null, releaseGroups: rgs };
+}
+
+// Grafo de relaciones de un artista: miembros de banda, bandas de las que forma
+// parte, proyectos paralelos y colaboraciones. Esto es lo que la música gana al
+// cine: MusicBrainz sabe quién toca con quién, no solo quién publicó qué.
+export async function artistRelations(mbid) {
+  if (!mbid) return [];
+  const data = await mbCached(`artist-rels:${mbid}`, `/artist/${enc(mbid)}?inc=artist-rels`);
+  const out = [];
+  for (const rel of data.relations || []) {
+    if (rel['target-type'] !== 'artist' || !rel.artist) continue;
+    out.push({
+      mbid: rel.artist.id,
+      name: rel.artist.name,
+      type: rel.type, // member of band | collaboration | founder | supporting musician...
+      direction: rel.direction, // forward | backward
+      attributes: rel.attributes || [], // p. ej. instrumentos
+      begin: rel.begin || null,
+      end: rel.end || null,
+      ended: !!rel.ended,
+    });
+  }
+  return out;
 }
 
 // Busca artistas por nombre (para seguir a alguien que aún no tienes en disco:

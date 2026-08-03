@@ -32,6 +32,8 @@ import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
 import { listeningOverview, ownershipGap, ownedUnplayed, hasScrobbles } from './listening.js';
 import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing } from './challenges.js';
+import { artistRelations } from './relations.js';
+import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums } from './editions.js';
 import * as q from './queries.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -40,8 +42,8 @@ const app = Fastify({ logger: { level: 'info' }, bodyLimit: 20 * 1024 * 1024 });
 
 // --- autenticación básica opcional (idéntica en espíritu a PowaFlex) --------
 const AUTH_OPEN_PATHS = new Set(['/api/version']);
-if (process.env.LIDERARR_AUTH) {
-  const raw = process.env.LIDERARR_AUTH.includes(':') ? process.env.LIDERARR_AUTH : `liderarr:${process.env.LIDERARR_AUTH}`;
+if (process.env.LIDERARRR_AUTH) {
+  const raw = process.env.LIDERARRR_AUTH.includes(':') ? process.env.LIDERARRR_AUTH : `liderarrr:${process.env.LIDERARRR_AUTH}`;
   const digest = (v) => crypto.createHash('sha256').update(v || '', 'utf-8').digest();
   const expected = digest(`Basic ${Buffer.from(raw, 'utf-8').toString('base64')}`);
   const FAILS_MAX = 10;
@@ -65,19 +67,19 @@ if (process.env.LIDERARR_AUTH) {
       return reply.code(429).send({ error: 'Demasiados intentos, prueba en unos minutos' });
     }
     fails.set(ip, [...(fails.get(ip) || []), Date.now()]);
-    reply.header('WWW-Authenticate', 'Basic realm="Liderarr", charset="UTF-8"');
+    reply.header('WWW-Authenticate', 'Basic realm="Liderarrr", charset="UTF-8"');
     return reply.code(401).send({ error: 'No autorizado' });
   });
-  console.log('[Liderarr] Autenticación básica activada (LIDERARR_AUTH)');
+  console.log('[Liderarrr] Autenticación básica activada (LIDERARRR_AUTH)');
 } else {
   console.warn(
-    '[Liderarr] SIN autenticación: cualquiera que alcance este puerto puede leer y CAMBIAR tus\n' +
-    '           ajustes. Define LIDERARR_AUTH="usuario:contraseña" si esto no está solo en tu red de casa.'
+    '[Liderarrr] SIN autenticación: cualquiera que alcance este puerto puede leer y CAMBIAR tus\n' +
+    '           ajustes. Define LIDERARRR_AUTH="usuario:contraseña" si esto no está solo en tu red de casa.'
   );
 }
 
 // --- meta -------------------------------------------------------------------
-app.get('/api/version', async () => ({ name: 'Liderarr', version: pkg.version }));
+app.get('/api/version', async () => ({ name: 'Liderarrr', version: pkg.version }));
 
 app.get('/api/setup-state', async () => {
   const s = getAllSettings();
@@ -232,6 +234,25 @@ app.post('/api/lidarr/auto/run', async (req) => {
   return runAutoLidarr({ months: cfg.months, lookbackDays: cfg.lookbackDays, dryRun: !!req.body?.dryRun });
 });
 
+// --- fase 4: relaciones, ediciones/upgrades, sellos -------------------------
+app.get('/api/artists/:id/relations', async (req, reply) => {
+  try {
+    return await artistRelations(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.get('/api/albums/:id/editions', async (req, reply) => {
+  try {
+    return await albumEditions(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.get('/api/quality/upgrades', async () => upgradeCandidates());
+app.get('/api/labels', async () => labelsOverview());
+app.get('/api/labels/:name', async (req) => labelAlbums(req.params.name));
+
 // --- escuchas (Last.fm) -----------------------------------------------------
 app.post('/api/scrobbles/import', async (req) => {
   importScrobbles({ full: !!req.body?.full }).catch((e) => console.error('scrobbles', e));
@@ -364,8 +385,8 @@ app.get('/api/cover/:id', async (req, reply) => {
 
 // --- copia de seguridad -----------------------------------------------------
 app.get('/api/backup/database', async (req, reply) => {
-  const file = path.join(DATA_DIR, 'liderarr.db');
-  reply.header('Content-Disposition', 'attachment; filename="liderarr.db"');
+  const file = path.join(DATA_DIR, 'liderarrr.db');
+  reply.header('Content-Disposition', 'attachment; filename="liderarrr.db"');
   reply.header('Content-Type', 'application/octet-stream');
   return reply.send(fs.createReadStream(file));
 });
@@ -385,7 +406,7 @@ function scheduleNightly() {
   const check = () => {
     const now = new Date();
     if (now.getHours() === 3 && now.getMinutes() === 0 && !refreshStatus.running) {
-      console.log('[Liderarr] Refresco nocturno');
+      console.log('[Liderarrr] Refresco nocturno');
       runFullRefresh('nightly').catch((e) => console.error('nightly', e));
     }
   };
@@ -396,7 +417,7 @@ const PORT = Number(process.env.PORT) || 3861;
 app
   .listen({ port: PORT, host: '0.0.0.0' })
   .then(() => {
-    console.log(`[Liderarr] escuchando en http://0.0.0.0:${PORT}`);
+    console.log(`[Liderarrr] escuchando en http://0.0.0.0:${PORT}`);
     scheduleNightly();
   })
   .catch((err) => {

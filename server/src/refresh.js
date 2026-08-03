@@ -6,7 +6,7 @@ import { enrichAllDiscographies, discographyStatus } from './discography.js';
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
 
-// La rutina "poner Liderarr al día", en orden de dependencias: primero el disco
+// La rutina "poner Liderarrr al día", en orden de dependencias: primero el disco
 // (escáner), luego lo que lee de él (identificación), luego el snapshot de
 // Lidarr. Una sola implementación compartida por el cron nocturno y el botón
 // "Actualizar todo", para que no puedan divergir. Cada paso es opcional y aislado:

@@ -86,7 +86,7 @@ export default function Settings() {
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">1 · Tu música</h2>
         <p className="text-xs text-neutral-500 mb-3">
-          La fuente de verdad. Una carpeta por línea. Tus ficheros mandan: lo que esté aquí existe en Liderarr, esté o
+          La fuente de verdad. Una carpeta por línea. Tus ficheros mandan: lo que esté aquí existe en Liderarrr, esté o
           no en MusicBrainz.
         </p>
         <Field label="Carpetas de música">

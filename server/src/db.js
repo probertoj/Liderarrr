@@ -20,14 +20,14 @@ try {
   fs.unlinkSync(probe);
 } catch (e) {
   console.error(
-    `[Liderarr] ⚠️  /data (${DATA_DIR}) NO es escribible: ${e.message}\n` +
+    `[Liderarrr] ⚠️  /data (${DATA_DIR}) NO es escribible: ${e.message}\n` +
       '           Los ajustes y la biblioteca NO se guardarán. Revisa el volumen montado\n' +
       '           y sus permisos (en Synology/UNRAID, el PUID/PGID del contenedor debe\n' +
       '           poder escribir en la carpeta que mapeas a /data).'
   );
 }
 
-export const db = new Database(path.join(DATA_DIR, 'liderarr.db'));
+export const db = new Database(path.join(DATA_DIR, 'liderarrr.db'));
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
 
@@ -289,7 +289,7 @@ const setStmt = db.prepare(
   'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
 );
 
-// Claves sensibles: se guardan como AES-256-GCM si hay LIDERARR_SECRET; si no,
+// Claves sensibles: se guardan como AES-256-GCM si hay LIDERARRR_SECRET; si no,
 // en claro (compatible) y se avisa una vez. La lectura es transparente.
 const SECRET_SETTING_KEYS = new Set([
   'lidarr_key',
@@ -299,8 +299,8 @@ const SECRET_SETTING_KEYS = new Set([
   'discogs_token',
   'plex_token',
 ]);
-const secretKey = process.env.LIDERARR_SECRET
-  ? crypto.createHash('sha256').update(process.env.LIDERARR_SECRET).digest()
+const secretKey = process.env.LIDERARRR_SECRET
+  ? crypto.createHash('sha256').update(process.env.LIDERARRR_SECRET).digest()
   : null;
 let warnedPlaintext = false;
 
@@ -336,7 +336,7 @@ export function setSetting(key, value) {
     if (secretKey) stored = encryptValue(stored);
     else if (!warnedPlaintext) {
       warnedPlaintext = true;
-      console.warn('[Liderarr] Credenciales guardadas en claro. Define LIDERARR_SECRET para cifrarlas en disco.');
+      console.warn('[Liderarrr] Credenciales guardadas en claro. Define LIDERARRR_SECRET para cifrarlas en disco.');
     }
   }
   return setStmt.run(key, stored);

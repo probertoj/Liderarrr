@@ -5,7 +5,7 @@ import { CACHE_MAX_AGE } from './cache-versions.js';
 // bootlegs físicos. Aquí se usa como red de seguridad de la identificación y,
 // más adelante (fase 4), para listar ediciones de un disco. Límite: 60 pet/min
 // autenticado; se serializa con un hueco de 1100 ms, igual que MusicBrainz.
-const UA = 'Liderarr/0.1.0 +https://github.com/probertoj/Liderarrr';
+const UA = 'Liderarrr/0.1.0 +https://github.com/probertoj/Liderarrr';
 const BASE = 'https://api.discogs.com';
 const GAP_MS = 1100;
 
@@ -64,6 +64,65 @@ export async function searchRelease(artist, title) {
     country: r.country || null,
     formats: r.format || [],
     thumb: r.thumb || null,
+  };
+}
+
+// Todas las ediciones de un álbum: el equivalente (mejor) de JustWatch. Discogs
+// lista cada prensaje/edición de un "master": remasters, deluxe, vinilo con
+// bonus, ediciones por país. Con esto sabes si de ese disco que tienes en MP3
+// existe algo mejor ahí fuera. Devuelve las ediciones y el sello principal.
+export async function releaseEditions(artist, title) {
+  if (!discogsConfigured() || !title) return null;
+  const hit = await searchRelease(artist, title);
+  if (!hit) return null;
+  // el resultado de búsqueda trae master_id cuando pertenece a un master
+  let masterId = null;
+  let mainLabel = hit.label || null;
+  let catno = null;
+  try {
+    const rel = await dcCached(`release:${hit.discogs_id}`, `/releases/${hit.discogs_id}`);
+    masterId = rel.master_id || null;
+    mainLabel = (rel.labels || [])[0]?.name || mainLabel;
+    catno = (rel.labels || [])[0]?.catno || null;
+  } catch {
+    /* nos quedamos con el sello del resultado de búsqueda */
+  }
+
+  let versions = [];
+  if (masterId) {
+    try {
+      const data = await dcCached(`master-versions:${masterId}`, `/masters/${masterId}/versions?per_page=100`);
+      versions = (data.versions || []).map((v) => ({
+        title: v.title,
+        year: Number(v.released) || null,
+        country: v.country || null,
+        format: v.format || v.major_formats?.join(', ') || '',
+        label: v.label || null,
+        descriptions: v.major_formats || [],
+        thumb: v.thumb || null,
+        url: v.resource_url ? `https://www.discogs.com/release/${v.id}` : null,
+      }));
+    } catch {
+      /* sin versiones: al menos devolvemos la que encontramos */
+    }
+  }
+  if (!versions.length) {
+    versions = [{ title: hit.title, year: hit.year, country: hit.country, format: (hit.formats || []).join(', '), label: mainLabel }];
+  }
+
+  // marca posibles upgrades: ediciones con pistas de más / vinilo / hi-res / remaster
+  const upgradeHints = versions.filter((v) =>
+    /deluxe|remaster|expanded|anniversary|hi-?res|24-?bit|vinyl|super audio|SACD|bonus/i.test(
+      `${v.format} ${v.title} ${(v.descriptions || []).join(' ')}`
+    )
+  );
+
+  return {
+    discogsUrl: masterId ? `https://www.discogs.com/master/${masterId}` : `https://www.discogs.com/release/${hit.discogs_id}`,
+    label: mainLabel,
+    catno,
+    editions: versions,
+    upgradeHints: upgradeHints.slice(0, 8),
   };
 }
 

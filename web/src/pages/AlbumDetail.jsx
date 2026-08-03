@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink } from 'lucide-react';
 import { api, fmtBytes } from '../api.js';
 import { Cover, StateBadge, Spinner, ErrorMsg, Button, PageTitle } from '../components.jsx';
 
@@ -112,7 +112,9 @@ export default function AlbumDetail() {
         </div>
       </div>
 
-      <div className="card overflow-hidden">
+      <Editions albumId={album.id} />
+
+      <div className="card overflow-hidden mb-6">
         <div className="px-4 py-2.5 border-b border-ink-800 flex items-center gap-2 text-sm text-neutral-400">
           <Music2 size={15} /> Pistas
         </div>
@@ -137,6 +139,88 @@ export default function AlbumDetail() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// Ediciones de Discogs (el equivalente de JustWatch): ¿existe una versión mejor
+// de este disco ahí fuera? Se carga bajo demanda para no gastar peticiones.
+function Editions({ albumId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      setData(await api.editions(albumId));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="card p-4 mb-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+          <Disc3 size={15} /> Ediciones (Discogs)
+        </h2>
+        {!data && (
+          <Button onClick={load} disabled={loading}>
+            {loading ? 'Buscando…' : 'Buscar ediciones'}
+          </Button>
+        )}
+      </div>
+
+      {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+      {data && data.configured === false && (
+        <p className="text-sm text-neutral-600 mt-3">Configura un token de Discogs en Ajustes para ver ediciones.</p>
+      )}
+      {data && data.found === false && <p className="text-sm text-neutral-600 mt-3">Discogs no encuentra este álbum.</p>}
+
+      {data && data.found && (
+        <div className="mt-3">
+          {data.upgradeHints?.length > 0 && (
+            <div className="mb-3 text-sm">
+              <span className="text-gold-400">Posibles upgrades:</span>{' '}
+              {data.upgradeHints.map((u, i) => (
+                <span key={i} className="text-neutral-400">
+                  {u.format}
+                  {u.year ? ` (${u.year})` : ''}
+                  {i < data.upgradeHints.length - 1 ? ' · ' : ''}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="max-h-72 overflow-y-auto divide-y divide-ink-850/60">
+            {data.editions.map((e, i) => (
+              <div key={i} className="py-1.5 flex items-center justify-between text-sm">
+                <span className="text-neutral-300">
+                  {e.format}
+                  {e.label ? <span className="text-neutral-600"> · {e.label}</span> : ''}
+                </span>
+                <span className="text-neutral-500 shrink-0 ml-2">
+                  {e.country ? `${e.country} ` : ''}
+                  {e.year || ''}
+                </span>
+              </div>
+            ))}
+          </div>
+          {data.discogsUrl && (
+            <a
+              href={data.discogsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-gold-400 hover:underline mt-2"
+            >
+              Ver en Discogs <ExternalLink size={12} />
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }

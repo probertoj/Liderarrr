@@ -1,15 +1,15 @@
-# 🎵 Liderarr
+# 🎵 Liderarrr
 
 > **Alpha 0.1.0** · Panel de completismo para tu colección de música digital. Escanea tus
 > ficheros, los identifica contra MusicBrainz / AcoustID / Discogs / Last.fm, y te enseña qué
 > tienes, qué te falta y qué es una rareza. Junto a **Lidarr**, no dentro de él.
 
-Liderarr es primo musical de [PowaFlex](https://github.com/ForeverRamone/PowaFlex) (que hace
+Liderarrr es primo musical de [PowaFlex](https://github.com/ForeverRamone/PowaFlex) (que hace
 lo mismo para cine con Plex). La diferencia de fondo, y su principio rector:
 
 > **Tus ficheros mandan. MusicBrainz anota. Lidarr solo ejecuta.**
 
-Tu disco duro es la única fuente de verdad. Un álbum existe en Liderarr aunque no esté en
+Tu disco duro es la única fuente de verdad. Un álbum existe en Liderarrr aunque no esté en
 ninguna base de datos profesional: las maquetas, bootlegs e inéditos son ciudadanos de primera
 clase (estado *rareza*), cuentan en tus estadísticas y no se pierden nunca. Lidarr, como Radarr
 en PowaFlex, es solo el actuador al que mandas lo que te falta.
@@ -48,9 +48,9 @@ Si nada coincide, queda *sin identificar* y decides tú: **rareza** o **empareja
 
 ```yaml
 services:
-  liderarr:
+  liderarrr:
     image: ghcr.io/probertoj/liderarrr:latest
-    container_name: liderarr
+    container_name: liderarrr
     restart: unless-stopped
     ports:
       - '3861:3861'
@@ -60,7 +60,7 @@ services:
     environment:
       - TZ=Europe/Madrid
       # Recomendado: cifra las credenciales en disco (elige una frase larga y no la cambies).
-      # - LIDERARR_SECRET=una-frase-larga-y-secreta
+      # - LIDERARRR_SECRET=una-frase-larga-y-secreta
 ```
 
 ```bash
@@ -77,7 +77,7 @@ todo». El escaneo y la identificación corren en segundo plano y se repiten sol
 
 > **Persistencia:** todo (ajustes, credenciales, biblioteca, caché) vive en un único fichero SQLite
 > dentro de `/data`. Mientras montes esa carpeta como volumen, tu configuración sobrevive a
-> reinicios y actualizaciones de la imagen. Liderarr avisa al arrancar si `/data` no es escribible.
+> reinicios y actualizaciones de la imagen. Liderarrr avisa al arrancar si `/data` no es escribible.
 
 ## 🧑‍💻 Desarrollo local
 
@@ -95,16 +95,16 @@ Los datos van a `server/data/` (configurable con `DATA_DIR`).
 ## 🔒 Privacidad y seguridad
 
 - Todo corre y se guarda en tu máquina (SQLite en `/data`). Sin cuentas, sin telemetría.
-- Liderarr **nunca escribe** en tus ficheros de música (monta la carpeta en `:ro`).
-- Credenciales cifradas en disco con `LIDERARR_SECRET` (AES-256-GCM).
-- Autenticación básica opcional con `LIDERARR_AUTH="usuario:contraseña"`.
+- Liderarrr **nunca escribe** en tus ficheros de música (monta la carpeta en `:ro`).
+- Credenciales cifradas en disco con `LIDERARRR_SECRET` (AES-256-GCM).
+- Autenticación básica opcional con `LIDERARRR_AUTH="usuario:contraseña"`.
 
 ## 🙏 Créditos
 
-Liderarr es un **fork conceptual de [PowaFlex](https://github.com/ForeverRamone/PowaFlex)**, la
+Liderarrr es un **fork conceptual de [PowaFlex](https://github.com/ForeverRamone/PowaFlex)**, la
 idea original de **[ForeverRamone](https://github.com/ForeverRamone)** para cine sobre Plex. Todo
 el planteamiento —leer tu biblioteca en local, cruzarla con una base de datos externa, calcular
-completismo y cazar lo que falta— nace de su trabajo; Liderarr solo lo lleva al terreno de la
+completismo y cazar lo que falta— nace de su trabajo; Liderarrr solo lo lleva al terreno de la
 música y Lidarr.
 
 Gracias en especial:
