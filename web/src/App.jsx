@@ -3,7 +3,7 @@ import { Routes, Route, NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle,
   Sparkles, Settings as SettingsIcon, Menu, X, RefreshCw, Star, Compass, CalendarClock,
-  Headphones, Trophy, ArrowUpCircle, Building2,
+  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon,
 } from 'lucide-react';
 import { api } from './api.js';
 import { Spinner } from './components.jsx';
@@ -103,9 +103,14 @@ function RefreshButton() {
 export default function App() {
   const [open, setOpen] = useState(false);
   const [version, setVersion] = useState('');
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
   useEffect(() => {
     api.version().then((v) => setVersion(v.version)).catch(() => {});
   }, []);
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light');
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   return (
     <div className="min-h-screen md:flex">
@@ -152,8 +157,15 @@ export default function App() {
             </div>
           ))}
         </nav>
-        <div className="p-3 border-t border-ink-800">
+        <div className="p-3 border-t border-ink-800 space-y-2">
           <RefreshButton />
+          <button
+            onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
+            className="w-full flex items-center justify-center gap-2 text-xs px-3 py-1.5 rounded-lg border border-ink-800 text-neutral-400 hover:bg-ink-850"
+          >
+            {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
+            {theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
+          </button>
         </div>
       </aside>
 

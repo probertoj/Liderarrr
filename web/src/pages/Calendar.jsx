@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarClock, Plus, Check } from 'lucide-react';
+import { CalendarClock, Plus, Check, Loader2 } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg } from '../components.jsx';
 
@@ -11,6 +11,7 @@ export default function Calendar() {
   const [err, setErr] = useState(null);
   const [all, setAll] = useState(false);
   const [added, setAdded] = useState({});
+  const [busy, setBusy] = useState(null);
 
   useEffect(() => {
     setRows(null);
@@ -18,11 +19,18 @@ export default function Calendar() {
   }, [all]);
 
   const add = async (r) => {
+    setBusy(r.rg_mbid);
     try {
-      await api.lidarrAdd(r.rg_mbid, r.artist_mbid);
+      const res = await api.lidarrAdd(r.rg_mbid, r.artist_mbid);
+      if (res.pending) {
+        alert(res.note);
+        return;
+      }
       setAdded((p) => ({ ...p, [r.rg_mbid]: true }));
     } catch (e) {
       alert(e.message);
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -78,9 +86,11 @@ export default function Calendar() {
                         ) : (
                           <button
                             onClick={() => add(r)}
-                            className="text-xs px-1.5 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1"
+                            disabled={busy === r.rg_mbid}
+                            className="text-xs px-1.5 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 disabled:opacity-50"
                           >
-                            <Plus size={12} /> Lidarr
+                            {busy === r.rg_mbid ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                            {busy === r.rg_mbid ? 'Enviando…' : 'Lidarr'}
                           </button>
                         )}
                       </div>

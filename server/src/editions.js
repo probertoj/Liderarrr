@@ -32,18 +32,26 @@ export async function albumEditions(albumId) {
 // candidatos naturales a buscar una edición mejor. Ordenados por lo que más pesa
 // (los más grandes en lossy suelen ser los que más ganarías reencodeando/sustituyendo).
 export function upgradeCandidates() {
+  const owned = new Set(db.prepare('SELECT rg_mbid FROM lidarr_albums').all().map((r) => r.rg_mbid));
   return db
     .prepare(
-      `SELECT a.id, a.title, a.album_artist, a.year, a.cover, a.size_bytes,
+      `SELECT a.id, a.title, a.album_artist, a.year, a.cover, a.size_bytes, a.rg_mbid,
+        ar.mbid AS artist_mbid,
         (SELECT MAX(t.bitrate) FROM tracks t WHERE t.album_id=a.id) AS max_bitrate,
         (SELECT GROUP_CONCAT(DISTINCT t.format) FROM tracks t WHERE t.album_id=a.id) AS formats
-       FROM albums a
+       FROM albums a LEFT JOIN artists ar ON ar.id = a.artist_id
        WHERE a.match_state NOT IN ('dismissed')
          AND NOT EXISTS (SELECT 1 FROM tracks t WHERE t.album_id=a.id AND t.lossless=1)
        ORDER BY a.size_bytes DESC`
     )
     .all()
-    .map((r) => ({ ...r, max_kbps: r.max_bitrate ? Math.round(r.max_bitrate / 1000) : null }));
+    .map((r) => ({
+      ...r,
+      max_kbps: r.max_bitrate ? Math.round(r.max_bitrate / 1000) : null,
+      // se puede pedir upgrade a Lidarr solo si el álbum está identificado (tiene rg_mbid)
+      can_upgrade: !!r.rg_mbid,
+      in_lidarr: r.rg_mbid ? owned.has(r.rg_mbid) : false,
+    }));
 }
 
 // Sellos de tu colección (según lo capturado de Discogs al explorar ediciones, y

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network } from 'lucide-react';
+import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2 } from 'lucide-react';
 import { api } from '../api.js';
 import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar } from '../components.jsx';
 
@@ -232,7 +232,11 @@ function MissingList({ items, artistMbid }) {
   const add = async (rg) => {
     setBusy(rg.rg_mbid);
     try {
-      await api.lidarrAdd(rg.rg_mbid, artistMbid);
+      const r = await api.lidarrAdd(rg.rg_mbid, artistMbid);
+      if (r.pending) {
+        alert(r.note);
+        return;
+      }
       setAdded((p) => ({ ...p, [rg.rg_mbid]: true }));
     } catch (e) {
       alert(e.message);
@@ -242,15 +246,18 @@ function MissingList({ items, artistMbid }) {
   };
 
   const addAll = async () => {
-    const pending = items.filter((i) => !added[i.rg_mbid] && !i.in_lidarr);
-    if (!pending.length) return;
+    const toSend = items.filter((i) => !added[i.rg_mbid] && !i.in_lidarr);
+    if (!toSend.length) return;
     setBusy('all');
     try {
-      const r = await api.lidarrAddBulk(pending.map((i) => ({ rg_mbid: i.rg_mbid, artist_mbid: artistMbid })));
+      const r = await api.lidarrAddBulk(toSend.map((i) => ({ rg_mbid: i.rg_mbid, artist_mbid: artistMbid })));
       const next = {};
-      for (const i of pending) next[i.rg_mbid] = true;
+      for (const i of toSend) next[i.rg_mbid] = true;
       setAdded((p) => ({ ...p, ...next }));
-      if (r.errors?.length) alert(`${r.added} añadidos, ${r.errors.length} con error`);
+      const bits = [];
+      if (r.pending) bits.push(`${r.pending} pendientes (reintenta en un momento)`);
+      if (r.errors?.length) bits.push(`${r.errors.length} con error`);
+      if (bits.length) alert(`${r.added} añadidos · ${bits.join(' · ')}`);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -263,7 +270,10 @@ function MissingList({ items, artistMbid }) {
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm text-neutral-400">Te faltan {items.length} álbumes de estudio</h2>
         <Button variant="gold" onClick={addAll} disabled={busy === 'all'}>
-          Enviar todos a Lidarr
+          <span className="inline-flex items-center gap-1.5">
+            {busy === 'all' && <Loader2 size={14} className="animate-spin" />}
+            {busy === 'all' ? 'Enviando…' : 'Enviar todos a Lidarr'}
+          </span>
         </Button>
       </div>
       <div className="space-y-1.5">
@@ -285,7 +295,8 @@ function MissingList({ items, artistMbid }) {
                   disabled={busy === m.rg_mbid}
                   className="text-xs px-2 py-1 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 shrink-0 inline-flex items-center gap-1 disabled:opacity-50"
                 >
-                  <Plus size={13} /> Lidarr
+                  {busy === m.rg_mbid ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                  {busy === m.rg_mbid ? 'Enviando…' : 'Lidarr'}
                 </button>
               )}
             </div>

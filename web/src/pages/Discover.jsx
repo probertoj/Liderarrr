@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Compass, Plus, Check, X, RefreshCw } from 'lucide-react';
+import { Compass, Plus, Check, X, RefreshCw, Loader2 } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button } from '../components.jsx';
 
@@ -24,7 +24,11 @@ export default function Discover() {
   const add = async (rg, artistMbid) => {
     setBusy(rg.rg_mbid);
     try {
-      await api.lidarrAdd(rg.rg_mbid, artistMbid);
+      const r = await api.lidarrAdd(rg.rg_mbid, artistMbid);
+      if (r.pending) {
+        alert(r.note);
+        return;
+      }
       setAdded((p) => ({ ...p, [rg.rg_mbid]: true }));
     } catch (e) {
       alert(e.message);
@@ -33,15 +37,18 @@ export default function Discover() {
     }
   };
   const addArtist = async (group) => {
-    const pending = group.missing.filter((m) => !added[m.rg_mbid] && !m.in_lidarr);
-    if (!pending.length) return;
+    const toSend = group.missing.filter((m) => !added[m.rg_mbid] && !m.in_lidarr);
+    if (!toSend.length) return;
     setBusy(group.artist_id);
     try {
-      const r = await api.lidarrAddBulk(pending.map((m) => ({ rg_mbid: m.rg_mbid, artist_mbid: group.artist_mbid })));
+      const r = await api.lidarrAddBulk(toSend.map((m) => ({ rg_mbid: m.rg_mbid, artist_mbid: group.artist_mbid })));
       const next = {};
-      for (const m of pending) next[m.rg_mbid] = true;
+      for (const m of toSend) next[m.rg_mbid] = true;
       setAdded((p) => ({ ...p, ...next }));
-      if (r.errors?.length) alert(`${r.added} añadidos, ${r.errors.length} con error`);
+      const bits = [];
+      if (r.pending) bits.push(`${r.pending} pendientes (reintenta)`);
+      if (r.errors?.length) bits.push(`${r.errors.length} con error`);
+      if (bits.length) alert(`${r.added} añadidos · ${bits.join(' · ')}`);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -106,7 +113,10 @@ export default function Discover() {
                 <span className="text-neutral-600 text-sm ml-2">faltan {group.missing.length}</span>
               </Link>
               <Button variant="gold" onClick={() => addArtist(group)} disabled={busy === group.artist_id}>
-                Enviar todos
+                <span className="inline-flex items-center gap-1.5">
+                  {busy === group.artist_id && <Loader2 size={14} className="animate-spin" />}
+                  {busy === group.artist_id ? 'Enviando…' : 'Enviar todos'}
+                </span>
               </Button>
             </div>
             <div className="grid sm:grid-cols-2 gap-1.5">
@@ -128,9 +138,10 @@ export default function Discover() {
                           <button
                             onClick={() => add(m, group.artist_mbid)}
                             disabled={busy === m.rg_mbid}
-                            className="text-xs px-1.5 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1"
+                            className="text-xs px-1.5 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 disabled:opacity-50"
                           >
-                            <Plus size={12} /> Lidarr
+                            {busy === m.rg_mbid ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                            {busy === m.rg_mbid ? 'Enviando…' : 'Lidarr'}
                           </button>
                           <button
                             onClick={() => dismiss(m)}

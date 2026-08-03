@@ -17,7 +17,7 @@ async function lidarrFetch(path, { method = 'GET', body } = {}) {
     method,
     headers: { 'X-Api-Key': key, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(60000),
   });
   if (!res.ok) {
     // Lidarr devuelve el motivo (errores de validación) en el cuerpo; sin esto
@@ -101,7 +101,17 @@ export function lidarrOwnedIds() {
 //   3. localizar el álbum bajo ese artista (Lidarr puede tardar en refrescar su
 //      discografía tras crear el artista),
 //   4. monitorizar solo ese álbum y lanzar la búsqueda.
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Monitoriza un álbum que YA está en la biblioteca de Lidarr (lee su BD local,
+// sin tocar MusicBrainz: instantáneo) y lanza la búsqueda. Devuelve null si el
+// álbum aún no aparece en la discografía importada del artista.
+async function monitorFromLibrary(artistId, rgMbid) {
+  const albums = await lidarrFetch(`/album?artistId=${artistId}`).catch(() => []);
+  const album = (albums || []).find((a) => a.foreignAlbumId === rgMbid);
+  if (!album) return null;
+  await lidarrFetch('/album/monitor', { method: 'PUT', body: { albumIds: [album.id], monitored: true } });
+  await lidarrFetch('/command', { method: 'POST', body: { name: 'AlbumSearch', albumIds: [album.id] } });
+  return { ok: true, title: album.title };
+}
 
 export async function lidarrAdd(rgMbid, artistMbid) {
   const quality = Number(getSetting('lidarr_quality_profile')) || 1;
@@ -109,54 +119,42 @@ export async function lidarrAdd(rgMbid, artistMbid) {
   const folder = getSetting('lidarr_root_folder') || '';
   if (!folder) throw new Error('Falta la carpeta raíz de Lidarr. Ve a Ajustes → Lidarr → «Cargar perfiles» y elige carpeta y perfiles.');
 
-  // 1. resolver el álbum en MusicBrainz a través de Lidarr (trae también el artista)
-  const albumLookup = await lidarrFetch(`/album/lookup?term=lidarr:${encodeURIComponent(rgMbid)}`);
-  const target = (albumLookup || []).find((a) => a.foreignAlbumId === rgMbid) || (albumLookup || [])[0];
-  if (!target) throw new Error('Lidarr no encuentra ese álbum en MusicBrainz.');
-  const artistForeignId = artistMbid || target.artist?.foreignArtistId;
-  if (!artistForeignId) throw new Error('No se pudo determinar el artista del álbum.');
-
-  // 2. ¿está ya el artista en la biblioteca de Lidarr?
+  // ¿está ya el artista en la biblioteca de Lidarr? (rápido, lee su BD)
   const allArtists = await lidarrFetch('/artist');
-  let artist = (allArtists || []).find((a) => a.foreignArtistId === artistForeignId);
+  const artist = artistMbid ? (allArtists || []).find((a) => a.foreignArtistId === artistMbid) : null;
 
-  // 3. si no, añadirlo SIN monitorizar toda su discografía (solo para poder colgar el álbum)
-  if (!artist) {
-    let lookupArtist = target.artist;
-    if (!lookupArtist) {
-      const r = await lidarrFetch(`/artist/lookup?term=mbid:${encodeURIComponent(artistForeignId)}`).catch(() => []);
-      lookupArtist = (r || [])[0];
-    }
-    if (!lookupArtist) throw new Error('Lidarr no encuentra al artista en MusicBrainz.');
-    artist = await lidarrFetch('/artist', {
-      method: 'POST',
-      body: {
-        ...lookupArtist,
-        qualityProfileId: quality,
-        metadataProfileId: metadata,
-        rootFolderPath: folder,
-        monitored: true,
-        addOptions: { monitor: 'none', searchForMissingAlbums: false },
-      },
-    });
+  // CAMINO RÁPIDO: artista ya presente → monitorizar el álbum de su discografía
+  if (artist) {
+    const done = await monitorFromLibrary(artist.id, rgMbid);
+    if (done) return done;
+    // el artista está pero ese álbum aún no está importado: pedir refresco y que reintente
+    await lidarrFetch('/command', { method: 'POST', body: { name: 'RefreshArtist', artistId: artist.id } }).catch(() => {});
+    return { ok: true, pending: true, note: 'El artista está en Lidarr pero ese álbum aún no aparece; se ha pedido un refresco. Reinténtalo en unos segundos.' };
   }
 
-  // 4. localizar el álbum bajo el artista (esperando al refresco si acaba de crearse)
-  let album = null;
-  for (let i = 0; i < 8; i++) {
-    const albums = await lidarrFetch(`/album?artistId=${artist.id}`).catch(() => []);
-    album = (albums || []).find((a) => a.foreignAlbumId === rgMbid);
-    if (album) break;
-    await sleep(1500);
+  // El artista NO está: buscarlo (esto sí consulta MusicBrainz) y añadirlo SIN
+  // monitorizar toda su obra. Se devuelve "pendiente" al momento, sin esperar a
+  // que importe su discografía (eso es lo que antes reventaba el timeout).
+  let lookupArtist = null;
+  if (artistMbid) {
+    const r = await lidarrFetch(`/artist/lookup?term=mbid:${encodeURIComponent(artistMbid)}`).catch(() => []);
+    lookupArtist = (r || []).find((a) => a.foreignArtistId === artistMbid) || (r || [])[0];
+  } else {
+    const al = await lidarrFetch(`/album/lookup?term=lidarr:${encodeURIComponent(rgMbid)}`).catch(() => []);
+    lookupArtist = (al || [])[0]?.artist;
   }
-  if (!album) {
-    // el artista se acaba de añadir y Lidarr aún está trayendo su discografía;
-    // no es un error: el álbum aparecerá y podrá monitorizarse en unos segundos
-    return { ok: true, pending: true, title: target.title, note: 'Artista añadido a Lidarr; su discografía se está importando. Reintenta el álbum en un momento.' };
-  }
+  if (!lookupArtist) throw new Error('Lidarr no encuentra al artista en MusicBrainz.');
 
-  // 5. monitorizar solo ese álbum y lanzar la búsqueda
-  await lidarrFetch('/album/monitor', { method: 'PUT', body: { albumIds: [album.id], monitored: true } });
-  await lidarrFetch('/command', { method: 'POST', body: { name: 'AlbumSearch', albumIds: [album.id] } });
-  return { ok: true, title: album.title };
+  await lidarrFetch('/artist', {
+    method: 'POST',
+    body: {
+      ...lookupArtist,
+      qualityProfileId: quality,
+      metadataProfileId: metadata,
+      rootFolderPath: folder,
+      monitored: true,
+      addOptions: { monitor: 'none', searchForMissingAlbums: false },
+    },
+  });
+  return { ok: true, pending: true, note: 'Artista añadido a Lidarr; está importando su discografía. Vuelve a pulsar el álbum en unos segundos para monitorizarlo.' };
 }

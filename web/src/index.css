@@ -13,12 +13,32 @@
 
 :root {
   color-scheme: dark;
+  --text-body: #e6e6ee;
+}
+
+/* Modo claro: se voltean los tokens de color (Tailwind v4 compila las utilidades
+   a var(--color-*), así que redefinirlos aquí cambia toda la app sin tocar cada
+   componente). Los ink pasan de oscuros a claros y los neutral de texto de claros
+   a oscuros. El dorado se mantiene como acento. */
+:root.light {
+  color-scheme: light;
+  --text-body: #23221f;
+  --color-ink-950: #f7f6f1; /* fondo de página */
+  --color-ink-900: #ffffff; /* tarjetas y barra lateral */
+  --color-ink-850: #f0eee7;
+  --color-ink-800: #e3e1d8; /* bordes */
+  --color-ink-700: #d0cdc2;
+  --color-neutral-300: #2c2c2a; /* texto primario */
+  --color-neutral-400: #454440;
+  --color-neutral-500: #62615c;
+  --color-neutral-600: #74736d;
+  --color-neutral-700: #8d8c85;
 }
 
 body {
   margin: 0;
   background: var(--color-ink-950);
-  color: #e6e6ee;
+  color: var(--text-body);
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 

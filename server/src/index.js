@@ -378,16 +378,18 @@ app.post('/api/lidarr/add-bulk', async (req, reply) => {
   const items = req.body?.items || [];
   if (!items.length) return reply.code(400).send({ error: 'Nada que añadir' });
   let added = 0;
+  let pending = 0;
   const errors = [];
   for (const it of items) {
     try {
-      await lidarrAdd(it.rg_mbid, it.artist_mbid);
-      added++;
+      const r = await lidarrAdd(it.rg_mbid, it.artist_mbid);
+      if (r.pending) pending++;
+      else added++;
     } catch (err) {
       errors.push({ rg_mbid: it.rg_mbid, error: String(err.message || err) });
     }
   }
-  return { added, total: items.length, errors };
+  return { added, pending, total: items.length, errors };
 });
 
 // --- imágenes locales (carátulas) -------------------------------------------
