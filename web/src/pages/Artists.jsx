@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Users } from 'lucide-react';
 import { api } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, Cover } from '../components.jsx';
 
 export default function Artists() {
   const [rows, setRows] = useState(null);
@@ -13,7 +13,7 @@ export default function Artists() {
   useEffect(() => {
     const t = setTimeout(() => {
       api
-        .artists({ q, sort, limit: 300 })
+        .artists({ q, sort, limit: 5000 })
         .then(setRows)
         .catch((e) => setErr(e.message));
     }, 200);
@@ -49,16 +49,19 @@ export default function Artists() {
             <Link
               key={a.id}
               to={`/artista/${a.id}`}
-              className="card px-4 py-3 hover:border-gold-500/40 flex items-center justify-between"
+              className="card p-2.5 hover:border-gold-500/40 flex items-center gap-3"
             >
-              <div className="min-w-0">
+              <div className="w-11 h-11 rounded-md overflow-hidden shrink-0">
+                <Cover id={a.cover_album_id} size="sm" />
+              </div>
+              <div className="min-w-0 flex-1">
                 <div className="truncate">{a.name}</div>
-                <div className="text-xs text-neutral-600">
+                <div className="text-xs text-neutral-600 truncate">
                   {a.mbid ? 'en MusicBrainz' : 'artista local'}
                   {a.country ? ` · ${a.country}` : ''}
                 </div>
               </div>
-              <div className="text-sm text-neutral-500 shrink-0 ml-3 text-right">
+              <div className="text-sm text-neutral-500 shrink-0 text-right">
                 <div>{a.albums} álb</div>
                 <div className="text-xs text-neutral-600">{a.tracks} pistas</div>
               </div>

@@ -35,6 +35,7 @@ import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challen
 import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums } from './editions.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
+import { albumCover } from './covers.js';
 import * as q from './queries.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -393,14 +394,13 @@ app.post('/api/lidarr/add-bulk', async (req, reply) => {
   return { added, pending, total: items.length, errors };
 });
 
-// --- imágenes locales (carátulas) -------------------------------------------
+// --- imágenes locales (carátulas: fichero o incrustada en etiquetas) --------
 app.get('/api/cover/:id', async (req, reply) => {
-  const row = db.prepare('SELECT cover FROM albums WHERE id = ?').get(Number(req.params.id));
-  if (!row?.cover || !fs.existsSync(row.cover)) return reply.code(404).send();
-  const ext = path.extname(row.cover).slice(1).toLowerCase();
-  reply.header('Content-Type', `image/${ext === 'jpg' ? 'jpeg' : ext}`);
+  const cover = await albumCover(Number(req.params.id));
+  if (!cover) return reply.code(404).send();
+  reply.header('Content-Type', cover.contentType);
   reply.header('Cache-Control', 'public, max-age=86400');
-  return reply.send(fs.createReadStream(row.cover));
+  return reply.send(fs.createReadStream(cover.path));
 });
 
 // --- copia de seguridad -----------------------------------------------------

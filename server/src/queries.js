@@ -14,7 +14,11 @@ export function overview() {
     COALESCE(SUM(size_bytes),0) AS size,
     COALESCE(SUM(duration_ms),0) AS duration
     FROM albums WHERE ${DESCRIPTIVE}`).get();
-  const artists = db.prepare('SELECT COUNT(*) AS n FROM artists').get().n;
+  // artistas con AL MENOS un álbum no descartado (mismo criterio que la página
+  // de Artistas, para que los recuentos no se contradigan)
+  const artists = db
+    .prepare(`SELECT COUNT(DISTINCT a.artist_id) AS n FROM albums a WHERE ${DESCRIPTIVE}`)
+    .get().n;
   const states = Object.fromEntries(
     db.prepare('SELECT match_state, COUNT(*) AS n FROM albums GROUP BY match_state').all().map((r) => [r.match_state, r.n])
   );
@@ -159,7 +163,7 @@ export function filterOptions() {
   };
 }
 
-export function artists({ q, sort, limit = 200 } = {}) {
+export function artists({ q, sort, limit = 5000 } = {}) {
   const where = ['1=1'];
   const args = {};
   if (q) {
@@ -170,7 +174,9 @@ export function artists({ q, sort, limit = 200 } = {}) {
   return db
     .prepare(
       `SELECT ar.id, ar.name, ar.mbid, ar.country, ar.type,
-        COUNT(a.id) AS albums, COALESCE(SUM(a.track_file_count),0) AS tracks
+        COUNT(a.id) AS albums, COALESCE(SUM(a.track_file_count),0) AS tracks,
+        (SELECT a2.id FROM albums a2 WHERE a2.artist_id=ar.id AND a2.${DESCRIPTIVE}
+          ORDER BY (a2.cover IS NULL), a2.added_at DESC LIMIT 1) AS cover_album_id
        FROM artists ar LEFT JOIN albums a ON a.artist_id=ar.id AND a.${DESCRIPTIVE}
        WHERE ${where.join(' AND ')} GROUP BY ar.id HAVING albums > 0 ORDER BY ${order} LIMIT @limit`
     )
