@@ -1,0 +1,21 @@
+{
+  "name": "liderarr",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Panel de completismo para tu colección de música digital, junto a Lidarr.",
+  "license": "MIT",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w web",
+    "start": "node server/src/index.js",
+    "test": "node --test server/test/"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

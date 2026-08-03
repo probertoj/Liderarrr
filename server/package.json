@@ -1,0 +1,19 @@
+{
+  "name": "@liderarr/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@fastify/multipart": "^8.3.0",
+    "@fastify/static": "^7.0.4",
+    "better-sqlite3": "^11.5.0",
+    "fastify": "^4.28.1",
+    "music-metadata": "^10.6.0"
+  }
+}

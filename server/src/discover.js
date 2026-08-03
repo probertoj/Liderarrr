@@ -1,0 +1,76 @@
+import { db } from './db.js';
+
+// Huecos y próximos lanzamientos, ambos leídos de release_groups (que llena
+// discography.js). Excluye lo que ya está en el snapshot de Lidarr ("ya
+// encargado") y lo que el usuario descartó.
+
+// Álbumes de estudio estrenados que MB conoce de tus artistas y que NO tienes.
+// onlyTracked = solo de los que sigues; si no, de todos los artistas con MBID.
+export function gaps({ onlyTracked = true } = {}) {
+  const trackedJoin = onlyTracked
+    ? 'JOIN tracked_artists t ON t.artist_id = rg.artist_id'
+    : '';
+  const rows = db
+    .prepare(
+      `SELECT rg.rg_mbid, rg.title, rg.first_release, rg.artist_id, rg.artist_mbid,
+        ar.name AS artist,
+        (SELECT 1 FROM lidarr_albums la WHERE la.rg_mbid = rg.rg_mbid) AS in_lidarr
+       FROM release_groups rg
+       JOIN artists ar ON ar.id = rg.artist_id
+       ${trackedJoin}
+       WHERE rg.is_owned = 0 AND rg.is_upcoming = 0
+         AND rg.primary_type = 'Album'
+         AND (rg.secondary_types IS NULL OR rg.secondary_types = '[]')
+         AND rg.rg_mbid NOT IN (SELECT rg_mbid FROM dismissed_albums)
+       ORDER BY ar.name COLLATE NOCASE, rg.first_release`
+    )
+    .all();
+  // agrupar por artista para la UI
+  const byArtist = new Map();
+  for (const r of rows) {
+    if (!byArtist.has(r.artist_id)) byArtist.set(r.artist_id, { artist_id: r.artist_id, artist: r.artist, artist_mbid: r.artist_mbid, missing: [] });
+    byArtist.get(r.artist_id).missing.push({
+      rg_mbid: r.rg_mbid,
+      title: r.title,
+      year: r.first_release ? Number(String(r.first_release).slice(0, 4)) : null,
+      in_lidarr: !!r.in_lidarr,
+    });
+  }
+  return { total: rows.length, artists: [...byArtist.values()] };
+}
+
+// Calendario de próximos: release groups por estrenar de tus artistas seguidos,
+// ordenados por fecha. MusicBrainz sí tiene fechas futuras.
+export function upcoming({ onlyTracked = true } = {}) {
+  const trackedJoin = onlyTracked ? 'JOIN tracked_artists t ON t.artist_id = rg.artist_id' : '';
+  return db
+    .prepare(
+      `SELECT rg.rg_mbid, rg.title, rg.first_release, rg.primary_type, rg.artist_id, rg.artist_mbid,
+        ar.name AS artist,
+        (SELECT 1 FROM lidarr_albums la WHERE la.rg_mbid = rg.rg_mbid) AS in_lidarr
+       FROM release_groups rg
+       JOIN artists ar ON ar.id = rg.artist_id
+       ${trackedJoin}
+       WHERE rg.is_upcoming = 1
+         AND rg.rg_mbid NOT IN (SELECT rg_mbid FROM dismissed_albums)
+       ORDER BY rg.first_release`
+    )
+    .all()
+    .map((r) => ({ ...r, in_lidarr: !!r.in_lidarr }));
+}
+
+export function dismissGap(rgMbid, title) {
+  db.prepare('INSERT OR REPLACE INTO dismissed_albums (rg_mbid, title, at) VALUES (?, ?, ?)').run(
+    rgMbid,
+    title || null,
+    Date.now()
+  );
+  return { ok: true };
+}
+export function undismissGap(rgMbid) {
+  db.prepare('DELETE FROM dismissed_albums WHERE rg_mbid = ?').run(rgMbid);
+  return { ok: true };
+}
+export function dismissedList() {
+  return db.prepare('SELECT rg_mbid, title, at FROM dismissed_albums ORDER BY at DESC').all();
+}
