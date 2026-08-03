@@ -274,6 +274,8 @@ function ensureColumn(table, column, decl) {
 }
 // Reservado para cuando el esquema evolucione entre versiones.
 ensureColumn('albums', 'disc_count', 'disc_count INTEGER DEFAULT 1');
+// fecha de alta en Lidarr, para «últimas peticiones» del dashboard
+ensureColumn('lidarr_albums', 'added', 'added TEXT');
 
 // Evita reimportar el mismo scrobble: sin esto, cada importación reinsertaba
 // desde cero. Los scrobbles "sonando ahora" (sin ts) se descartan al importar.

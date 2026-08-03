@@ -52,7 +52,44 @@ export function charts() {
     SELECT ar.id, ar.name, COUNT(a.id) AS albums, COALESCE(SUM(a.track_file_count),0) AS tracks
     FROM artists ar JOIN albums a ON a.artist_id = ar.id AND a.${DESCRIPTIVE}
     GROUP BY ar.id ORDER BY albums DESC, tracks DESC LIMIT 20`).all();
-  return { byDecade, byGenre, byFormat, topArtists };
+  // crecimiento de la colección: álbumes añadidos por mes (added_at es ms)
+  const addedByMonth = db.prepare(`
+    SELECT strftime('%Y-%m', added_at/1000, 'unixepoch') AS month, COUNT(*) AS n
+    FROM albums WHERE ${DESCRIPTIVE} AND added_at IS NOT NULL
+    GROUP BY month ORDER BY month`).all();
+  return { byDecade, byGenre, byFormat, topArtists, addedByMonth };
+}
+
+// Actividad reciente para el dashboard: últimas añadidas (con carátula), últimas
+// escuchas (Last.fm, con carátula si están en tu biblioteca) y últimas en Lidarr.
+export function recent() {
+  const recentlyAdded = db
+    .prepare(
+      `SELECT id, title, album_artist, year, added_at, cover FROM albums
+       WHERE ${DESCRIPTIVE} ORDER BY added_at DESC LIMIT 14`
+    )
+    .all();
+
+  const recentlyListened = db
+    .prepare(
+      `SELECT l.artist, l.album, MAX(l.ts) AS ts,
+        (SELECT a.id FROM albums a JOIN artists ar ON ar.id=a.artist_id
+          WHERE ar.name = l.artist COLLATE NOCASE AND a.title = l.album COLLATE NOCASE
+          AND a.${DESCRIPTIVE} LIMIT 1) AS album_id
+       FROM listens l WHERE l.source='lastfm' AND l.album <> ''
+       GROUP BY l.artist COLLATE NOCASE, l.album COLLATE NOCASE
+       ORDER BY ts DESC LIMIT 14`
+    )
+    .all();
+
+  const lidarrRecent = db
+    .prepare(
+      `SELECT rg_mbid, title, artist, has_file, monitored, added FROM lidarr_albums
+       ORDER BY COALESCE(added, '') DESC LIMIT 12`
+    )
+    .all();
+
+  return { recentlyAdded, recentlyListened, lidarrRecent };
 }
 
 // Discoteca: parrilla filtrable. Filtros básicos de la fase 1.

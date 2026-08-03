@@ -37,6 +37,7 @@ export const api = {
 
   overview: () => req('/stats/overview'),
   charts: () => req('/stats/charts'),
+  recent: () => req('/stats/recent'),
 
   library: (params) => req(`/library?${new URLSearchParams(params)}`),
   libraryFilters: () => req('/library/filters'),

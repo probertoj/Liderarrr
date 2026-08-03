@@ -163,6 +163,7 @@ app.get('/api/refresh/status', async () => refreshStatus);
 // --- estadísticas y secciones -----------------------------------------------
 app.get('/api/stats/overview', async () => q.overview());
 app.get('/api/stats/charts', async () => q.charts());
+app.get('/api/stats/recent', async () => q.recent());
 
 app.get('/api/library', async (req) => q.library(req.query || {}));
 app.get('/api/library/filters', async () => q.filterOptions());

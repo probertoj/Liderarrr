@@ -62,10 +62,10 @@ export async function lidarrProfiles() {
 
 // Refresca el snapshot local de lo que Lidarr tiene monitorizado.
 const upsertLidarr = db.prepare(`
-INSERT INTO lidarr_albums (rg_mbid, title, artist, monitored, has_file, synced_at)
-VALUES (@rg_mbid, @title, @artist, @monitored, @has_file, @synced_at)
+INSERT INTO lidarr_albums (rg_mbid, title, artist, monitored, has_file, added, synced_at)
+VALUES (@rg_mbid, @title, @artist, @monitored, @has_file, @added, @synced_at)
 ON CONFLICT(rg_mbid) DO UPDATE SET title=excluded.title, artist=excluded.artist,
-  monitored=excluded.monitored, has_file=excluded.has_file, synced_at=excluded.synced_at
+  monitored=excluded.monitored, has_file=excluded.has_file, added=excluded.added, synced_at=excluded.synced_at
 `);
 
 export async function lidarrSync() {
@@ -81,6 +81,7 @@ export async function lidarrSync() {
         artist: a.artist?.artistName || null,
         monitored: a.monitored ? 1 : 0,
         has_file: a.statistics?.trackFileCount > 0 ? 1 : 0,
+        added: a.added || null,
         synced_at: now,
       });
     }

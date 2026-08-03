@@ -90,6 +90,48 @@ export function Stat({ label, value, sub }) {
   );
 }
 
+// Cabecera editorial estilo PowaFlex: antetítulo pequeño en dorado + título grande.
+export function PageHeader({ eyebrow, title, action, sub }) {
+  return (
+    <header className="mb-7">
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          {eyebrow && (
+            <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-gold-400/80 mb-1">{eyebrow}</p>
+          )}
+          <h1 className="font-display text-3xl md:text-4xl text-neutral-100 leading-tight">{title}</h1>
+        </div>
+        {action}
+      </div>
+      {sub && <p className="text-sm text-neutral-500 mt-2">{sub}</p>}
+    </header>
+  );
+}
+
+// Sección con título y acción opcional a la derecha.
+export function Section({ title, action, children, className = '' }) {
+  return (
+    <section className={`mb-8 ${className}`}>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-base font-medium text-neutral-300">{title}</h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// Tarjeta de estadística: número grande en la tipografía de display.
+export function StatCard({ label, value, sub }) {
+  return (
+    <div className="card p-4">
+      <div className="font-display text-3xl text-neutral-100 leading-none">{value}</div>
+      <div className="text-sm text-neutral-400 mt-2">{label}</div>
+      {sub && <div className="text-xs text-neutral-600 mt-1">{sub}</div>}
+    </div>
+  );
+}
+
 export function PageTitle({ icon: Icon, title, sub, children }) {
   return (
     <div className="flex items-start justify-between gap-4 mb-5">

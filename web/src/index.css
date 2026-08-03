@@ -14,6 +14,17 @@
 :root {
   color-scheme: dark;
   --text-body: #e6e6ee;
+  /* colores de las gráficas (Recharts pinta con strings, no con clases, así que
+     los lee de aquí vía useChartTheme y así siguen el tema claro/oscuro) */
+  --chart-axis: #6f6e69;
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-cursor: rgba(255, 255, 255, 0.06);
+  --chart-tip-bg: #191921;
+  --chart-tip-fg: #e6e6ee;
+  --chart-tip-border: #2c2c39;
+  --chart-accent: #d4a24a;
+  --chart-2: #c98a3a;
+  --chart-positive: #34d399;
 }
 
 /* Modo claro: se voltean los tokens de color (Tailwind v4 compila las utilidades
@@ -28,11 +39,21 @@
   --color-ink-850: #f0eee7;
   --color-ink-800: #e3e1d8; /* bordes */
   --color-ink-700: #d0cdc2;
+  --color-neutral-100: #1a1a18; /* títulos y cifras grandes */
+  --color-neutral-200: #26251f;
   --color-neutral-300: #2c2c2a; /* texto primario */
   --color-neutral-400: #454440;
   --color-neutral-500: #62615c;
   --color-neutral-600: #74736d;
   --color-neutral-700: #8d8c85;
+  --chart-axis: #8a8983;
+  --chart-grid: rgba(0, 0, 0, 0.08);
+  --chart-cursor: rgba(0, 0, 0, 0.05);
+  --chart-tip-bg: #ffffff;
+  --chart-tip-fg: #23221f;
+  --chart-tip-border: #e3e1d8;
+  --chart-accent: #b9852f;
+  --chart-2: #ca9b52;
 }
 
 body {
