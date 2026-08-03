@@ -22,19 +22,35 @@ function schedule(fn) {
   return chain;
 }
 
+// El token se recorta: un espacio o salto de línea al pegarlo era la causa más
+// típica de un 401.
+function discogsToken() {
+  return (getSetting('discogs_token') || '').trim();
+}
+
 export function discogsConfigured() {
-  return !!getSetting('discogs_token');
+  return !!discogsToken();
 }
 
 async function dcFetch(pathAndQuery) {
-  const token = getSetting('discogs_token');
+  const token = discogsToken();
   if (!token) throw new Error('Discogs no configurado');
-  const url = `${BASE}${pathAndQuery}${pathAndQuery.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
-  const res = await fetch(url, {
-    headers: { 'User-Agent': UA, Accept: 'application/json' },
+  // El token va en la cabecera Authorization (lo que recomienda Discogs), no en
+  // la URL: más robusto y no se queda escrito en logs ni en la caché de la ruta.
+  const res = await fetch(`${BASE}${pathAndQuery}`, {
+    headers: { 'User-Agent': UA, Accept: 'application/json', Authorization: `Discogs token=${token}` },
     signal: AbortSignal.timeout(20000),
   });
-  if (!res.ok) throw new Error(`Discogs ${res.status}`);
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const j = await res.json();
+      if (j?.message) detail = ` — ${j.message}`;
+    } catch {
+      /* sin cuerpo */
+    }
+    throw new Error(`Discogs ${res.status}${detail}`);
+  }
   return res.json();
 }
 
