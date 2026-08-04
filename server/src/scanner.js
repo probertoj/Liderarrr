@@ -43,21 +43,30 @@ const isLossless = (fmt) => /flac|alac|wav|ape|wavpack|aiff|pcm/i.test(fmt || ''
 // reventaba con "Too many parameter values were provided" y tumbaba el escaneo.
 const first = (v) => (Array.isArray(v) ? v[0] : v) || null;
 
-function walk(dir, out = []) {
+// Recorrido ASÍNCRONO: usa fs.promises.readdir, que cede el bucle de eventos en
+// cada carpeta. Antes era síncrono (readdirSync recursivo) y con decenas de miles
+// de carpetas por red bloqueaba el servidor entero ~1 min (ni sondeo ni
+// healthcheck respondían: parecía que el botón no hacía nada). `onProgress` va
+// informando de cuántas carpetas con audio se llevan.
+async function walk(dir, out, onProgress) {
   let entries;
   try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
+    entries = await fs.promises.readdir(dir, { withFileTypes: true });
   } catch {
-    return out;
+    return;
   }
   const files = [];
+  const subdirs = [];
   for (const e of entries) {
     const full = path.join(dir, e.name);
-    if (e.isDirectory()) walk(full, out);
+    if (e.isDirectory()) subdirs.push(full);
     else if (e.isFile() && isAudio(e.name)) files.push(full);
   }
-  if (files.length) out.push({ dir, files });
-  return out;
+  if (files.length) {
+    out.push({ dir, files });
+    if (onProgress) onProgress(out.length);
+  }
+  for (const sd of subdirs) await walk(sd, out, onProgress);
 }
 
 function findCover(dir, files) {
@@ -273,7 +282,10 @@ export async function runScan(opts = {}) {
         scanStatus.error = `No existe la carpeta: ${root}`;
         continue;
       }
-      walk(root, folders);
+      // el recorrido es asíncrono y va informando: la UI muestra "N encontradas"
+      await walk(root, folders, (n) => {
+        scanStatus.foldersFound = n;
+      });
     }
     scanStatus.foldersFound = folders.length;
     scanStatus.phase = 'reading';

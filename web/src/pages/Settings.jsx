@@ -25,9 +25,14 @@ function ScanPanel() {
   }, [st?.running]);
 
   const start = async (force) => {
-    await api.scan(force);
-    setSt((s) => ({ ...(s || {}), running: true, phase: 'walking' }));
-    setTimeout(poll, 800);
+    // respuesta inmediata: marcamos "en marcha" antes de nada, para que se vea
+    setSt((s) => ({ ...(s || {}), running: true, phase: 'walking', foldersFound: 0, albumsDone: 0, skipped: 0 }));
+    try {
+      await api.scan(force);
+    } catch (e) {
+      alert(e.message);
+    }
+    setTimeout(poll, 600);
   };
 
   if (!st) return null;
@@ -62,9 +67,11 @@ function ScanPanel() {
         <div>
           <div className="flex justify-between text-xs text-neutral-500 mb-1">
             <span>
-              {st.phase === 'walking' ? 'Recorriendo carpetas…' : `${done.toLocaleString('es')} / ${st.foldersFound.toLocaleString('es')} carpetas · ${st.albumsDone} nuevas · ${st.skipped} sin cambios`}
+              {st.phase === 'walking'
+                ? `Recorriendo carpetas… (${(st.foldersFound || 0).toLocaleString('es')} encontradas)`
+                : `${done.toLocaleString('es')} / ${st.foldersFound.toLocaleString('es')} carpetas · ${st.albumsDone} nuevas · ${st.skipped} sin cambios${st.errors ? ` · ${st.errors} omitidas` : ''}`}
             </span>
-            <span>{pct}%</span>
+            <span>{st.phase === 'walking' ? '' : `${pct}%`}</span>
           </div>
           <div className="h-2 rounded-full bg-ink-800 overflow-hidden">
             <div className="h-full bg-gold-400 transition-all" style={{ width: `${pct}%` }} />
