@@ -43,12 +43,12 @@ const isLossless = (fmt) => /flac|alac|wav|ape|wavpack|aiff|pcm/i.test(fmt || ''
 // reventaba con "Too many parameter values were provided" y tumbaba el escaneo.
 const first = (v) => (Array.isArray(v) ? v[0] : v) || null;
 
-// Recorrido ASÍNCRONO: usa fs.promises.readdir, que cede el bucle de eventos en
-// cada carpeta. Antes era síncrono (readdirSync recursivo) y con decenas de miles
-// de carpetas por red bloqueaba el servidor entero ~1 min (ni sondeo ni
-// healthcheck respondían: parecía que el botón no hacía nada). `onProgress` va
-// informando de cuántas carpetas con audio se llevan.
-async function walk(dir, out, onProgress) {
+// Recorrido en STREAMING: asíncrono (fs.promises.readdir cede el bucle de eventos
+// en cada carpeta) y procesa cada carpeta con audio en el momento vía onFolder, sin
+// acumular las decenas de miles de carpetas en memoria. Acumularlas hacía que el
+// proceso se quedara sin memoria y muriera de golpe al pulsar "Escanear" (crash
+// nativo de better-sqlite3 en el cierre). Con streaming la memoria se mantiene plana.
+async function scanTree(dir, onFolder) {
   let entries;
   try {
     entries = await fs.promises.readdir(dir, { withFileTypes: true });
@@ -62,11 +62,8 @@ async function walk(dir, out, onProgress) {
     if (e.isDirectory()) subdirs.push(full);
     else if (e.isFile() && isAudio(e.name)) files.push(full);
   }
-  if (files.length) {
-    out.push({ dir, files });
-    if (onProgress) onProgress(out.length);
-  }
-  for (const sd of subdirs) await walk(sd, out, onProgress);
+  if (files.length) await onFolder({ dir, files });
+  for (const sd of subdirs) await scanTree(sd, onFolder);
 }
 
 function findCover(dir, files) {
@@ -262,7 +259,7 @@ export async function runScan(opts = {}) {
     .filter(Boolean);
   Object.assign(scanStatus, {
     running: true,
-    phase: 'walking',
+    phase: 'reading',
     foldersFound: 0,
     albumsDone: 0,
     tracksDone: 0,
@@ -274,56 +271,48 @@ export async function runScan(opts = {}) {
     error: null,
   });
   const started = Date.now();
+
+  // procesa UNA carpeta: salto incremental o ingesta, con aislamiento de errores
+  const handleFolder = async (folder) => {
+    scanStatus.foldersFound++;
+    scanStatus.current = folder.dir;
+    if (!force) {
+      const existing = scannedAtOf.get(sha1(folder.dir));
+      if (existing?.scanned_at) {
+        let mtime = 0;
+        try {
+          mtime = (await fs.promises.stat(folder.dir)).mtimeMs;
+        } catch {
+          /* si no se puede leer el mtime, mejor reescanear */
+        }
+        if (mtime && mtime <= existing.scanned_at) {
+          scanStatus.skipped++;
+          return;
+        }
+      }
+    }
+    try {
+      await ingestFolder(folder);
+    } catch (err) {
+      scanStatus.errors++;
+      console.warn(`[scan] ⚠️ carpeta omitida: ${folder.dir} — ${String(err.message || err)}`);
+    }
+    if (scanStatus.foldersFound % 500 === 0)
+      console.log(`[scan] ${scanStatus.foldersFound} carpetas · ${scanStatus.albumsDone} nuevas · ${scanStatus.skipped} sin cambios · ${scanStatus.errors} errores`);
+  };
+
   try {
     if (!roots.length) throw new Error('No hay carpetas de música configuradas (Ajustes → carpetas)');
-    const folders = [];
+    console.log(`[scan] iniciando${force ? ' (reescaneo completo)' : ''}…`);
     for (const root of roots) {
       if (!fs.existsSync(root)) {
         scanStatus.error = `No existe la carpeta: ${root}`;
         continue;
       }
-      // el recorrido es asíncrono y va informando: la UI muestra "N encontradas"
-      await walk(root, folders, (n) => {
-        scanStatus.foldersFound = n;
-      });
-    }
-    scanStatus.foldersFound = folders.length;
-    scanStatus.phase = 'reading';
-    console.log(`[scan] ${folders.length} carpetas con audio encontradas${force ? ' (reescaneo completo)' : ''}`);
-
-    let processed = 0;
-    for (const folder of folders) {
-      scanStatus.current = folder.dir;
-      // salto incremental: si ya lo escaneamos y la carpeta no ha cambiado, fuera
-      if (!force) {
-        const existing = scannedAtOf.get(sha1(folder.dir));
-        if (existing?.scanned_at) {
-          let mtime = 0;
-          try {
-            mtime = fs.statSync(folder.dir).mtimeMs;
-          } catch {
-            /* si no se puede leer el mtime, mejor reescanear */
-          }
-          if (mtime && mtime <= existing.scanned_at) {
-            scanStatus.skipped++;
-            processed++;
-            continue;
-          }
-        }
-      }
-      // aislamiento: una carpeta con datos raros NO debe tumbar todo el escaneo
-      try {
-        await ingestFolder(folder);
-      } catch (err) {
-        scanStatus.errors = (scanStatus.errors || 0) + 1;
-        console.warn(`[scan] ⚠️ carpeta omitida: ${folder.dir} — ${String(err.message || err)}`);
-      }
-      processed++;
-      if (processed % 500 === 0)
-        console.log(`[scan] ${processed}/${folders.length} · ${scanStatus.albumsDone} nuevas · ${scanStatus.skipped} sin cambios · ${scanStatus.errors || 0} errores`);
+      await scanTree(root, handleFolder);
     }
     scanStatus.phase = 'done';
-    console.log(`[scan] fin: ${scanStatus.albumsDone} nuevas, ${scanStatus.skipped} sin cambios, ${scanStatus.errors} errores, ${folders.length} carpetas`);
+    console.log(`[scan] fin: ${scanStatus.foldersFound} carpetas · ${scanStatus.albumsDone} nuevas · ${scanStatus.skipped} sin cambios · ${scanStatus.errors} errores`);
   } catch (err) {
     scanStatus.phase = 'error';
     scanStatus.error = String(err.message || err);

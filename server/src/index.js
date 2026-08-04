@@ -446,6 +446,25 @@ function scheduleNightly() {
   setInterval(check, 60 * 1000);
 }
 
+// Errores fatales: los logueamos para que se VEAN. Antes, un error no capturado
+// tumbaba el proceso y en los logs solo aparecía el crash del destructor de
+// better-sqlite3, ocultando la causa real. No salimos: preferimos seguir vivos.
+process.on('uncaughtException', (e) => console.error('[fatal] uncaughtException:', e));
+process.on('unhandledRejection', (e) => console.error('[fatal] unhandledRejection:', e));
+
+// Cierre limpio al parar el contenedor: cierra la BD para que better-sqlite3 no
+// pete con una aserción en su destructor durante el apagado.
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, () => {
+    try {
+      db.close();
+    } catch {
+      /* noop */
+    }
+    process.exit(0);
+  });
+}
+
 const PORT = Number(process.env.PORT) || 3861;
 app
   .listen({ port: PORT, host: '0.0.0.0' })

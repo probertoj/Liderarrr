@@ -36,8 +36,7 @@ function ScanPanel() {
   };
 
   if (!st) return null;
-  const done = (st.albumsDone || 0) + (st.skipped || 0);
-  const pct = st.foldersFound ? Math.min(100, Math.round((done / st.foldersFound) * 100)) : 0;
+  const n = (x) => (x || 0).toLocaleString('es');
   const fmtTime = (ms) => (ms ? new Date(ms).toLocaleString('es') : '—');
 
   return (
@@ -65,16 +64,15 @@ function ScanPanel() {
 
       {st.running ? (
         <div>
-          <div className="flex justify-between text-xs text-neutral-500 mb-1">
+          <div className="flex items-center gap-2 text-xs text-neutral-400 mb-1.5">
+            <Loader2 size={13} className="animate-spin shrink-0" />
             <span>
-              {st.phase === 'walking'
-                ? `Recorriendo carpetas… (${(st.foldersFound || 0).toLocaleString('es')} encontradas)`
-                : `${done.toLocaleString('es')} / ${st.foldersFound.toLocaleString('es')} carpetas · ${st.albumsDone} nuevas · ${st.skipped} sin cambios${st.errors ? ` · ${st.errors} omitidas` : ''}`}
+              {n(st.foldersFound)} carpetas · {n(st.albumsDone)} nuevas · {n(st.skipped)} sin cambios
+              {st.errors ? ` · ${n(st.errors)} omitidas` : ''}
             </span>
-            <span>{st.phase === 'walking' ? '' : `${pct}%`}</span>
           </div>
-          <div className="h-2 rounded-full bg-ink-800 overflow-hidden">
-            <div className="h-full bg-gold-400 transition-all" style={{ width: `${pct}%` }} />
+          <div className="h-1.5 rounded-full bg-ink-800 overflow-hidden">
+            <div className="h-full w-1/3 bg-gold-400 animate-pulse" />
           </div>
           {st.current && <div className="text-[11px] text-neutral-600 mt-1 truncate">{st.current}</div>}
         </div>
