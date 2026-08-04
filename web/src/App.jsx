@@ -3,7 +3,7 @@ import { Routes, Route, NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle,
   Sparkles, Settings as SettingsIcon, Menu, X, RefreshCw, Star, Compass, CalendarClock,
-  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon,
+  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope,
 } from 'lucide-react';
 import { api } from './api.js';
 import { Spinner } from './components.jsx';
@@ -24,6 +24,7 @@ const Listening = lazy(() => import('./pages/Listening.jsx'));
 const Challenges = lazy(() => import('./pages/Challenges.jsx'));
 const Upgrades = lazy(() => import('./pages/Upgrades.jsx'));
 const Labels = lazy(() => import('./pages/Labels.jsx'));
+const Diagnostics = lazy(() => import('./pages/Diagnostics.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
 const NAV = [
@@ -63,7 +64,10 @@ const NAV = [
   },
   {
     label: 'Cuenta',
-    items: [{ to: '/ajustes', label: 'Ajustes', Icon: SettingsIcon }],
+    items: [
+      { to: '/ajustes', label: 'Ajustes', Icon: SettingsIcon },
+      { to: '/diagnostico', label: 'Diagnóstico', Icon: Stethoscope },
+    ],
   },
 ];
 
@@ -186,6 +190,7 @@ export default function App() {
             <Route path="/retos" element={<Challenges />} />
             <Route path="/upgrades" element={<Upgrades />} />
             <Route path="/sellos" element={<Labels />} />
+            <Route path="/diagnostico" element={<Diagnostics />} />
             <Route path="/sin-identificar" element={<Unidentified />} />
             <Route path="/rarezas" element={<Rarities />} />
             <Route path="/ajustes" element={<Settings />} />

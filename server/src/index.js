@@ -36,6 +36,7 @@ import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums } from './editions.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
 import { albumCover } from './covers.js';
+import { diagnostics, pushEvent } from './diag.js';
 import * as q from './queries.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -80,8 +81,19 @@ if (process.env.LIDERARRR_AUTH) {
   );
 }
 
+// registra en el diagnóstico las peticiones lentas (>1.5s), para cazar cuellos de
+// botella sin bucear en los logs. Se ignora el sondeo de estado del escaneo.
+app.addHook('onResponse', async (req, reply) => {
+  const rt = reply.elapsedTime || 0;
+  const url = req.raw.url || '';
+  if (rt > 1500 && url.startsWith('/api/') && !url.includes('/status')) {
+    pushEvent('slow', `${req.method} ${url} — ${Math.round(rt)}ms`);
+  }
+});
+
 // --- meta -------------------------------------------------------------------
 app.get('/api/version', async () => ({ name: 'Liderarrr', version: pkg.version }));
+app.get('/api/diag', async () => diagnostics());
 
 app.get('/api/setup-state', async () => {
   const s = getAllSettings();

@@ -22,6 +22,7 @@ async function req(path, { method = 'GET', body } = {}) {
 
 export const api = {
   version: () => req('/version'),
+  diag: () => req('/diag'),
   setupState: () => req('/setup-state'),
   settings: () => req('/settings'),
   saveSettings: (body) => req('/settings', { method: 'PUT', body }),
