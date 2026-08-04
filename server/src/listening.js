@@ -1,70 +1,30 @@
 import { db } from './db.js';
 
-// Análisis de escuchas y la brecha escucha↔propiedad. Se casa el texto libre de
-// Last.fm con tu biblioteca por nombre (COLLATE NOCASE): imperfecto pero
-// suficiente, y lo que no case cuenta como "no lo tienes", que es justo la señal
-// que buscamos en la brecha.
+// Análisis de escuchas y la brecha escucha↔propiedad.
+//
+// CLAVE DE RENDIMIENTO: better-sqlite3 es SÍNCRONO y corre en el hilo principal,
+// así que una consulta lenta congela TODO el servidor (peticiones y healthcheck).
+// Con ~128k escuchas y ~3k álbumes, cruzarlos con subconsultas correlacionadas en
+// SQL era O(álbumes × escuchas) → decenas de segundos. Por eso el cruce se hace
+// EN MEMORIA: una pasada por cada tabla para montar Sets/Maps, y luego se casan.
+
+// Normalización para casar Last.fm con la biblioteca pese a mayúsculas, acentos,
+// "The" inicial o espacios/puntuación (el COLLATE NOCASE de SQLite solo pliega ASCII).
+const strip = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+const normArtist = (s) => strip(String(s || '').toLowerCase().replace(/^the\s+/, ''));
+const normText = (s) => strip(s);
+const albumKey = (artist, title) => `${normArtist(artist)}|${normText(title)}`;
 
 export function hasScrobbles() {
   return db.prepare("SELECT COUNT(*) AS n FROM listens WHERE source='lastfm'").get().n > 0;
 }
 
-export function listeningOverview() {
-  const totals = db
-    .prepare(
-      `SELECT COUNT(*) AS scrobbles, COUNT(DISTINCT artist) AS artists,
-        COUNT(DISTINCT artist || '|' || album) AS albums,
-        MIN(ts) AS first, MAX(ts) AS last
-       FROM listens WHERE source='lastfm'`
-    )
-    .get();
-
-  const topArtists = db
-    .prepare(
-      `SELECT l.artist, COUNT(*) AS plays,
-        (SELECT ar.id FROM artists ar WHERE ar.name = l.artist COLLATE NOCASE LIMIT 1) AS artist_id,
-        (SELECT COUNT(*) FROM albums a JOIN artists ar ON ar.id=a.artist_id
-          WHERE ar.name = l.artist COLLATE NOCASE AND a.match_state!='dismissed') AS owned_albums
-       FROM listens l WHERE l.source='lastfm'
-       GROUP BY l.artist COLLATE NOCASE ORDER BY plays DESC LIMIT 25`
-    )
-    .all();
-
-  const topAlbums = db
-    .prepare(
-      `SELECT l.artist, l.album, COUNT(*) AS plays,
-        (SELECT a.id FROM albums a JOIN artists ar ON ar.id=a.artist_id
-          WHERE ar.name = l.artist COLLATE NOCASE AND a.title = l.album COLLATE NOCASE
-          AND a.match_state!='dismissed' LIMIT 1) AS owned_album_id
-       FROM listens l WHERE l.source='lastfm' AND l.album <> ''
-       GROUP BY l.artist COLLATE NOCASE, l.album COLLATE NOCASE ORDER BY plays DESC LIMIT 25`
-    )
-    .all()
-    .map((r) => ({ ...r, owned: !!r.owned_album_id }));
-
-  const byYear = db
-    .prepare(
-      `SELECT CAST(strftime('%Y', ts/1000, 'unixepoch') AS INTEGER) AS year, COUNT(*) AS plays
-       FROM listens WHERE source='lastfm' GROUP BY year ORDER BY year`
-    )
-    .all();
-
-  return { totals, topArtists, topAlbums, byYear };
-}
-
-// Normaliza un nombre de artista para casar Last.fm con la biblioteca pese a
-// diferencias de mayúsculas, acentos, "The" inicial o espacios/puntuación. El
-// COLLATE NOCASE de SQLite solo pliega ASCII, así que esto se hace en JS.
-const normArtist = (s) =>
-  String(s || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/^the\s+/, '')
-    .replace(/[^a-z0-9]+/g, '');
-
-// Mapa nombre-normalizado -> { albums, id, mbid } de lo que TIENES, sumando
-// homónimos. Se usa para el cruce con las escuchas.
+// Mapa nombre-normalizado -> { albums, id, mbid } de artistas que TIENES.
 function ownedArtistMap() {
   const rows = db
     .prepare(
@@ -85,11 +45,55 @@ function ownedArtistMap() {
   return map;
 }
 
+// Set de álbumes que tienes (clave artista|título normalizada).
+function ownedAlbumSet() {
+  const s = new Set();
+  for (const a of db.prepare("SELECT album_artist, title FROM albums WHERE match_state != 'dismissed'").all())
+    s.add(albumKey(a.album_artist, a.title));
+  return s;
+}
+
 function trackedArtistSet() {
-  const rows = db
-    .prepare('SELECT ar.name FROM tracked_artists t JOIN artists ar ON ar.id=t.artist_id')
+  return new Set(
+    db.prepare('SELECT ar.name FROM tracked_artists t JOIN artists ar ON ar.id=t.artist_id').all().map((r) => normArtist(r.name))
+  );
+}
+
+export function listeningOverview() {
+  const totals = db
+    .prepare(
+      `SELECT COUNT(*) AS scrobbles, COUNT(DISTINCT artist) AS artists,
+        COUNT(DISTINCT artist || '|' || album) AS albums,
+        MIN(ts) AS first, MAX(ts) AS last
+       FROM listens WHERE source='lastfm'`
+    )
+    .get();
+
+  const owned = ownedArtistMap();
+  const topArtists = db
+    .prepare("SELECT artist, COUNT(*) AS plays FROM listens WHERE source='lastfm' GROUP BY LOWER(artist) ORDER BY plays DESC LIMIT 25")
+    .all()
+    .map((r) => {
+      const o = owned.get(normArtist(r.artist));
+      return { artist: r.artist, plays: r.plays, artist_id: o?.id || null, owned_albums: o?.albums || 0 };
+    });
+
+  const ownedAlbums = ownedAlbumSet();
+  const topAlbums = db
+    .prepare(
+      "SELECT artist, album, COUNT(*) AS plays FROM listens WHERE source='lastfm' AND album<>'' GROUP BY LOWER(artist), LOWER(album) ORDER BY plays DESC LIMIT 25"
+    )
+    .all()
+    .map((r) => ({ artist: r.artist, album: r.album, plays: r.plays, owned: ownedAlbums.has(albumKey(r.artist, r.album)) }));
+
+  const byYear = db
+    .prepare(
+      `SELECT CAST(strftime('%Y', ts/1000, 'unixepoch') AS INTEGER) AS year, COUNT(*) AS plays
+       FROM listens WHERE source='lastfm' GROUP BY year ORDER BY year`
+    )
     .all();
-  return new Set(rows.map((r) => normArtist(r.name)));
+
+  return { totals, topArtists, topAlbums, byYear };
 }
 
 // La brecha: artistas que escuchas mucho y de los que tienes poco o nada.
@@ -97,7 +101,6 @@ function trackedArtistSet() {
 export function ownershipGap({ minPlays = 15 } = {}) {
   const owned = ownedArtistMap();
   const tracked = trackedArtistSet();
-  // escuchas por artista (agrupando por nombre normalizado, para fundir variantes)
   const scrobbles = new Map();
   for (const r of db.prepare("SELECT artist, COUNT(*) AS plays FROM listens WHERE source='lastfm' GROUP BY LOWER(artist)").all()) {
     const k = normArtist(r.artist);
@@ -125,19 +128,41 @@ export function ownershipGap({ minPlays = 15 } = {}) {
   return out.slice(0, 60);
 }
 
-// Lo contrario, para la sección de escuchas: álbumes que TIENES pero no has
-// escuchado nunca (según Last.fm). Joyas olvidadas en tu propio disco.
+// Últimas escuchas para el dashboard: álbumes distintos más recientes. Usa el
+// índice de fecha (LIMIT sobre ts DESC) y deduplica en memoria, en vez de un
+// GROUP BY caro sobre las 128k filas.
+export function recentListenedAlbums(limit = 14) {
+  const idByKey = new Map();
+  for (const a of db.prepare("SELECT id, album_artist, title FROM albums WHERE match_state != 'dismissed'").all())
+    idByKey.set(albumKey(a.album_artist, a.title), a.id);
+  const seen = new Set();
+  const out = [];
+  for (const r of db.prepare("SELECT artist, album, ts FROM listens WHERE source='lastfm' AND album<>'' ORDER BY ts DESC LIMIT 2000").all()) {
+    const k = albumKey(r.artist, r.album);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({ artist: r.artist, album: r.album, ts: r.ts, album_id: idByKey.get(k) || null });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+// Álbumes que TIENES pero no has escuchado nunca (según Last.fm). Joyas olvidadas
+// en tu propio disco. Cruce en memoria: Set de escuchados + filtro de álbumes.
 export function ownedUnplayed() {
-  return db
+  const listened = new Set();
+  for (const r of db.prepare("SELECT DISTINCT artist, album FROM listens WHERE source='lastfm' AND album<>''").all())
+    listened.add(albumKey(r.artist, r.album));
+  const albums = db
     .prepare(
-      `SELECT a.id, a.title, a.album_artist, a.year, a.cover
-       FROM albums a
-       WHERE a.match_state NOT IN ('dismissed','orphan')
-         AND NOT EXISTS (
-           SELECT 1 FROM listens l WHERE l.source='lastfm'
-             AND l.artist = a.album_artist COLLATE NOCASE
-             AND l.album = a.title COLLATE NOCASE)
-       ORDER BY a.album_artist, a.year LIMIT 100`
+      `SELECT id, title, album_artist, year, cover FROM albums
+       WHERE match_state NOT IN ('dismissed','orphan') ORDER BY album_artist, year`
     )
     .all();
+  const out = [];
+  for (const a of albums) {
+    if (!listened.has(albumKey(a.album_artist, a.title))) out.push(a);
+    if (out.length >= 100) break;
+  }
+  return out;
 }

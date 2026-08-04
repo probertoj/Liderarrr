@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { recentListenedAlbums } from './listening.js';
 
 // Todas las consultas que alimentan las secciones. Regla de oro del diseño:
 //  - Lo DESCRIPTIVO (totales, disco, formatos, escuchas) incluye TODO, también
@@ -74,17 +75,8 @@ export function recent() {
     )
     .all();
 
-  const recentlyListened = db
-    .prepare(
-      `SELECT l.artist, l.album, MAX(l.ts) AS ts,
-        (SELECT a.id FROM albums a JOIN artists ar ON ar.id=a.artist_id
-          WHERE ar.name = l.artist COLLATE NOCASE AND a.title = l.album COLLATE NOCASE
-          AND a.${DESCRIPTIVE} LIMIT 1) AS album_id
-       FROM listens l WHERE l.source='lastfm' AND l.album <> ''
-       GROUP BY l.artist COLLATE NOCASE, l.album COLLATE NOCASE
-       ORDER BY ts DESC LIMIT 14`
-    )
-    .all();
+  // cruce en memoria (ver listening.js): evita el GROUP BY caro sobre ~128k filas
+  const recentlyListened = recentListenedAlbums(14);
 
   const lidarrRecent = db
     .prepare(

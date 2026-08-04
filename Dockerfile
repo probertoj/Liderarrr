@@ -43,7 +43,10 @@ ENV PORT=3861
 VOLUME /data
 EXPOSE 3861
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
+# Margen amplio y varios reintentos: aunque una consulta puntual tarde, el
+# contenedor no debe marcarse unhealthy por un pico. La app arranca en segundos,
+# pero el escaneo/identificación inicial de una biblioteca grande da mucha guerra.
+HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=5 \
   CMD node -e "fetch('http://127.0.0.1:3861/api/version').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 ENTRYPOINT ["entrypoint.sh"]
