@@ -1,5 +1,5 @@
 # --- build del frontend -----------------------------------------------------
-FROM node:24-slim AS web
+FROM node:22-slim AS web
 WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY web/package.json web/
@@ -10,7 +10,7 @@ RUN npm run build --workspace web
 # --- dependencias del servidor (compila better-sqlite3 aquí) ----------------
 # Se compila el módulo nativo en una etapa con toolchain y luego solo se copia
 # node_modules a la imagen final, que así no arrastra gcc/python.
-FROM node:24-slim AS deps
+FROM node:22-slim AS deps
 WORKDIR /app
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
@@ -20,7 +20,7 @@ COPY server/package.json server/
 RUN npm install --workspace server --include-workspace-root --omit=dev
 
 # --- imagen final -----------------------------------------------------------
-FROM node:24-slim
+FROM node:22-slim
 WORKDIR /app
 
 # fpcalc (Chromaprint) es imprescindible para AcoustID: saca la huella acústica

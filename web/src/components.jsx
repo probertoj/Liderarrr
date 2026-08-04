@@ -1,7 +1,38 @@
-import { useState } from 'react';
+import { useState, Component } from 'react';
 import { Link } from 'react-router-dom';
 import { Disc3, ImageOff } from 'lucide-react';
 import { coverUrl } from './api.js';
+
+// Red de seguridad: si una página lanza un error al pintar (o falla la carga de
+// su código tras una actualización, o una petición revienta), muestra un aviso
+// con recargar en vez de dejar TODA la app en blanco. Se remonta al cambiar de
+// ruta (key en App), así navegar a otra sección recupera.
+export class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="card p-6 max-w-lg mx-auto mt-10 text-center">
+          <p className="text-neutral-200 mb-1">Algo ha fallado en esta sección.</p>
+          <p className="text-xs text-neutral-500 mb-4 break-words">{String(this.state.error?.message || this.state.error)}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-sm px-3 py-1.5 rounded-lg border border-gold-500/50 bg-gold-500/15 text-gold-300 hover:bg-gold-500/25"
+          >
+            Recargar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export function Spinner({ label }) {
   return (

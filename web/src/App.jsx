@@ -1,12 +1,12 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { Routes, Route, NavLink } from 'react-router-dom';
+import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle,
   Sparkles, Settings as SettingsIcon, Menu, X, RefreshCw, Star, Compass, CalendarClock,
   Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope,
 } from 'lucide-react';
 import { api } from './api.js';
-import { Spinner } from './components.jsx';
+import { Spinner, ErrorBoundary } from './components.jsx';
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Library = lazy(() => import('./pages/Library.jsx'));
@@ -114,6 +114,7 @@ export default function App() {
   const [open, setOpen] = useState(false);
   const [version, setVersion] = useState('');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+  const location = useLocation();
   useEffect(() => {
     api.version().then((v) => setVersion(v.version)).catch(() => {});
   }, []);
@@ -180,7 +181,8 @@ export default function App() {
       </aside>
 
       <main className="flex-1 min-w-0 px-4 md:px-8 py-6 md:py-8 max-w-[1400px]">
-        <Suspense fallback={<Spinner label="Cargando…" />}>
+        <ErrorBoundary key={location.pathname}>
+          <Suspense fallback={<Spinner label="Cargando…" />}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/discoteca" element={<Library />} />
@@ -201,7 +203,8 @@ export default function App() {
             <Route path="/rarezas" element={<Rarities />} />
             <Route path="/ajustes" element={<Settings />} />
           </Routes>
-        </Suspense>
+          </Suspense>
+        </ErrorBoundary>
       </main>
     </div>
   );
