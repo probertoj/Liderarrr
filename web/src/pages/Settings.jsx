@@ -74,7 +74,7 @@ function ScanPanel() {
       ) : (
         <div className="text-xs text-neutral-600">
           {st.lastScan
-            ? `Último escaneo: ${fmtTime(st.lastScan.at)} · ${st.lastScan.albums} nuevas de ${st.lastScan.folders} carpetas${st.lastScan.error ? ` · error: ${st.lastScan.error}` : ''}`
+            ? `Último escaneo: ${fmtTime(st.lastScan.at)} · ${st.lastScan.albums} nuevas de ${st.lastScan.folders} carpetas${st.lastScan.errors ? ` · ${st.lastScan.errors} omitidas` : ''}${st.lastScan.error ? ` · error: ${st.lastScan.error}` : ''}`
             : 'Aún no se ha escaneado.'}
         </div>
       )}

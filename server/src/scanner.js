@@ -28,6 +28,7 @@ export const scanStatus = {
   albumsDone: 0,
   tracksDone: 0,
   skipped: 0, // carpetas sin cambios que nos saltamos
+  errors: 0, // carpetas que fallaron y se omitieron
   current: null,
   startedAt: null,
   finishedAt: null,
@@ -37,6 +38,10 @@ export const scanStatus = {
 const sha1 = (s) => crypto.createHash('sha1').update(s).digest('hex');
 const isAudio = (f) => AUDIO_EXT.has(path.extname(f).toLowerCase());
 const isLossless = (fmt) => /flac|alac|wav|ape|wavpack|aiff|pcm/i.test(fmt || '');
+// music-metadata devuelve varios MBID como ARRAY (álbumes con varios artistas).
+// Nos quedamos con el primero: pasar un array a una consulta de un solo hueco
+// reventaba con "Too many parameter values were provided" y tumbaba el escaneo.
+const first = (v) => (Array.isArray(v) ? v[0] : v) || null;
 
 function walk(dir, out = []) {
   let entries;
@@ -164,17 +169,18 @@ async function ingestFolder({ dir, files }) {
       size_bytes: size,
       lossless: f.lossless || isLossless(f.codec || fmt) ? 1 : 0,
       has_replaygain: c.replaygain_track_gain != null || c.replaygain_album_gain != null ? 1 : 0,
-      mb_recording_id: c.musicbrainz_recordingid || null,
+      mb_recording_id: first(c.musicbrainz_recordingid),
     });
 
-    // metadatos de álbum: se toman del primer fichero que los tenga
+    // metadatos de álbum: se toman del primer fichero que los tenga. Los MBID se
+    // pasan por first() porque music-metadata los da como array.
     albumMeta.album ||= c.album;
     albumMeta.albumArtist ||= c.albumartist || c.artist;
     albumMeta.artist ||= c.artist;
     albumMeta.year ||= c.year || (c.date ? Number(String(c.date).slice(0, 4)) : null);
-    albumMeta.rgMbid ||= c.musicbrainz_releasegroupid || null;
-    albumMeta.relMbid ||= c.musicbrainz_albumid || null;
-    albumMeta.artistMbid ||= c.musicbrainz_albumartistid || c.musicbrainz_artistid || null;
+    albumMeta.rgMbid ||= first(c.musicbrainz_releasegroupid);
+    albumMeta.relMbid ||= first(c.musicbrainz_albumid);
+    albumMeta.artistMbid ||= first(c.musicbrainz_albumartistid) || first(c.musicbrainz_artistid);
     albumMeta.totalTracks ||= c.track?.of || null;
     if ((c.disk?.of || 1) > albumMeta.discs) albumMeta.discs = c.disk.of;
   }
@@ -252,6 +258,7 @@ export async function runScan(opts = {}) {
     albumsDone: 0,
     tracksDone: 0,
     skipped: 0,
+    errors: 0,
     current: null,
     startedAt: Date.now(),
     finishedAt: null,
@@ -292,13 +299,19 @@ export async function runScan(opts = {}) {
           }
         }
       }
-      await ingestFolder(folder);
+      // aislamiento: una carpeta con datos raros NO debe tumbar todo el escaneo
+      try {
+        await ingestFolder(folder);
+      } catch (err) {
+        scanStatus.errors = (scanStatus.errors || 0) + 1;
+        console.warn(`[scan] ⚠️ carpeta omitida: ${folder.dir} — ${String(err.message || err)}`);
+      }
       processed++;
       if (processed % 500 === 0)
-        console.log(`[scan] ${processed}/${folders.length} · ${scanStatus.albumsDone} nuevas · ${scanStatus.skipped} sin cambios`);
+        console.log(`[scan] ${processed}/${folders.length} · ${scanStatus.albumsDone} nuevas · ${scanStatus.skipped} sin cambios · ${scanStatus.errors || 0} errores`);
     }
     scanStatus.phase = 'done';
-    console.log(`[scan] fin: ${scanStatus.albumsDone} álbumes escaneados, ${scanStatus.skipped} sin cambios, ${folders.length} carpetas`);
+    console.log(`[scan] fin: ${scanStatus.albumsDone} nuevas, ${scanStatus.skipped} sin cambios, ${scanStatus.errors} errores, ${folders.length} carpetas`);
   } catch (err) {
     scanStatus.phase = 'error';
     scanStatus.error = String(err.message || err);
@@ -314,6 +327,7 @@ export async function runScan(opts = {}) {
         folders: scanStatus.foldersFound,
         albums: scanStatus.albumsDone,
         skipped: scanStatus.skipped,
+        errors: scanStatus.errors,
         phase: scanStatus.phase,
         error: scanStatus.error,
       })
