@@ -28,7 +28,7 @@ export const api = {
   test: (svc) => req(`/settings/test/${svc}`, { method: 'POST' }),
   lidarrProfiles: () => req('/lidarr/profiles'),
 
-  scan: () => req('/scan', { method: 'POST' }),
+  scan: (force) => req('/scan', { method: 'POST', body: { force } }),
   scanStatus: () => req('/scan/status'),
   identify: (force) => req('/identify', { method: 'POST', body: { force } }),
   identifyStatus: () => req('/identify/status'),

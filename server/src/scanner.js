@@ -2,15 +2,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseFile } from 'music-metadata';
-import { db, getSetting } from './db.js';
+import { db, getSetting, setSetting } from './db.js';
 
 // El escáner es la espina dorsal: TUS FICHEROS MANDAN. Recorre la raíz de música,
 // agrupa por carpeta (una carpeta = un álbum, el caso normal), lee las etiquetas
 // de cada pista y vuelca artistas/álbumes/pistas a SQLite. No consulta ninguna
 // base externa: eso es identificación, y va después (identify.js). Un álbum sin
 // MBID existe igual; las maquetas nunca desaparecen.
+//
+// Es INCREMENTAL y REANUDABLE: se salta las carpetas ya escaneadas que no han
+// cambiado (por fecha de modificación), así una pasada interrumpida (actualización
+// del contenedor, reinicio) no empieza de cero — cada pasada avanza. Clave para
+// bibliotecas enormes por red, donde un escaneo completo tarda mucho.
 
-const AUDIO_EXT = new Set(['.flac', '.mp3', '.m4a', '.aac', '.ogg', '.opus', '.wav', '.wv', '.ape', '.alac', '.aiff']);
+const AUDIO_EXT = new Set([
+  '.flac', '.mp3', '.m4a', '.aac', '.ogg', '.opus', '.oga', '.wav', '.wv', '.ape',
+  '.alac', '.aiff', '.aif', '.dsf', '.dff', '.mpc', '.tak', '.tta', '.wma',
+]);
 const COVER_NAMES = ['cover', 'folder', 'front', 'albumart', 'album'];
 
 export const scanStatus = {
@@ -19,6 +27,7 @@ export const scanStatus = {
   foldersFound: 0,
   albumsDone: 0,
   tracksDone: 0,
+  skipped: 0, // carpetas sin cambios que nos saltamos
   current: null,
   startedAt: null,
   finishedAt: null,
@@ -224,10 +233,14 @@ async function ingestFolder({ dir, files }) {
   scanStatus.tracksDone += trackFileCount;
 }
 
-// Recorre la biblioteca entera. `roots` viene del ajuste music_dirs (rutas
-// separadas por salto de línea) o del parámetro.
-export async function runScan(rootsArg) {
+// scanned_at de un álbum ya en BD por su carpeta, para el salto incremental.
+const scannedAtOf = db.prepare('SELECT scanned_at FROM albums WHERE local_key = ?');
+
+// Recorre la biblioteca. `opts.roots` sobrescribe music_dirs; `opts.force` reescanea
+// TODO (ignora el salto incremental).
+export async function runScan(opts = {}) {
   if (scanStatus.running) return scanStatus;
+  const { roots: rootsArg, force = false } = typeof opts === 'string' ? { roots: opts } : opts;
   const roots = (rootsArg || getSetting('music_dirs') || '')
     .split(/[\n;]+/)
     .map((s) => s.trim())
@@ -238,6 +251,7 @@ export async function runScan(rootsArg) {
     foldersFound: 0,
     albumsDone: 0,
     tracksDone: 0,
+    skipped: 0,
     current: null,
     startedAt: Date.now(),
     finishedAt: null,
@@ -256,22 +270,59 @@ export async function runScan(rootsArg) {
     }
     scanStatus.foldersFound = folders.length;
     scanStatus.phase = 'reading';
+    console.log(`[scan] ${folders.length} carpetas con audio encontradas${force ? ' (reescaneo completo)' : ''}`);
+
+    let processed = 0;
     for (const folder of folders) {
       scanStatus.current = folder.dir;
+      // salto incremental: si ya lo escaneamos y la carpeta no ha cambiado, fuera
+      if (!force) {
+        const existing = scannedAtOf.get(sha1(folder.dir));
+        if (existing?.scanned_at) {
+          let mtime = 0;
+          try {
+            mtime = fs.statSync(folder.dir).mtimeMs;
+          } catch {
+            /* si no se puede leer el mtime, mejor reescanear */
+          }
+          if (mtime && mtime <= existing.scanned_at) {
+            scanStatus.skipped++;
+            processed++;
+            continue;
+          }
+        }
+      }
       await ingestFolder(folder);
+      processed++;
+      if (processed % 500 === 0)
+        console.log(`[scan] ${processed}/${folders.length} · ${scanStatus.albumsDone} nuevas · ${scanStatus.skipped} sin cambios`);
     }
     scanStatus.phase = 'done';
+    console.log(`[scan] fin: ${scanStatus.albumsDone} álbumes escaneados, ${scanStatus.skipped} sin cambios, ${folders.length} carpetas`);
   } catch (err) {
     scanStatus.phase = 'error';
     scanStatus.error = String(err.message || err);
+    console.error('[scan] error:', scanStatus.error);
   } finally {
     scanStatus.running = false;
     scanStatus.finishedAt = Date.now();
+    // resumen persistente, para que el estado sobreviva a un reinicio
+    setSetting(
+      'last_scan',
+      JSON.stringify({
+        at: Date.now(),
+        folders: scanStatus.foldersFound,
+        albums: scanStatus.albumsDone,
+        skipped: scanStatus.skipped,
+        phase: scanStatus.phase,
+        error: scanStatus.error,
+      })
+    );
     db.prepare('INSERT INTO sync_log (started_at, finished_at, status, detail) VALUES (?, ?, ?, ?)').run(
       started,
       Date.now(),
       scanStatus.error ? 'error' : 'ok',
-      `${scanStatus.albumsDone} álbumes · ${scanStatus.tracksDone} pistas`
+      `${scanStatus.albumsDone} nuevas · ${scanStatus.skipped} sin cambios · ${scanStatus.foldersFound} carpetas`
     );
   }
   return scanStatus;

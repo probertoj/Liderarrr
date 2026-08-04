@@ -1,7 +1,86 @@
-import { useEffect, useState } from 'react';
-import { Settings as SettingsIcon, Check, X, Loader2, Download } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Settings as SettingsIcon, Check, X, Loader2, Download, FolderSearch, RefreshCw } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, Button } from '../components.jsx';
+
+// Panel de escaneo: progreso en vivo del recorrido de tus carpetas. Deja ver si
+// terminó o dónde va, que es justo lo que faltaba para saber si escanea todo.
+function ScanPanel() {
+  const [st, setSt] = useState(null);
+  const timer = useRef(null);
+
+  const poll = async () => {
+    const s = await api.scanStatus().catch(() => null);
+    if (s) setSt(s);
+    return s;
+  };
+  useEffect(() => {
+    poll();
+    return () => clearInterval(timer.current);
+  }, []);
+  useEffect(() => {
+    clearInterval(timer.current);
+    if (st?.running) timer.current = setInterval(poll, 1500);
+    return () => clearInterval(timer.current);
+  }, [st?.running]);
+
+  const start = async (force) => {
+    await api.scan(force);
+    setSt((s) => ({ ...(s || {}), running: true, phase: 'walking' }));
+    setTimeout(poll, 800);
+  };
+
+  if (!st) return null;
+  const done = (st.albumsDone || 0) + (st.skipped || 0);
+  const pct = st.foldersFound ? Math.min(100, Math.round((done / st.foldersFound) * 100)) : 0;
+  const fmtTime = (ms) => (ms ? new Date(ms).toLocaleString('es') : '—');
+
+  return (
+    <div className="mt-3 border-t border-ink-800 pt-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-sm text-neutral-300">
+          {st.totalAlbums?.toLocaleString('es') || 0} álbumes · {st.totalArtists?.toLocaleString('es') || 0} artistas en la biblioteca
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => start(false)} disabled={st.running}>
+            <span className="inline-flex items-center gap-1.5">
+              <FolderSearch size={14} /> Escanear
+            </span>
+          </Button>
+          <Button
+            onClick={() => confirm('Reescanea TODAS las carpetas desde cero (más lento). ¿Seguir?') && start(true)}
+            disabled={st.running}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <RefreshCw size={14} className={st.running ? 'animate-spin' : ''} /> Reescanear todo
+            </span>
+          </Button>
+        </div>
+      </div>
+
+      {st.running ? (
+        <div>
+          <div className="flex justify-between text-xs text-neutral-500 mb-1">
+            <span>
+              {st.phase === 'walking' ? 'Recorriendo carpetas…' : `${done.toLocaleString('es')} / ${st.foldersFound.toLocaleString('es')} carpetas · ${st.albumsDone} nuevas · ${st.skipped} sin cambios`}
+            </span>
+            <span>{pct}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-ink-800 overflow-hidden">
+            <div className="h-full bg-gold-400 transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          {st.current && <div className="text-[11px] text-neutral-600 mt-1 truncate">{st.current}</div>}
+        </div>
+      ) : (
+        <div className="text-xs text-neutral-600">
+          {st.lastScan
+            ? `Último escaneo: ${fmtTime(st.lastScan.at)} · ${st.lastScan.albums} nuevas de ${st.lastScan.folders} carpetas${st.lastScan.error ? ` · error: ${st.lastScan.error}` : ''}`
+            : 'Aún no se ha escaneado.'}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Field({ label, hint, children }) {
   return (
@@ -98,6 +177,7 @@ export default function Settings() {
             className={`${input} font-mono`}
           />
         </Field>
+        <ScanPanel />
       </section>
 
       {/* 2. Identificación */}

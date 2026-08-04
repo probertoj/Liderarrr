@@ -142,11 +142,24 @@ app.get('/api/lidarr/profiles', async (req, reply) => {
 });
 
 // --- escaneo / identificación / refresco ------------------------------------
-app.post('/api/scan', async () => {
-  runScan().catch((e) => console.error('scan', e));
+app.post('/api/scan', async (req) => {
+  runScan({ force: !!req.body?.force }).catch((e) => console.error('scan', e));
   return { started: true };
 });
-app.get('/api/scan/status', async () => scanStatus);
+app.get('/api/scan/status', async () => {
+  let lastScan = null;
+  try {
+    lastScan = JSON.parse(getSetting('last_scan') || 'null');
+  } catch {
+    /* ignore */
+  }
+  return {
+    ...scanStatus,
+    totalAlbums: db.prepare('SELECT COUNT(*) AS n FROM albums').get().n,
+    totalArtists: db.prepare('SELECT COUNT(DISTINCT artist_id) AS n FROM albums').get().n,
+    lastScan,
+  };
+});
 
 app.post('/api/identify', async (req) => {
   const force = !!(req.body && req.body.force);
