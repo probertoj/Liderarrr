@@ -131,6 +131,23 @@ VALUES (@album_id, @disc, @num, @title, @artist, @duration_ms, @path, @format, @
 const insertGenre = db.prepare("INSERT INTO tags (type, name) VALUES ('genre', ?) ON CONFLICT DO NOTHING");
 const getGenreId = db.prepare("SELECT id FROM tags WHERE type = 'genre' AND name = ?");
 const linkTag = db.prepare('INSERT INTO album_tags (album_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING');
+// La transacción se crea UNA vez y se reutiliza. Crearla por carpeta (26k veces)
+// era un antipatrón: acumulaba objetos y presionaba la memoria/handles nativos.
+const insertTracksTx = db.transaction((albumId, rows) => {
+  for (const t of rows) insertTrack.run({ ...t, album_id: albumId });
+});
+
+// Parseo de etiquetas ROBUSTO y LIGERO:
+//  - duration:false → no fuerza a leer el fichero entero cuando la cabecera no
+//    trae duración (MP3 VBR sin Xing): eso era lento y pesado por la red.
+//  - timeout por fichero → un fichero enorme o un montaje lento no cuelga el
+//    escaneo; se descarta ese fichero y se sigue.
+async function parseTags(file) {
+  return Promise.race([
+    parseFile(file, { duration: false, skipCovers: true }),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 20000)),
+  ]);
+}
 
 async function ingestFolder({ dir, files }) {
   const tracks = [];
@@ -142,7 +159,7 @@ async function ingestFolder({ dir, files }) {
   for (const file of files) {
     let meta;
     try {
-      meta = await parseFile(file, { duration: true, skipCovers: true });
+      meta = await parseTags(file);
     } catch {
       meta = { common: {}, format: {} };
     }
@@ -230,10 +247,7 @@ async function ingestFolder({ dir, files }) {
 
   const albumId = getAlbumId.get(localKey).id;
   clearTracks.run(albumId);
-  const tx = db.transaction((rows) => {
-    for (const t of rows) insertTrack.run({ ...t, album_id: albumId });
-  });
-  tx(tracks);
+  insertTracksTx(albumId, tracks);
 
   for (const g of genres) {
     insertGenre.run(g);

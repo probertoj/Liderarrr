@@ -9,6 +9,7 @@ export default function Diagnostics() {
   const [d, setD] = useState(null);
   const [err, setErr] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [showText, setShowText] = useState(false);
   const timer = useRef(null);
 
   const load = () => api.diag().then(setD).catch((e) => setErr(e.message));
@@ -25,11 +26,21 @@ export default function Diagnostics() {
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!d) return <Spinner label="Recopilando diagnóstico…" />;
 
+  const ok = () => {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  // navigator.clipboard NO existe en HTTP (solo HTTPS/localhost), y el NAS se abre
+  // por http://IP. Por eso el copiado directo fallaba en silencio. Se intenta, y si
+  // no, execCommand con un textarea; y siempre se muestra el texto para copiar a mano.
   const copy = () => {
-    navigator.clipboard.writeText(asText(d)).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    const text = asText(d);
+    setShowText(true);
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(ok).catch(() => execCopy(text) && ok());
+    } else if (execCopy(text)) {
+      ok();
+    }
   };
 
   const scan = d.scan || {};
@@ -49,6 +60,21 @@ export default function Diagnostics() {
           </span>
         </Button>
       </PageTitle>
+
+      {showText && (
+        <div className="card p-3 mb-4">
+          <div className="text-xs text-neutral-500 mb-1.5">
+            {copied ? '✓ Copiado al portapapeles. ' : ''}Si no se copió (habitual por HTTP), selecciona todo aquí (clic dentro y Ctrl+A) y copia:
+          </div>
+          <textarea
+            readOnly
+            onFocus={(e) => e.target.select()}
+            value={asText(d)}
+            rows={8}
+            className="w-full bg-ink-950 border border-ink-800 rounded-lg p-2 text-[11px] font-mono text-neutral-300"
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <StatCard label="Álbumes" value={d.totals.albums.toLocaleString('es')} sub={`${d.totals.tracks.toLocaleString('es')} pistas`} />
@@ -126,6 +152,24 @@ export default function Diagnostics() {
       </div>
     </div>
   );
+}
+
+// Copiado alternativo para contextos no seguros (HTTP): textarea + execCommand.
+function execCopy(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const okCmd = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return okCmd;
+  } catch {
+    return false;
+  }
 }
 
 const n = (x) => (x || 0).toLocaleString('es');

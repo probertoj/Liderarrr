@@ -40,6 +40,9 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 ENV NODE_ENV=production
 ENV DATA_DIR=/data
 ENV PORT=3861
+# Acota el heap de V8: fuerza recolección agresiva y evita que un pico de memoria
+# durante el escaneo dispare al asesino de OOM del contenedor. La app va sobrada.
+ENV NODE_OPTIONS=--max-old-space-size=1024
 VOLUME /data
 EXPOSE 3861
 
