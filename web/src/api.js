@@ -47,6 +47,9 @@ export const api = {
   albumState: (id, state) => req(`/albums/${id}/state`, { method: 'POST', body: { state } }),
   candidates: (id) => req(`/albums/${id}/candidates`),
   match: (id, rg_mbid) => req(`/albums/${id}/match`, { method: 'POST', body: { rg_mbid } }),
+  identifyAlbum: (id) => req(`/albums/${id}/identify`, { method: 'POST' }),
+  lidarrReleases: (id) => req(`/albums/${id}/lidarr-releases`),
+  lidarrGrab: (guid, indexerId) => req('/lidarr/grab', { method: 'POST', body: { guid, indexerId } }),
 
   artists: (params) => req(`/artists?${new URLSearchParams(params)}`),
   artist: (id) => req(`/artists/${id}`),

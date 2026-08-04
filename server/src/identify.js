@@ -214,6 +214,21 @@ export async function runIdentify({ force = false, limit = 0 } = {}) {
   return identifyStatus;
 }
 
+// Identifica UN álbum bajo demanda (tu clic desde la página del disco). Corre por
+// el carril RÁPIDO de MusicBrainz (no es runBackground) y NO toca los contadores
+// del barrido. Devuelve la fuente que acertó, o null si nada casó.
+export async function identifyOne(albumId) {
+  const album = db
+    .prepare(
+      `SELECT a.id, a.title, a.album_artist, a.rg_mbid, a.primary_type, ar.mbid AS artist_mbid
+       FROM albums a LEFT JOIN artists ar ON ar.id = a.artist_id WHERE a.id = ?`
+    )
+    .get(albumId);
+  if (!album) throw new Error('Álbum no encontrado');
+  const source = await identifyAlbum(album);
+  return { matched: !!source, source: source || null };
+}
+
 // Marca un álbum como rareza (orphan) o lo devuelve a pendiente. El estado
 // orphan es de primera clase: cuenta en todo lo descriptivo, no en lo comparativo.
 export function setMatchState(albumId, state) {

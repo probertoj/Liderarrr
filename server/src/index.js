@@ -6,9 +6,9 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { db, DATA_DIR, getAllSettings, getSetting, setSetting } from './db.js';
 import { runScan, scanStatus } from './scanner.js';
-import { runIdentify, identifyStatus, setMatchState, manualMatch } from './identify.js';
+import { runIdentify, identifyOne, identifyStatus, setMatchState, manualMatch } from './identify.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
-import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds } from './lidarr.js';
+import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab } from './lidarr.js';
 import { mbTest, searchReleaseGroup, searchArtists } from './musicbrainz.js';
 import { acoustidTest } from './acoustid.js';
 import { discogsTest, searchRelease } from './discogs.js';
@@ -383,6 +383,25 @@ app.post('/api/albums/:id/match', async (req, reply) => {
     return reply.code(400).send({ error: String(err.message || err) });
   }
 });
+// identificar UN álbum bajo demanda (carril rápido, no el barrido)
+app.post('/api/albums/:id/identify', async (req, reply) => {
+  try {
+    return await identifyOne(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// búsqueda interactiva de Lidarr: releases de los indexers para este álbum
+app.get('/api/albums/:id/lidarr-releases', async (req, reply) => {
+  const a = q.albumDetail(Number(req.params.id));
+  if (!a) return reply.code(404).send({ error: 'No encontrado' });
+  if (!a.rg_mbid) return reply.code(400).send({ error: 'El álbum no está identificado (sin MBID)' });
+  try {
+    return await lidarrReleases(a.rg_mbid, a.artist?.mbid || null);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 
 // --- Lidarr (actuador) ------------------------------------------------------
 app.post('/api/lidarr/sync', async (req, reply) => {
@@ -397,6 +416,15 @@ app.post('/api/lidarr/add', async (req, reply) => {
     const { rg_mbid, artist_mbid } = req.body || {};
     if (!rg_mbid) return reply.code(400).send({ error: 'Falta rg_mbid' });
     return await lidarrAdd(rg_mbid, artist_mbid);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// descargar (grab) una release elegida en la búsqueda interactiva
+app.post('/api/lidarr/grab', async (req, reply) => {
+  try {
+    const { guid, indexerId } = req.body || {};
+    return await lidarrGrab({ guid, indexerId });
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

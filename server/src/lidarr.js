@@ -210,3 +210,49 @@ export async function lidarrAdd(rgMbid, artistMbid) {
   console.warn(`[lidarr] … artista añadido pero discografía aún importándose (${Date.now() - t0}ms)`);
   return { ok: true, pending: true, note: 'Artista añadido a Lidarr; está importando su discografía. Si el álbum no se monitorizó solo, vuelve a pulsarlo en unos segundos.' };
 }
+
+// Localiza el álbum en la biblioteca de Lidarr por su rg_mbid (necesita conocer al
+// artista por su MBID). Devuelve el objeto álbum de Lidarr (con su .id interno) o
+// null si el artista/álbum aún no está importado en Lidarr.
+async function findLidarrAlbum(rgMbid, artistMbid) {
+  const byId = await lidarrArtists();
+  const artist = artistMbid ? byId.get(artistMbid) : null;
+  if (!artist) return null;
+  const albums = await lidarrFetch(`/album?artistId=${artist.id}`).catch(() => []);
+  return (albums || []).find((a) => a.foreignAlbumId === rgMbid) || null;
+}
+
+// Búsqueda INTERACTIVA: pide a Lidarr las releases que sus indexers tienen para
+// este álbum, para que el usuario elija una a mano (el equivalente al "Interactive
+// Search" de Lidarr). Requiere que el álbum esté ya en la biblioteca de Lidarr: sin
+// albumId no hay contra qué buscar. La consulta va a los indexers en vivo → lenta.
+export async function lidarrReleases(rgMbid, artistMbid) {
+  if (!rgMbid) throw new Error('Falta rg_mbid');
+  const album = await findLidarrAlbum(rgMbid, artistMbid);
+  if (!album) return { inLibrary: false, releases: [] };
+  const rel = await lidarrFetch(`/release?albumId=${album.id}`);
+  const releases = (rel || []).map((r) => ({
+    guid: r.guid,
+    indexerId: r.indexerId,
+    indexer: r.indexer || '',
+    title: r.title || '',
+    quality: r.quality?.quality?.name || '',
+    size: r.size || 0,
+    seeders: typeof r.seeders === 'number' ? r.seeders : null,
+    leechers: typeof r.leechers === 'number' ? r.leechers : null,
+    protocol: r.protocol || '',
+    ageHours: typeof r.ageHours === 'number' ? r.ageHours : typeof r.age === 'number' ? r.age * 24 : null,
+    approved: !r.rejected,
+    rejections: Array.isArray(r.rejections) ? r.rejections : [],
+  }));
+  // como en Lidarr: aprobadas primero, y dentro por seeders (o tamaño) descendente
+  releases.sort((a, b) => Number(b.approved) - Number(a.approved) || (b.seeders ?? -1) - (a.seeders ?? -1));
+  return { inLibrary: true, albumId: album.id, releases };
+}
+
+// Descarga (grab) una release concreta elegida en la búsqueda interactiva.
+export async function lidarrGrab({ guid, indexerId }) {
+  if (!guid || indexerId == null) throw new Error('Release inválida (falta guid o indexerId)');
+  await lidarrFetch('/release', { method: 'POST', body: { guid, indexerId } });
+  return { ok: true };
+}

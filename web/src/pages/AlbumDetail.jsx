@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send } from 'lucide-react';
 import { api, fmtBytes } from '../api.js';
-import { Cover, StateBadge, Spinner, ErrorMsg, Button, PageTitle } from '../components.jsx';
+import { Cover, StateBadge, Spinner, ErrorMsg, Button } from '../components.jsx';
 
 export default function AlbumDetail() {
   const { id } = useParams();
@@ -111,6 +111,12 @@ export default function AlbumDetail() {
           <p className="text-xs text-neutral-600 mt-2 break-all">{album.path}</p>
         </div>
       </div>
+
+      {album.match_state !== 'matched' && album.match_state !== 'orphan' && (
+        <IdentifySection albumId={album.id} onDone={load} />
+      )}
+
+      {album.match_state === 'matched' && <LidarrSection album={album} onDone={load} />}
 
       <Editions albumId={album.id} />
 
@@ -295,6 +301,11 @@ function Editions({ albumId }) {
           </Button>
         )}
       </div>
+      <p className="text-xs text-neutral-600 mt-1">
+        Tu radar de <span className="text-neutral-500">upgrades</span>: MusicBrainz dice qué álbumes existen; Discogs dice
+        qué versiones hay de este (vinilo, remaster, edición japonesa, box set…). Si tienes un rip peor que una edición
+        que Discogs conoce, aparece en «Posibles upgrades». No toca tus ficheros: solo te informa.
+      </p>
 
       {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
       {data && data.configured === false && (
@@ -341,6 +352,250 @@ function Editions({ albumId }) {
             </a>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Identificar ESTE álbum bajo demanda (para álbumes pending/unmatched). Auto corre
+// la cadena (MB/Last.fm/AcoustID) por el carril rápido; manual muestra candidatos.
+function IdentifySection({ albumId, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [err, setErr] = useState(null);
+  const [showManual, setShowManual] = useState(false);
+
+  const auto = async () => {
+    setBusy(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      const r = await api.identifyAlbum(albumId);
+      if (r.matched) {
+        setMsg(`Identificado vía ${r.source}.`);
+        await onDone();
+      } else {
+        setMsg('Ninguna base reconoció este álbum automáticamente. Prueba a elegirlo a mano.');
+        setShowManual(true);
+      }
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card p-4 mb-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+          <Sparkles size={15} /> Identificar este álbum
+        </h2>
+        <div className="flex gap-2">
+          <Button variant="gold" onClick={auto} disabled={busy}>
+            {busy ? 'Identificando…' : 'Identificar automáticamente'}
+          </Button>
+          <Button onClick={() => setShowManual((v) => !v)} disabled={busy}>
+            Elegir a mano
+          </Button>
+        </div>
+      </div>
+      <p className="text-xs text-neutral-600 mt-1">
+        Busca este disco en MusicBrainz, Last.fm y AcoustID para asignarle su MBID (lo que activa carátula oficial,
+        completismo y envío a Lidarr). Si nada casa, elígelo a mano entre los candidatos.
+      </p>
+      {msg && <p className="text-sm text-neutral-400 mt-3">{msg}</p>}
+      {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+      {showManual && (
+        <Candidates
+          id={albumId}
+          onDone={async () => {
+            setShowManual(false);
+            await onDone();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Candidatos de MusicBrainz/Discogs para resolver a mano (mismo flujo que la página
+// «Sin identificar»). Al elegir uno, fija el match y recarga.
+function Candidates({ id, onDone }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setData(null);
+    api.candidates(id).then(setData).catch((e) => setErr(e.message));
+  }, [id]);
+
+  if (err) return <p className="text-sm text-red-400 mt-3">{err}</p>;
+  if (!data) return <Spinner label="Buscando candidatos…" />;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-ink-800 space-y-2">
+      {data.musicbrainz ? (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <div className="min-w-0">
+            <span className="text-emerald-400 text-xs mr-2">MusicBrainz {data.musicbrainz.score}%</span>
+            <span className="truncate">
+              {data.musicbrainz.artist} — {data.musicbrainz.title}
+            </span>
+            {data.musicbrainz.primary_type && (
+              <span className="text-neutral-600 text-xs ml-2">{data.musicbrainz.primary_type}</span>
+            )}
+          </div>
+          <Button
+            variant="gold"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await api.match(id, data.musicbrainz.rg_mbid);
+                await onDone();
+              } catch (e) {
+                setErr(e.message);
+                setSaving(false);
+              }
+            }}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Check size={14} /> Es este
+            </span>
+          </Button>
+        </div>
+      ) : (
+        <p className="text-sm text-neutral-600">MusicBrainz no propone nada.</p>
+      )}
+      {data.discogs && (
+        <div className="text-sm text-neutral-500">
+          <span className="text-xs mr-2 text-neutral-600">Discogs</span>
+          {data.discogs.title} {data.discogs.year ? `(${data.discogs.year})` : ''}
+          {data.discogs.label ? ` · ${data.discogs.label}` : ''}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Acciones de Lidarr para un álbum ya identificado: envío con búsqueda AUTOMÁTICA, y
+// búsqueda INTERACTIVA (releases de los indexers para elegir y descargar a mano).
+function LidarrSection({ album, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [err, setErr] = useState(null);
+  const [releases, setReleases] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [grabbing, setGrabbing] = useState(null);
+
+  const sendAuto = async () => {
+    setBusy(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      const r = await api.lidarrAdd(album.rg_mbid, album.artist?.mbid || null);
+      setMsg(r.note || (r.title ? `Enviado a Lidarr: «${r.title}» — búsqueda automática lanzada.` : 'Enviado a Lidarr.'));
+      await onDone();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const search = async () => {
+    setSearching(true);
+    setErr(null);
+    setMsg(null);
+    setReleases(null);
+    try {
+      const r = await api.lidarrReleases(album.id);
+      if (!r.inLibrary) {
+        setMsg('El álbum aún no está en la biblioteca de Lidarr. Envíalo primero (botón de arriba) y espera unos segundos a que Lidarr importe la discografía del artista.');
+        setReleases([]);
+      } else {
+        setReleases(r.releases);
+      }
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const grab = async (rel) => {
+    setGrabbing(rel.guid);
+    setErr(null);
+    try {
+      await api.lidarrGrab(rel.guid, rel.indexerId);
+      setMsg(`Descarga enviada a Lidarr: ${rel.title}`);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setGrabbing(null);
+    }
+  };
+
+  return (
+    <div className="card p-4 mb-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+          <Send size={15} /> Lidarr
+          {album.inLidarr && <span className="text-xs text-emerald-400">· ya en Lidarr</span>}
+        </h2>
+        <div className="flex gap-2">
+          <Button variant="gold" onClick={sendAuto} disabled={busy}>
+            <span className="inline-flex items-center gap-1.5">
+              <Send size={14} /> {busy ? 'Enviando…' : 'Enviar (automática)'}
+            </span>
+          </Button>
+          <Button onClick={search} disabled={searching}>
+            <span className="inline-flex items-center gap-1.5">
+              <Search size={14} /> {searching ? 'Buscando…' : 'Búsqueda interactiva'}
+            </span>
+          </Button>
+        </div>
+      </div>
+      <p className="text-xs text-neutral-600 mt-1">
+        <span className="text-neutral-500">Automática</span>: Lidarr elige la mejor release y la descarga.{' '}
+        <span className="text-neutral-500">Interactiva</span>: te trae la lista de los indexers para que elijas tú
+        (requiere que el álbum ya esté en Lidarr; la búsqueda consulta los indexers en vivo y puede tardar).
+      </p>
+
+      {msg && <p className="text-sm text-neutral-400 mt-3">{msg}</p>}
+      {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+
+      {releases && releases.length > 0 && (
+        <div className="mt-3 max-h-96 overflow-y-auto divide-y divide-ink-850/60">
+          {releases.map((r) => (
+            <div key={r.guid} className="py-2 flex items-center gap-3 text-sm">
+              <div className="min-w-0 flex-1">
+                <div className={`truncate ${r.approved ? '' : 'text-neutral-500'}`}>{r.title}</div>
+                <div className="text-xs text-neutral-600 flex flex-wrap gap-x-2">
+                  {r.quality && <span className="text-neutral-400">{r.quality}</span>}
+                  <span>{fmtBytes(r.size)}</span>
+                  {r.protocol && <span>{r.protocol}</span>}
+                  {r.seeders != null && <span>{r.seeders} seeders</span>}
+                  {r.indexer && <span>· {r.indexer}</span>}
+                  {!r.approved && r.rejections.length > 0 && (
+                    <span className="text-amber-500/80" title={r.rejections.join('\n')}>
+                      rechazada: {r.rejections[0]}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <Button onClick={() => grab(r)} disabled={grabbing === r.guid}>
+                <span className="inline-flex items-center gap-1.5">
+                  <Download size={14} /> {grabbing === r.guid ? '…' : 'Descargar'}
+                </span>
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+      {releases && releases.length === 0 && !msg && (
+        <p className="text-sm text-neutral-600 mt-3">Los indexers no devolvieron releases para este álbum.</p>
       )}
     </div>
   );
