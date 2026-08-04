@@ -136,17 +136,20 @@ export async function enrichAllDiscographies({ onlyTracked = false, maxAgeDays =
     error: null,
   });
   try {
-    for (const id of ids) {
-      const name = db.prepare('SELECT name FROM artists WHERE id = ?').get(id)?.name;
-      discographyStatus.current = name;
-      try {
-        await enrichArtistDiscography(id);
-      } catch (err) {
-        // un artista que falle (MB caído, MBID malo) no debe parar al resto
-        console.warn('[discography]', name, String(err.message || err));
+    // Barrido de fondo: carril LENTO de MB, cede el paso a lo interactivo.
+    await mb.runBackground(async () => {
+      for (const id of ids) {
+        const name = db.prepare('SELECT name FROM artists WHERE id = ?').get(id)?.name;
+        discographyStatus.current = name;
+        try {
+          await enrichArtistDiscography(id);
+        } catch (err) {
+          // un artista que falle (MB caído, MBID malo) no debe parar al resto
+          console.warn('[discography]', name, String(err.message || err));
+        }
+        discographyStatus.done++;
       }
-      discographyStatus.done++;
-    }
+    });
   } catch (err) {
     discographyStatus.error = String(err.message || err);
   } finally {

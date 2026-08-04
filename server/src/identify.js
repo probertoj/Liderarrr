@@ -78,7 +78,6 @@ function commitMatch(album, rg, source, confidence) {
     confidence,
     now: Date.now(),
   });
-  identifyStatus.matched++;
   // ya tiene MBID: el Cover Art Archive puede tener su portada → que se reintente
   clearNone(album.id);
 }
@@ -154,7 +153,6 @@ async function identifyAlbum(album) {
   }
 
   markUnmatched.run({ id: album.id, now: Date.now() });
-  identifyStatus.unmatched++;
   return null;
 }
 
@@ -195,11 +193,17 @@ export async function runIdentify({ force = false, limit = 0 } = {}) {
     error: null,
   });
   try {
-    for (const album of rows) {
-      identifyStatus.current = `${album.album_artist} — ${album.title}`;
-      await identifyAlbum(album);
-      identifyStatus.done++;
-    }
+    // Todo el barrido corre en el carril LENTO de MusicBrainz: cede el paso a las
+    // llamadas interactivas (ver runBackground/schedule en musicbrainz.js).
+    await mb.runBackground(async () => {
+      for (const album of rows) {
+        identifyStatus.current = `${album.album_artist} — ${album.title}`;
+        const source = await identifyAlbum(album);
+        if (source) identifyStatus.matched++;
+        else identifyStatus.unmatched++;
+        identifyStatus.done++;
+      }
+    });
   } catch (err) {
     identifyStatus.error = String(err.message || err);
   } finally {

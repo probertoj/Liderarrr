@@ -1,26 +1,62 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { cacheRead, cacheWrite } from './db.js';
 import { CACHE_MAX_AGE } from './cache-versions.js';
 
 // MusicBrainz exige: (1) máximo 1 petición por segundo y (2) un User-Agent que
 // te identifique. Incumplir cualquiera de las dos te gana un bloqueo. Aquí se
-// serializan TODAS las llamadas por una única cola con hueco de 1100 ms, y todo
+// serializan TODAS las llamadas por una cola con hueco de 1100 ms, y todo
 // lo que vuelve se cachea en SQLite (ext_cache, prefijo mb:) para no repetir.
+//
+// La cola tiene DOS carriles sobre ese mismo límite de 1,1 s: uno rápido para
+// las peticiones interactivas (tus clics) y uno lento para el barrido de
+// identificación en segundo plano. Sin esto, un clic quedaba encolado detrás de
+// miles de llamadas del barrido y tardaba ~10 s. Con esto, lo interactivo
+// adelanta al fondo; MB nunca se salta (el hueco global se respeta siempre).
 const UA = 'Liderarrr/0.1.0 ( https://github.com/probertoj/Liderarrr )';
 const BASE = 'https://musicbrainz.org/ws/2';
 const GAP_MS = 1100;
 
-let chain = Promise.resolve();
+// Contexto de prioridad: lo que corra dentro de runBackground() usa el carril
+// lento. Se propaga a través de los await, así que basta envolver el bucle de
+// identificación una vez (no hay que tocar cada sitio de llamada).
+const priorityCtx = new AsyncLocalStorage();
+export function runBackground(fn) {
+  return priorityCtx.run({ background: true }, fn);
+}
+
+const fastQ = [];
+const slowQ = [];
 let lastAt = 0;
+let pumping = false;
 
 function schedule(fn) {
-  const run = async () => {
-    const wait = Math.max(0, lastAt + GAP_MS - Date.now());
-    if (wait) await new Promise((r) => setTimeout(r, wait));
-    lastAt = Date.now();
-    return fn();
-  };
-  chain = chain.then(run, run);
-  return chain;
+  const background = priorityCtx.getStore()?.background === true;
+  return new Promise((resolve, reject) => {
+    (background ? slowQ : fastQ).push({ fn, resolve, reject });
+    pump();
+  });
+}
+
+async function pump() {
+  if (pumping) return;
+  pumping = true;
+  try {
+    while (fastQ.length || slowQ.length) {
+      const wait = Math.max(0, lastAt + GAP_MS - Date.now());
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      // Reevaluar DESPUÉS de esperar: si llegó una interactiva mientras dormíamos
+      // el hueco, sale ella primero. Así el fondo cede el paso hasta a mitad de gap.
+      const item = fastQ.shift() || slowQ.shift();
+      lastAt = Date.now();
+      try {
+        item.resolve(await item.fn());
+      } catch (err) {
+        item.reject(err);
+      }
+    }
+  } finally {
+    pumping = false;
+  }
 }
 
 async function mbFetch(pathAndQuery) {
