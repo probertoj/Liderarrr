@@ -183,6 +183,20 @@ export default function Settings() {
           />
         </Field>
         <ScanPanel />
+        <div className="mt-3 border-t border-ink-800 pt-3 flex items-center justify-between gap-3">
+          <span className="text-xs text-neutral-500">
+            Las carátulas que no están en tus ficheros se descargan de Cover Art Archive / iTunes. Si acabas de
+            identificar la biblioteca, reintenta las que faltaban.
+          </span>
+          <Button
+            onClick={async () => {
+              const r = await api.retryCovers();
+              alert(`${r.retried} carátulas se reintentarán al volver a verlas.`);
+            }}
+          >
+            Reintentar carátulas
+          </Button>
+        </div>
       </section>
 
       {/* 2. Identificación */}

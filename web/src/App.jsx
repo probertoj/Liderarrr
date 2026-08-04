@@ -96,10 +96,10 @@ function RefreshButton() {
       }}
       disabled={running}
       className="w-full flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 disabled:opacity-60"
-      title="Escanear, identificar y sincronizar Lidarr"
+      title="Identifica contra MusicBrainz, importa tus escuchas de Last.fm y sincroniza Lidarr y las discografías (también recoge cambios del disco)."
     >
       <RefreshCw size={15} className={running ? 'animate-spin' : ''} />
-      <span className="truncate">{running ? step || 'Actualizando…' : 'Actualizar todo'}</span>
+      <span className="truncate">{running ? step || 'Trabajando…' : 'Identificar y sincronizar'}</span>
     </button>
   );
 }

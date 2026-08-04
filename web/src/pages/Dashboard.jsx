@@ -56,7 +56,7 @@ export default function Dashboard() {
         <div className="card p-8 text-center">
           <p className="text-neutral-300 mb-2">Aún no hay nada escaneado.</p>
           <p className="text-neutral-500 text-sm mb-4">
-            Configura tus carpetas de música en Ajustes y pulsa «Actualizar todo».
+            Configura tus carpetas de música en Ajustes y lanza el primer escaneo.
           </p>
           <Link to="/ajustes" className="text-gold-400 hover:underline">Ir a Ajustes →</Link>
         </div>

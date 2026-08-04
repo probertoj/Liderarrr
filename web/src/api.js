@@ -31,6 +31,7 @@ export const api = {
 
   scan: (force) => req('/scan', { method: 'POST', body: { force } }),
   scanStatus: () => req('/scan/status'),
+  retryCovers: () => req('/covers/retry-missing', { method: 'POST' }),
   identify: (force) => req('/identify', { method: 'POST', body: { force } }),
   identifyStatus: () => req('/identify/status'),
   refresh: (trigger) => req('/refresh', { method: 'POST', body: { trigger } }),

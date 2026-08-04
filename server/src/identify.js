@@ -3,6 +3,7 @@ import * as mb from './musicbrainz.js';
 import * as acoustid from './acoustid.js';
 import * as discogs from './discogs.js';
 import * as lastfm from './lastfm.js';
+import { clearNone } from './covers.js';
 
 // La cadena de identificación, en orden de fiabilidad decreciente (es el flujo
 // del segundo diagrama). Cada álbum sin resolver pasa por:
@@ -78,6 +79,8 @@ function commitMatch(album, rg, source, confidence) {
     now: Date.now(),
   });
   identifyStatus.matched++;
+  // ya tiene MBID: el Cover Art Archive puede tener su portada → que se reintente
+  clearNone(album.id);
 }
 
 // Identifica un solo álbum recorriendo la cadena. Devuelve la fuente que acertó

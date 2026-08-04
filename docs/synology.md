@@ -66,8 +66,9 @@ Permiso**, y concede lectura/escritura al usuario que ejecuta Docker (o a
    `/music` (no la ruta del NAS).
 3. Rellena lo que quieras usar (AcoustID, Discogs, Last.fm, Lidarr) y pulsa
    **Guardar**.
-4. En la barra lateral, pulsa **Actualizar todo**. El primer escaneo e
-   identificación corren en segundo plano; puedes ir mirando el Dashboard mientras.
+4. En **Ajustes → Tu música** pulsa **Escanear** para leer tu biblioteca. Después,
+   el botón **Identificar y sincronizar** de la barra lateral la cruza con
+   MusicBrainz, Last.fm y Lidarr. Todo corre en segundo plano; ve mirando el Dashboard.
 
 A partir de ahí, Liderarrr se actualiza solo cada noche a las 03:00.
 

@@ -35,7 +35,7 @@ import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challen
 import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums } from './editions.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
-import { albumCover } from './covers.js';
+import { albumCover, retryMissingCovers } from './covers.js';
 import { diagnostics, pushEvent } from './diag.js';
 import * as q from './queries.js';
 
@@ -427,6 +427,9 @@ app.get('/api/cover/:id', async (req, reply) => {
   reply.header('Cache-Control', 'public, max-age=86400');
   return reply.send(fs.createReadStream(cover.path));
 });
+
+// vuelve a intentar las carátulas que no se encontraron (útil tras identificar)
+app.post('/api/covers/retry-missing', async () => ({ retried: retryMissingCovers() }));
 
 // --- copia de seguridad -----------------------------------------------------
 app.get('/api/backup/database', async (req, reply) => {

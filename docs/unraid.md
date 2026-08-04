@@ -57,8 +57,9 @@ Pulsa **Apply**. UNRAID descargará la imagen y arrancará el contenedor.
 2. Ve a **Ajustes** y en «Tu música» escribe la ruta **dentro del contenedor**:
    `/music` (no `/mnt/user/Musica`).
 3. Rellena lo que quieras usar (AcoustID, Discogs, Last.fm, Lidarr) y **Guarda**.
-4. En la barra lateral pulsa **Actualizar todo**. El escaneo e identificación
-   corren en segundo plano.
+4. En **Ajustes → Tu música** pulsa **Escanear**. Después, **Identificar y
+   sincronizar** (barra lateral) la cruza con MusicBrainz, Last.fm y Lidarr. Todo
+   corre en segundo plano.
 
 Después, Liderarrr se actualiza solo cada noche a las 03:00.
 
