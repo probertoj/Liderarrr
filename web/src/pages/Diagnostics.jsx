@@ -14,13 +14,20 @@ export default function Diagnostics() {
 
   const load = () => api.diag().then(setD).catch((e) => setErr(e.message));
   useEffect(() => {
-    load();
-    // refresco en vivo mientras haya un escaneo en marcha
-    timer.current = setInterval(async () => {
+    let alive = true;
+    // sondeo adaptativo: rápido solo mientras hay escaneo en marcha; lento en
+    // reposo, para no machacar el servidor con la consulta (pesada sobre 200k pistas)
+    const tick = async () => {
       const x = await api.diag().catch(() => null);
+      if (!alive) return;
       if (x) setD(x);
-    }, 2500);
-    return () => clearInterval(timer.current);
+      timer.current = setTimeout(tick, x?.scan?.running ? 3000 : 20000);
+    };
+    tick();
+    return () => {
+      alive = false;
+      clearTimeout(timer.current);
+    };
   }, []);
 
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
