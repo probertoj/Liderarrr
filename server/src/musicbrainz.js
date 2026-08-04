@@ -87,14 +87,43 @@ function lucene(s) {
   return String(s || '').replace(/[+\-!(){}[\]^"~*?:\\/]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// Palabras de edición que, entre paréntesis al final del título, son decoración y
+// estorban la búsqueda (no forman parte del nombre real del álbum en MusicBrainz).
+const EDITION_RE = /\b(remaster(ed)?|deluxe|expanded|anniversary|edition|reissue|mono|stereo|bonus|disc\s*\d+|cd\s*\d+)\b/i;
+
+// Limpia el título para buscarlo en MusicBrainz. Dos ruidos de etiquetado rompen
+// la búsqueda: (1) el nombre del artista repetido al principio ("Neil Young Archives
+// Vol. II" en vez de "Archives Vol. II"), y (2) paréntesis/corchetes finales con
+// año o edición ("(1972 - 1976)", "(Remastered)"). Ambos se quitan; se conservan
+// subtítulos con significado como "(Live)". Si limpiar lo deja vacío, usa el original.
+export function cleanAlbumTitle(title, artist) {
+  let t = String(title || '').trim();
+  if (!t) return t;
+  const a = String(artist || '').trim();
+  if (a) {
+    const re = new RegExp('^' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[-–—:]?\\s*', 'i');
+    const stripped = t.replace(re, '').trim();
+    if (stripped.length >= 2) t = stripped;
+  }
+  // quita paréntesis/corchetes finales que sean año o edición (repetido: puede haber
+  // varios, p. ej. "Album (Deluxe) (2009)")
+  for (;;) {
+    const m = t.match(/[([]([^)\]]*)[)\]]\s*$/);
+    if (!m || (!/\d{4}/.test(m[1]) && !EDITION_RE.test(m[1]))) break;
+    t = t.slice(0, m.index).trim();
+  }
+  return t || String(title || '').trim();
+}
+
 // Busca un release group por artista + título. Devuelve el mejor candidato con
 // su score (0-100), tipos y artista, o null.
 export async function searchReleaseGroup(artist, title) {
   if (!title) return null;
+  const clean = cleanAlbumTitle(title, artist);
   const q = artist
-    ? `releasegroup:"${lucene(title)}" AND artist:"${lucene(artist)}"`
-    : `releasegroup:"${lucene(title)}"`;
-  const data = await mbCached(`rg-search:${artist || ''}:${title}`.toLowerCase(), `/release-group?query=${enc(q)}&limit=5`);
+    ? `releasegroup:"${lucene(clean)}" AND artist:"${lucene(artist)}"`
+    : `releasegroup:"${lucene(clean)}"`;
+  const data = await mbCached(`rg-search:${artist || ''}:${clean}`.toLowerCase(), `/release-group?query=${enc(q)}&limit=5`);
   const rg = (data['release-groups'] || [])[0];
   if (!rg) return null;
   return {
