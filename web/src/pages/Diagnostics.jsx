@@ -21,7 +21,8 @@ export default function Diagnostics() {
       const x = await api.diag().catch(() => null);
       if (!alive) return;
       if (x) setD(x);
-      timer.current = setTimeout(tick, x?.scan?.running ? 3000 : 20000);
+      const busy = x?.scan?.running || x?.identify?.running;
+      timer.current = setTimeout(tick, busy ? 3000 : 20000);
     };
     tick();
     return () => {
@@ -107,6 +108,34 @@ export default function Diagnostics() {
           </div>
         ) : (
           <div className="text-sm text-neutral-600">Aún no se ha escaneado.</div>
+        )}
+      </div>
+
+      {/* identificación */}
+      <div className="card p-4 mb-4">
+        <h2 className="text-sm text-neutral-400 mb-2">Identificación (MusicBrainz)</h2>
+        {d.identify?.running ? (
+          <div>
+            <div className="flex justify-between text-sm text-gold-300 mb-1">
+              <span>
+                {n(d.identify.done)} / {n(d.identify.total)} · {n(d.identify.matched)} identificados ·{' '}
+                {n(d.identify.unmatched)} sin coincidencia
+              </span>
+              <span>{d.identify.total ? Math.round((d.identify.done / d.identify.total) * 100) : 0}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-ink-800 overflow-hidden">
+              <div
+                className="h-full bg-gold-400 transition-all"
+                style={{ width: `${d.identify.total ? Math.round((d.identify.done / d.identify.total) * 100) : 0}%` }}
+              />
+            </div>
+            {d.identify.current && <div className="text-[11px] text-neutral-600 mt-1 truncate">{d.identify.current}</div>}
+          </div>
+        ) : (
+          <div className="text-sm text-neutral-400">
+            {n(d.states.matched || 0)} identificados · {n((d.states.pending || 0) + (d.states.unmatched || 0))} pendientes.
+            {(d.states.pending || 0) > 0 ? ' Pulsa «Identificar y sincronizar» para continuar.' : ' Todo identificado.'}
+          </div>
         )}
       </div>
 

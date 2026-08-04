@@ -1,5 +1,6 @@
 import { db, getSetting } from './db.js';
 import { scanStatus } from './scanner.js';
+import { identifyStatus } from './identify.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -98,6 +99,14 @@ export function diagnostics() {
       errors: scanStatus.errors,
       current: scanStatus.current,
       lastScan,
+    },
+    identify: {
+      running: identifyStatus.running,
+      total: identifyStatus.total,
+      done: identifyStatus.done,
+      matched: identifyStatus.matched,
+      unmatched: identifyStatus.unmatched,
+      current: identifyStatus.current,
     },
     events: recentEvents(),
   };

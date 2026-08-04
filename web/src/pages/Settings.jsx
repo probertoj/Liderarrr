@@ -208,6 +208,15 @@ export default function Settings() {
         <Field label="AcoustID · API key" hint="Gratis en acoustid.org/api-key. Necesita el binario fpcalc (incluido en Docker).">
           <input value={s.acoustid_key || ''} onChange={set('acoustid_key')} className={input} placeholder="••••••••" />
         </Field>
+        <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={s.identify_acoustid !== '0'}
+            onChange={(e) => setS((p) => ({ ...p, identify_acoustid: e.target.checked ? '1' : '0' }))}
+          />
+          Usar AcoustID como último recurso al identificar
+          <span className="text-xs text-neutral-600">(lee el fichero entero; pesado en bibliotecas enormes)</span>
+        </label>
         <Field label="Discogs · token personal" hint="discogs.com → Ajustes → Developers → Generate token.">
           <input value={s.discogs_token || ''} onChange={set('discogs_token')} className={input} placeholder="••••••••" />
         </Field>

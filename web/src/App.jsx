@@ -77,15 +77,21 @@ function RefreshButton() {
   useEffect(() => {
     if (!running) return;
     const t = setInterval(async () => {
-      const s = await api.refreshStatus().catch(() => null);
-      if (s) {
+      const [s, id] = await Promise.all([
+        api.refreshStatus().catch(() => null),
+        api.identifyStatus().catch(() => null),
+      ]);
+      // la identificación es el paso largo: mostramos su progreso concreto
+      if (id?.running && id.total) {
+        setStep(`Identificando ${id.done.toLocaleString('es')}/${id.total.toLocaleString('es')}`);
+      } else if (s) {
         setStep(s.step);
-        if (!s.running) {
-          setRunning(false);
-          setStep(null);
-        }
       }
-    }, 1200);
+      if (s && !s.running) {
+        setRunning(false);
+        setStep(null);
+      }
+    }, 1500);
     return () => clearInterval(t);
   }, [running]);
   return (

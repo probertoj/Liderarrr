@@ -1,4 +1,4 @@
-import { db } from './db.js';
+import { db, getSetting } from './db.js';
 import * as mb from './musicbrainz.js';
 import * as acoustid from './acoustid.js';
 import * as discogs from './discogs.js';
@@ -99,28 +99,8 @@ async function identifyAlbum(album) {
     return 'tags';
   }
 
-  // 2. AcoustID sobre una pista representativa (la más larga suele ser fiable)
-  const rep = db
-    .prepare('SELECT path FROM tracks WHERE album_id = ? AND path IS NOT NULL ORDER BY duration_ms DESC LIMIT 1')
-    .get(album.id);
-  if (rep) {
-    try {
-      const hit = await acoustid.lookup(rep.path);
-      if (hit?.mb_recording_id && hit.score >= 0.5) {
-        const { artist_mbid, releaseGroups } = await mb.recordingReleaseGroups(hit.mb_recording_id);
-        const rg = pickBest(releaseGroups, album.title);
-        if (rg) {
-          commitMatch(album, rg, 'acoustid', hit.score);
-          await anchorArtist(album.id, artist_mbid);
-          return 'acoustid';
-        }
-      }
-    } catch {
-      /* sigue la cadena */
-    }
-  }
-
-  // 3. MusicBrainz por texto
+  // 2. MusicBrainz por texto (BARATO: 1 pet/s y cacheado). Es lo primero porque
+  //    resuelve la mayoría de los álbumes bien etiquetados sin tocar el fichero.
   try {
     const rg = await mb.searchReleaseGroup(album.album_artist, album.title);
     if (rg && rg.score >= 80) {
@@ -132,7 +112,7 @@ async function identifyAlbum(album) {
     /* sigue la cadena */
   }
 
-  // 4. Last.fm puede tener el MBID de release; si lo da, se vuelve a MB
+  // 3. Last.fm puede tener el MBID de release; si lo da, se vuelve a MB
   try {
     const info = await lastfm.albumInfo(album.album_artist, album.title);
     if (info?.mbid) {
@@ -148,9 +128,30 @@ async function identifyAlbum(album) {
     /* sigue la cadena */
   }
 
-  // 5. Discogs (solo confirma existencia/edición; no da rg_mbid, así que sirve
-  //    de pista para el usuario, no como match automático fiable)
-  // -> se deja para resolución manual asistida en la página "Sin identificar".
+  // 4. AcoustID (huella del audio) — ÚLTIMO recurso: fpcalc LEE EL FICHERO ENTERO y
+  //    calcula la huella (caro por red y CPU). Solo se hace si lo anterior falló y
+  //    está activado; si no, en una biblioteca enorme ahogaría toda la app.
+  if (getSetting('identify_acoustid') !== '0') {
+    const rep = db
+      .prepare('SELECT path FROM tracks WHERE album_id = ? AND path IS NOT NULL ORDER BY duration_ms DESC LIMIT 1')
+      .get(album.id);
+    if (rep) {
+      try {
+        const hit = await acoustid.lookup(rep.path);
+        if (hit?.mb_recording_id && hit.score >= 0.5) {
+          const { artist_mbid, releaseGroups } = await mb.recordingReleaseGroups(hit.mb_recording_id);
+          const rg = pickBest(releaseGroups, album.title);
+          if (rg) {
+            commitMatch(album, rg, 'acoustid', hit.score);
+            await anchorArtist(album.id, artist_mbid);
+            return 'acoustid';
+          }
+        }
+      } catch {
+        /* sigue */
+      }
+    }
+  }
 
   markUnmatched.run({ id: album.id, now: Date.now() });
   identifyStatus.unmatched++;
