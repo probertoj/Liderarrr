@@ -280,6 +280,29 @@ export default function Settings() {
         )}
       </section>
 
+      {/* 3b. Prowlarr — buscar y descargar sin el filtro de Lidarr */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">
+          3b · Prowlarr <span className="text-xs text-neutral-500">(opcional)</span>
+        </h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Buscar y descargar un disco desde Liderarr usando TODOS tus indexers (RED, OPS, Jackett), sin pasar por el
+          filtro de metadatos de Lidarr. Prowlarr manda la release elegida a su cliente de descarga.
+        </p>
+        <Field label="URL de Prowlarr" hint="Ej.: http://192.168.1.50:9696">
+          <input value={s.prowlarr_url || ''} onChange={set('prowlarr_url')} className={input} placeholder="http://…:9696" />
+        </Field>
+        <Field label="API key" hint="Prowlarr → Settings → General → Security → API Key.">
+          <input value={s.prowlarr_key || ''} onChange={set('prowlarr_key')} className={input} placeholder="••••••••" />
+        </Field>
+        <div className="flex gap-2">
+          <TestButton service="prowlarr" label="Prowlarr" />
+        </div>
+        <p className="text-xs text-neutral-600 mt-2">
+          Para descargar de punta a punta, Prowlarr necesita un cliente de descarga en Settings → Download Clients.
+        </p>
+      </section>
+
       {/* 4. Auto-Lidarr */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">4 · Auto-Lidarr diario <span className="text-xs text-neutral-500">(opcional)</span></h2>

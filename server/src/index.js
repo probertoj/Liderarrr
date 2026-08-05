@@ -9,6 +9,7 @@ import { runScan, scanStatus } from './scanner.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch } from './identify.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
 import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab } from './lidarr.js';
+import { prowlarrTest, prowlarrSearch, prowlarrGrab } from './prowlarr.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists } from './musicbrainz.js';
 import { acoustidTest } from './acoustid.js';
 import { discogsTest, searchRelease } from './discogs.js';
@@ -100,6 +101,7 @@ app.get('/api/setup-state', async () => {
   return {
     music: !!s.music_dirs,
     lidarr: !!(s.lidarr_url && s.lidarr_key),
+    prowlarr: !!(s.prowlarr_url && s.prowlarr_key),
     acoustid: !!s.acoustid_key,
     lastfm: !!s.lastfm_key,
     discogs: !!s.discogs_token,
@@ -108,7 +110,7 @@ app.get('/api/setup-state', async () => {
 });
 
 // --- ajustes ----------------------------------------------------------------
-const SECRET_KEYS = new Set(['lidarr_key', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token']);
+const SECRET_KEYS = new Set(['lidarr_key', 'prowlarr_key', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token']);
 app.get('/api/settings', async () => {
   const raw = getAllSettings();
   const out = {};
@@ -133,6 +135,7 @@ app.post('/api/settings/test/:service', async (req, reply) => {
     const svc = req.params.service;
     const map = {
       lidarr: lidarrTest,
+      prowlarr: prowlarrTest,
       musicbrainz: mbTest,
       acoustid: acoustidTest,
       discogs: discogsTest,
@@ -442,6 +445,23 @@ app.post('/api/lidarr/grab', async (req, reply) => {
   try {
     const { guid, indexerId } = req.body || {};
     return await lidarrGrab({ guid, indexerId });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+
+// --- Prowlarr (buscar y descargar sin pasar por el filtro de Lidarr) ---------
+app.get('/api/prowlarr/search', async (req, reply) => {
+  try {
+    return await prowlarrSearch(req.query?.q);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/prowlarr/grab', async (req, reply) => {
+  try {
+    const { guid, indexerId } = req.body || {};
+    return await prowlarrGrab({ guid, indexerId });
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

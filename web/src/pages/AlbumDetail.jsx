@@ -118,6 +118,8 @@ export default function AlbumDetail() {
 
       {album.match_state === 'matched' && <LidarrSection album={album} onDone={load} />}
 
+      <ProwlarrSearch album={album} />
+
       <Editions albumId={album.id} />
 
       {album.match_state === 'matched' && <TagWriter albumId={album.id} />}
@@ -632,6 +634,115 @@ function LidarrSection({ album, onDone }) {
       )}
       {releases && releases.length === 0 && !msg && (
         <p className="text-sm text-neutral-600 mt-3">Los indexers no devolvieron releases para este álbum.</p>
+      )}
+    </div>
+  );
+}
+
+// Buscar y descargar vía Prowlarr, SIN pasar por el filtro de metadatos de Lidarr.
+// Busca en todos tus indexers (RED, OPS, Jackett), listas todas las releases y la
+// que elijas la agarra Prowlarr y la manda a su cliente de descarga. Es la vía para
+// pedir lo que Lidarr veta (compilaciones, directos, ediciones que su perfil excluye).
+function ProwlarrSearch({ album }) {
+  const [q, setQ] = useState(`${album.artist?.name || album.album_artist || ''} ${album.title || ''}`.trim());
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+  const [grabbing, setGrabbing] = useState(null);
+  const [grabbed, setGrabbed] = useState({});
+  const [msg, setMsg] = useState(null);
+
+  const search = async () => {
+    if (!q.trim()) return;
+    setLoading(true);
+    setErr(null);
+    setMsg(null);
+    setResults(null);
+    try {
+      setResults(await api.prowlarrSearch(q));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const grab = async (r) => {
+    setGrabbing(r.guid);
+    setErr(null);
+    try {
+      await api.prowlarrGrab(r.guid, r.indexerId);
+      setGrabbed((p) => ({ ...p, [r.guid]: true }));
+      setMsg('Enviado a tu cliente de descarga.');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setGrabbing(null);
+    }
+  };
+
+  return (
+    <div className="card p-4 mb-6">
+      <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+        <Search size={15} /> Buscar y descargar (Prowlarr)
+      </h2>
+      <p className="text-xs text-neutral-600 mt-1">
+        Busca en <b className="font-normal text-neutral-500">todos tus indexers</b> (RED, OPS, Jackett) sin el filtro de
+        Lidarr. Elige la release que quieras y Prowlarr la manda a tu cliente de descarga. La búsqueda consulta los
+        trackers en vivo: puede tardar.
+      </p>
+      <div className="flex gap-2 mt-3">
+        <input
+          className="flex-1 bg-ink-850 border border-ink-800 rounded px-2 py-1.5 text-sm outline-none focus:border-gold-500/60"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && search()}
+          placeholder="Artista y álbum…"
+        />
+        <Button variant="gold" onClick={search} disabled={loading}>
+          <span className="inline-flex items-center gap-1.5">
+            <Search size={14} /> {loading ? 'Buscando…' : 'Buscar'}
+          </span>
+        </Button>
+      </div>
+
+      {msg && <p className="text-sm text-emerald-400 mt-3">{msg}</p>}
+      {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+      {results && results.length === 0 && !loading && (
+        <p className="text-sm text-neutral-600 mt-3">Tus indexers no devolvieron nada. Prueba a cambiar el texto.</p>
+      )}
+      {results && results.length > 0 && (
+        <div className="mt-3 max-h-[30rem] overflow-y-auto divide-y divide-ink-850/60">
+          {results.map((r) => (
+            <div key={`${r.indexerId}:${r.guid}`} className="py-2 flex items-start gap-3 text-sm">
+              <div className="min-w-0 flex-1">
+                <div className="truncate" title={r.title}>
+                  {r.title}
+                </div>
+                <div className="text-xs text-neutral-600 flex flex-wrap gap-x-2 mt-0.5">
+                  <span className="text-neutral-400">{r.indexer}</span>
+                  <span>{fmtBytes(r.size)}</span>
+                  {r.seeders != null && (
+                    <span className={r.seeders > 0 ? 'text-emerald-400/70' : 'text-red-400/70'}>{r.seeders} seeders</span>
+                  )}
+                  {r.grabs != null && <span>{r.grabs} grabs</span>}
+                  {r.protocol && <span>{r.protocol}</span>}
+                </div>
+              </div>
+              {grabbed[r.guid] ? (
+                <span className="text-emerald-400 text-xs inline-flex items-center gap-1 shrink-0 self-center">
+                  <Check size={14} /> enviado
+                </span>
+              ) : (
+                <Button variant="gold" disabled={grabbing === r.guid} onClick={() => grab(r)}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Download size={14} /> {grabbing === r.guid ? '…' : 'Descargar'}
+                  </span>
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

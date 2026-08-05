@@ -67,6 +67,8 @@ export const api = {
   lidarrSync: () => req('/lidarr/sync', { method: 'POST' }),
   lidarrAdd: (rg_mbid, artist_mbid) => req('/lidarr/add', { method: 'POST', body: { rg_mbid, artist_mbid } }),
   lidarrAddBulk: (items) => req('/lidarr/add-bulk', { method: 'POST', body: { items } }),
+  prowlarrSearch: (q) => req(`/prowlarr/search?q=${encodeURIComponent(q)}`),
+  prowlarrGrab: (guid, indexerId) => req('/prowlarr/grab', { method: 'POST', body: { guid, indexerId } }),
 
   // fase 2 — la caza
   tracked: () => req('/tracked'),
