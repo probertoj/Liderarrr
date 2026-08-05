@@ -53,6 +53,16 @@ export default function AlbumDetail() {
             {album.secondary_types?.map((t) => (
               <span key={t} className="text-xs text-neutral-600">· {t}</span>
             ))}
+            {album.rg_mbid && (
+              <a
+                href={`https://musicbrainz.org/release-group/${album.rg_mbid}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-gold-400 hover:underline inline-flex items-center gap-1"
+              >
+                MusicBrainz <ExternalLink size={11} />
+              </a>
+            )}
           </div>
           <h1 className="text-2xl font-display">{album.title}</h1>
           <Link to={`/artista/${album.artist_id}`} className="text-gold-400 hover:underline">
@@ -502,6 +512,14 @@ function ManualSearch({ album, onDone }) {
                   <span className="text-emerald-400/80">{r.score}%</span>
                   {r.primary_type && <span className="ml-2">{r.primary_type}</span>}
                   {r.secondary_types?.length ? <span className="ml-1 text-neutral-700">· {r.secondary_types.join(', ')}</span> : null}
+                  <a
+                    href={`https://musicbrainz.org/release-group/${r.rg_mbid}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ml-2 text-gold-400 hover:underline inline-flex items-center gap-0.5"
+                  >
+                    MusicBrainz <ExternalLink size={11} />
+                  </a>
                 </div>
               </div>
               <Button variant="gold" disabled={saving === r.rg_mbid} onClick={() => pick(r.rg_mbid)}>

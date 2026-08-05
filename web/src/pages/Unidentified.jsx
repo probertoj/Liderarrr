@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Sparkles, Check } from 'lucide-react';
+import { HelpCircle, Sparkles, Check, ExternalLink } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Cover, Spinner, ErrorMsg, Button } from '../components.jsx';
 
@@ -98,6 +98,14 @@ function Candidates({ id, onDone }) {
             {data.musicbrainz.primary_type && (
               <span className="text-neutral-600 text-xs ml-2">{data.musicbrainz.primary_type}</span>
             )}
+            <a
+              href={`https://musicbrainz.org/release-group/${data.musicbrainz.rg_mbid}`}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-2 text-gold-400 hover:underline inline-flex items-center gap-0.5 text-xs"
+            >
+              MusicBrainz <ExternalLink size={11} />
+            </a>
           </div>
           <Button
             variant="gold"
