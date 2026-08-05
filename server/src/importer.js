@@ -25,14 +25,32 @@ function importConfig() {
 const importedSet = () => new Set(db.prepare('SELECT source_dir FROM imports').all().map((r) => r.source_dir));
 const recordImport = db.prepare('INSERT OR IGNORE INTO imports (source_dir, dest_dir, imported_at) VALUES (?,?,?)');
 
-// sanea un componente de ruta para el sistema de ficheros
-function safe(name) {
-  return (
-    String(name || '')
+// Construye la ruta de destino desde una plantilla CONFIGURABLE con tokens
+// {artist} {album} {year}. Las '/' de la plantilla son separadores de carpeta; cada
+// segmento se sanea (fuera caracteres ilegales). Si no hay año, se limpian los
+// restos de un año ausente ("()", "[]", guiones sueltos). Ejemplos:
+//   {artist}/{album} ({year})     -> Radiohead/Kid A (2000)
+//   {artist}/{year} - {album}     -> Radiohead/2000 - Kid A
+//   {artist} - {album} ({year})   -> Radiohead - Kid A (2000)   (carpeta única)
+function renderPath(template, { artist, album, year }) {
+  const tpl = String(template || '').trim() || '{artist}/{album} ({year})';
+  const yr = year != null && year !== '' ? String(year) : '';
+  const segs = [];
+  for (let seg of tpl.split('/')) {
+    seg = seg
+      .replace(/\{artist\}/gi, artist || '')
+      .replace(/\{album\}/gi, album || '')
+      .replace(/\{year\}/gi, yr);
+    if (!yr) seg = seg.replace(/[([]\s*[)\]]/g, ''); // quita "()" / "[]" del año ausente
+    seg = seg
       .replace(/[/\\:*?"<>|]+/g, ' ')
       .replace(/\s+/g, ' ')
-      .trim() || 'Desconocido'
-  );
+      .replace(/^[\s\-–—_]+|[\s\-–—_]+$/g, '')
+      .trim();
+    if (seg) segs.push(seg);
+  }
+  if (!segs.length) segs.push('Desconocido');
+  return path.join(...segs);
 }
 
 // ficheros interesantes bajo una carpeta, con su ruta RELATIVA (para respetar
@@ -144,9 +162,14 @@ export async function importFolder(sourceDir, override = {}) {
   if (!audio.length) throw new Error('La carpeta no tiene ficheros de audio que importar.');
   const tags = await readTags(path.join(norm, audio[0]));
   const meta = { ...tags, ...override };
-  const artist = safe(meta.artist);
-  const albumBase = safe(meta.album || path.basename(norm));
-  const destDir = path.join(dest, artist, meta.year ? `${albumBase} (${meta.year})` : albumBase);
+  const destDir = path.join(
+    dest,
+    renderPath(getSetting('import_naming'), {
+      artist: meta.artist || 'Artista desconocido',
+      album: meta.album || path.basename(norm),
+      year: meta.year || null,
+    })
+  );
 
   // Si origen y biblioteca están en montajes distintos, el hardlink da EXDEV. Con
   // "copiar si no se puede enlazar" activo, se copia (ocupa el doble); si no, se avisa.

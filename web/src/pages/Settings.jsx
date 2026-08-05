@@ -327,6 +327,17 @@ export default function Settings() {
         <Field label="Carpeta de la biblioteca (destino)" hint="Tu biblioteca organizada. Ej.: /data/media/music">
           <input value={s.import_dest_dir || ''} onChange={set('import_dest_dir')} className={input} placeholder="/data/media/music" />
         </Field>
+        <Field
+          label="Estructura de carpetas"
+          hint="Tokens: {artist} {album} {year}. La / crea subcarpetas. Ej.: {artist}/{year} - {album}"
+        >
+          <input
+            value={s.import_naming || ''}
+            onChange={set('import_naming')}
+            className={input}
+            placeholder="{artist}/{album} ({year})"
+          />
+        </Field>
         <label className="flex items-center gap-2 text-sm mt-3 cursor-pointer">
           <input
             type="checkbox"
