@@ -148,7 +148,12 @@ export async function importFolder(sourceDir, override = {}) {
   const albumBase = safe(meta.album || path.basename(norm));
   const destDir = path.join(dest, artist, meta.year ? `${albumBase} (${meta.year})` : albumBase);
 
+  // Si origen y biblioteca están en montajes distintos, el hardlink da EXDEV. Con
+  // "copiar si no se puede enlazar" activo, se copia (ocupa el doble); si no, se avisa.
+  const copyAllowed = getSetting('import_copy_fallback') === '1';
+
   let linked = 0;
+  let method = 'hardlink';
   const errors = [];
   for (const rel of files) {
     const src = path.join(norm, rel);
@@ -163,13 +168,23 @@ export async function importFolder(sourceDir, override = {}) {
       linked++;
     } catch (e) {
       if (e.code === 'EXDEV') {
-        throw new Error(
-          'El origen y la biblioteca están en sistemas de ficheros distintos: el hardlink no es posible. Monta /data como un único volumen (guía TRaSH) para que ambos compartan sistema de ficheros.'
-        );
+        if (!copyAllowed) {
+          throw new Error(
+            'El origen y la biblioteca están en sistemas de ficheros distintos: el hardlink no es posible. Monta /data como un único volumen (guía TRaSH), o activa «Copiar si el hardlink no es posible» en Ajustes → Importar descargas (ocupará el doble de espacio).'
+          );
+        }
+        try {
+          fs.copyFileSync(src, target);
+          linked++;
+          method = 'copy';
+        } catch (ce) {
+          errors.push(`${rel}: ${ce.message}`);
+        }
+      } else {
+        errors.push(`${rel}: ${e.message}`);
       }
-      errors.push(`${rel}: ${e.message}`);
     }
   }
   recordImport.run(norm, destDir, Date.now());
-  return { dest: destDir, linked, errors, artist: meta.artist, album: meta.album, year: meta.year };
+  return { dest: destDir, linked, method, errors, artist: meta.artist, album: meta.album, year: meta.year };
 }

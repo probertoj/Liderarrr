@@ -36,7 +36,7 @@ export default function Imports() {
         album: field(it.source_dir, 'album', it.album),
         year: field(it.source_dir, 'year', it.year),
       });
-      setDone((p) => ({ ...p, [it.source_dir]: r.dest }));
+      setDone((p) => ({ ...p, [it.source_dir]: { dest: r.dest, method: r.method } }));
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -92,7 +92,9 @@ export default function Imports() {
             {done[it.source_dir] ? (
               <div className="text-sm text-emerald-400 flex items-center gap-2 min-w-0">
                 <Link2 size={14} className="shrink-0" />
-                <span className="truncate">Enlazado a {done[it.source_dir]}</span>
+                <span className="truncate">
+                  {done[it.source_dir].method === 'copy' ? 'Copiado' : 'Enlazado'} a {done[it.source_dir].dest}
+                </span>
               </div>
             ) : (
               <div className="flex flex-wrap items-end gap-2">

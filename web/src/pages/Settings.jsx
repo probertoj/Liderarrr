@@ -327,6 +327,14 @@ export default function Settings() {
         <Field label="Carpeta de la biblioteca (destino)" hint="Tu biblioteca organizada. Ej.: /data/media/music">
           <input value={s.import_dest_dir || ''} onChange={set('import_dest_dir')} className={input} placeholder="/data/media/music" />
         </Field>
+        <label className="flex items-center gap-2 text-sm mt-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={s.import_copy_fallback === '1'}
+            onChange={(e) => setS((p) => ({ ...p, import_copy_fallback: e.target.checked ? '1' : '0' }))}
+          />
+          Copiar si el hardlink no es posible <span className="text-xs text-neutral-500">(ocupa el doble; úsalo si origen y biblioteca no comparten volumen)</span>
+        </label>
       </section>
 
       {/* 4. Auto-Lidarr */}
