@@ -12,6 +12,7 @@ export default function Imports() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [edits, setEdits] = useState({}); // source_dir -> { artist, album, year }
   const [done, setDone] = useState({}); // source_dir -> dest
 
@@ -44,8 +45,35 @@ export default function Imports() {
     }
   };
 
+  // importar uno, avisando si ya parece estar en la biblioteca
+  const runWithWarn = (it) => {
+    if (
+      it.inLibrary &&
+      !window.confirm(`«${it.album || it.name}» ya parece estar en tu biblioteca. ¿Importar igualmente? Creará una copia organizada aparte.`)
+    )
+      return;
+    run(it);
+  };
+
+  // importar en lote las que NO están ya en la biblioteca
+  const importAll = async () => {
+    const todo = (data?.items || []).filter((it) => !done[it.source_dir] && !it.inLibrary);
+    if (!todo.length || !window.confirm(`¿Importar ${todo.length} descargas a la biblioteca?`)) return;
+    setBulkBusy(true);
+    try {
+      for (const it of todo) {
+        // eslint-disable-next-line no-await-in-loop
+        await run(it);
+      }
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!data) return <Spinner />;
+
+  const importable = data.items?.filter((it) => !done[it.source_dir] && !it.inLibrary) || [];
 
   return (
     <div>
@@ -54,6 +82,13 @@ export default function Imports() {
         title="Importar descargas"
         sub={data.items?.length ? `${data.items.length} sin importar` : ''}
       >
+        {importable.length > 0 && (
+          <Button variant="gold" onClick={importAll} disabled={bulkBusy}>
+            <span className="inline-flex items-center gap-1.5">
+              <Link2 size={14} /> {bulkBusy ? 'Importando…' : `Importar todo (${importable.length})`}
+            </span>
+          </Button>
+        )}
         <Button onClick={load}>
           <span className="inline-flex items-center gap-1.5">
             <RefreshCw size={14} /> Refrescar
@@ -88,6 +123,7 @@ export default function Imports() {
           <div key={it.source_dir} className="card p-3">
             <div className="text-xs text-neutral-600 truncate mb-2" title={it.source_dir}>
               {it.name} · {it.tracks} pistas
+              {it.inLibrary && <span className="text-amber-400/80"> · ⚠ ya en tu biblioteca</span>}
             </div>
             {done[it.source_dir] ? (
               <div className="text-sm text-emerald-400 flex items-center gap-2 min-w-0">
@@ -125,7 +161,11 @@ export default function Imports() {
                     placeholder="Año"
                   />
                 </label>
-                <Button variant="gold" disabled={busy === it.source_dir} onClick={() => run(it)}>
+                <Button
+                  variant={it.inLibrary ? 'default' : 'gold'}
+                  disabled={busy === it.source_dir}
+                  onClick={() => runWithWarn(it)}
+                >
                   <span className="inline-flex items-center gap-1.5">
                     <Link2 size={14} /> {busy === it.source_dir ? 'Enlazando…' : 'Importar'}
                   </span>

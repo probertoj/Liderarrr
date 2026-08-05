@@ -180,7 +180,7 @@ export function artists({ q, sort, limit = 5000 } = {}) {
 // la puntuación. Así "Philophobia", "Philophobia (Deluxe Version)" y "Philophobia
 // (Deluxe Edition) CD2" caen en el mismo grupo.
 const DUP_STRIP = /\b(deluxe|remaster(ed)?|expanded|anniversary|edition|version|reissue|mono|stereo|bonus|remix(es|ed)?|disc\s*\d+|cd\s*\d+)\b/gi;
-function normalizeForDup(title) {
+export function normalizeForDup(title) {
   return String(title || '')
     .toLowerCase()
     .replace(/[([{][^)\]}]*[)\]}]/g, ' ')
