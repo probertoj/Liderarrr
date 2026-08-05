@@ -135,6 +135,10 @@ VALUES (@album_id, @disc, @num, @title, @artist, @duration_ms, @path, @format, @
 `);
 const insertGenre = db.prepare("INSERT INTO tags (type, name) VALUES ('genre', ?) ON CONFLICT DO NOTHING");
 const getGenreId = db.prepare("SELECT id FROM tags WHERE type = 'genre' AND name = ?");
+// sellos: mismo mecanismo que géneros pero type='label' (así alimenta la vista de
+// Sellos desde las etiquetas de tus ficheros, no solo desde Discogs bajo demanda).
+const insertLabel = db.prepare("INSERT INTO tags (type, name) VALUES ('label', ?) ON CONFLICT DO NOTHING");
+const getLabelId = db.prepare("SELECT id FROM tags WHERE type = 'label' AND name = ?");
 const linkTag = db.prepare('INSERT INTO album_tags (album_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING');
 // La transacción se crea UNA vez y se reutiliza. Crearla por carpeta (26k veces)
 // era un antipatrón: acumulaba objetos y presionaba la memoria/handles nativos.
@@ -159,6 +163,7 @@ async function ingestFolder({ dir, files }) {
   let totalSize = 0;
   let totalDur = 0;
   const genres = new Set();
+  const labels = new Set();
   let albumMeta = { album: null, albumArtist: null, artist: null, year: null, rgMbid: null, relMbid: null, artistMbid: null, totalTracks: null, discs: 1 };
 
   for (const file of files) {
@@ -179,6 +184,12 @@ async function ingestFolder({ dir, files }) {
     totalSize += size;
     totalDur += (f.duration || 0) * 1000;
     for (const g of c.genre || []) genres.add(g);
+    // sello/discográfica (TPUB / LABEL / PUBLISHER / ORGANIZATION → common.label).
+    // Se descartan valores absurdamente largos (suelen ser textos de copyright).
+    for (const l of c.label || []) {
+      const s = String(l || '').trim();
+      if (s && s.length <= 80) labels.add(s);
+    }
 
     const fmt = (path.extname(file).slice(1) || f.container || '').toUpperCase();
     tracks.push({
@@ -258,6 +269,11 @@ async function ingestFolder({ dir, files }) {
     insertGenre.run(g);
     const gid = getGenreId.get(g)?.id;
     if (gid) linkTag.run(albumId, gid);
+  }
+  for (const l of labels) {
+    insertLabel.run(l);
+    const lid = getLabelId.get(l)?.id;
+    if (lid) linkTag.run(albumId, lid);
   }
 
   scanStatus.albumsDone++;
