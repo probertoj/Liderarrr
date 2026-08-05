@@ -107,6 +107,7 @@ export const api = {
   upgrades: () => req('/quality/upgrades'),
   labels: () => req('/labels'),
   label: (name) => req(`/labels/${encodeURIComponent(name)}`),
+  labelCompletism: (name) => req(`/labels/${encodeURIComponent(name)}/completism`),
   tagPreview: (id) => req(`/albums/${id}/tag-preview`),
   writeTags: (id) => req(`/albums/${id}/write-tags`, { method: 'POST' }),
 };

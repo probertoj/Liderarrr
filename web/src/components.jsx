@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, Component } from 'react';
 import { Link } from 'react-router-dom';
-import { Disc3, ImageOff } from 'lucide-react';
-import { coverUrl } from './api.js';
+import { Disc3, ImageOff, Search, X, Download, Check } from 'lucide-react';
+import { api, coverUrl, fmtBytes } from './api.js';
 
 // Red de seguridad: si una página lanza un error al pintar (o falla la carga de
 // su código tras una actualización, o una petición revienta), muestra un aviso
@@ -252,5 +252,122 @@ export function Button({ children, onClick, variant = 'default', disabled, class
     <button onClick={onClick} disabled={disabled} className={`${base} ${styles[variant]} ${className}`}>
       {children}
     </button>
+  );
+}
+
+// Búsqueda manual en Prowlarr (modal reutilizable). Para pedir un disco que FALTA
+// desde donde sea (huecos, discografía de artista, completismo de sello): busca en
+// todos los indexers por texto y descarga la release que elijas. Es la alternativa
+// a "enviar a Lidarr": o lo delegas en Lidarr, o lo buscas y descargas tú al momento.
+export function ProwlarrSearchModal({ initialQuery, onClose }) {
+  const [q, setQ] = useState(initialQuery || '');
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+  const [grabbing, setGrabbing] = useState(null);
+  const [grabbed, setGrabbed] = useState({});
+  const [msg, setMsg] = useState(null);
+
+  const search = async () => {
+    if (!q.trim()) return;
+    setLoading(true);
+    setErr(null);
+    setMsg(null);
+    setResults(null);
+    try {
+      setResults(await api.prowlarrSearch(q));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    search();
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const grab = async (r) => {
+    setGrabbing(r.guid);
+    setErr(null);
+    try {
+      await api.prowlarrGrab(r.guid, r.indexerId);
+      setGrabbed((p) => ({ ...p, [r.guid]: true }));
+      setMsg('Enviado a tu cliente de descarga.');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setGrabbing(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
+      <div className="card p-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <h2 className="text-sm text-neutral-300 flex items-center gap-2">
+            <Search size={15} /> Buscar y descargar (Prowlarr)
+          </h2>
+          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-200 shrink-0" aria-label="Cerrar">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="flex gap-2 mt-2">
+          <input
+            className="flex-1 bg-ink-850 border border-ink-800 rounded px-2 py-1.5 text-sm outline-none focus:border-gold-500/60"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && search()}
+            placeholder="Artista y álbum…"
+          />
+          <Button variant="gold" onClick={search} disabled={loading}>
+            <span className="inline-flex items-center gap-1.5">
+              <Search size={14} /> {loading ? 'Buscando…' : 'Buscar'}
+            </span>
+          </Button>
+        </div>
+        {msg && <p className="text-sm text-emerald-400 mt-3">{msg}</p>}
+        {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+        {results && results.length === 0 && !loading && (
+          <p className="text-sm text-neutral-600 mt-3">Sin resultados en tus indexers.</p>
+        )}
+        {results && results.length > 0 && (
+          <div className="mt-3 divide-y divide-ink-850/60">
+            {results.map((r) => (
+              <div key={`${r.indexerId}:${r.guid}`} className="py-2 flex items-start gap-3 text-sm">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate" title={r.title}>
+                    {r.title}
+                  </div>
+                  <div className="text-xs text-neutral-600 flex flex-wrap gap-x-2 mt-0.5">
+                    <span className="text-neutral-400">{r.indexer}</span>
+                    <span>{fmtBytes(r.size)}</span>
+                    {r.seeders != null && (
+                      <span className={r.seeders > 0 ? 'text-emerald-400/70' : 'text-red-400/70'}>{r.seeders} seeders</span>
+                    )}
+                    {r.protocol && <span>{r.protocol}</span>}
+                  </div>
+                </div>
+                {grabbed[r.guid] ? (
+                  <span className="text-emerald-400 text-xs inline-flex items-center gap-1 shrink-0 self-center">
+                    <Check size={14} /> enviado
+                  </span>
+                ) : (
+                  <Button variant="gold" disabled={grabbing === r.guid} onClick={() => grab(r)}>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Download size={14} /> {grabbing === r.guid ? '…' : 'Descargar'}
+                    </span>
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

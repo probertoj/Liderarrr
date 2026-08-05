@@ -35,7 +35,7 @@ import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobble
 import { listeningOverview, ownershipGap, ownedUnplayed, hasScrobbles } from './listening.js';
 import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing } from './challenges.js';
 import { artistRelations } from './relations.js';
-import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums } from './editions.js';
+import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCompletism } from './editions.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
 import { coverFast, resolveCoverSlow, retryMissingCovers } from './covers.js';
 import { diagnostics, pushEvent } from './diag.js';
@@ -284,6 +284,14 @@ app.get('/api/albums/:id/editions', async (req, reply) => {
 app.get('/api/quality/upgrades', async () => upgradeCandidates());
 app.get('/api/labels', async () => labelsOverview());
 app.get('/api/labels/:name', async (req) => labelAlbums(req.params.name));
+// completismo del sello contra MusicBrainz (bajo demanda; puede tardar)
+app.get('/api/labels/:name/completism', async (req, reply) => {
+  try {
+    return await labelCompletism(req.params.name);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 
 // escritura de etiquetas (MBID) — opt-in, solo matched, con preview
 app.get('/api/albums/:id/tag-preview', async (req, reply) => {

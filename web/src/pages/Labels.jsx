@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Building2, ArrowLeft } from 'lucide-react';
-import { api } from '../api.js';
-import { PageTitle, AlbumCard, Spinner, ErrorMsg } from '../components.jsx';
+import { Building2, ArrowLeft, ExternalLink, Check } from 'lucide-react';
+import { api, pollLidarrQueue } from '../api.js';
+import { PageTitle, AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, ProwlarrSearchModal } from '../components.jsx';
 
 // Sellos de tu colección. Los sellos se van capturando de Discogs a medida que
 // consultas ediciones de tus álbumes (y de las etiquetas si las traen), así que
@@ -74,6 +73,10 @@ function LabelDetail({ name, onBack }) {
         <ArrowLeft size={15} /> Sellos
       </button>
       <h1 className="text-xl font-display mb-4">{name}</h1>
+
+      <LabelCompletism name={name} />
+
+      <p className="text-sm text-neutral-500 mb-2">{albums?.length || 0} en tu colección</p>
       {!albums ? (
         <Spinner />
       ) : (
@@ -83,6 +86,146 @@ function LabelDetail({ name, onBack }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Completismo del sello contra MusicBrainz (bajo demanda). Cruza el catálogo de
+// álbumes de estudio del sello con lo que tienes; por cada uno que falte, o lo
+// envías a Lidarr o lo buscas a mano en Prowlarr.
+function LabelCompletism({ name }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+  const [added, setAdded] = useState({});
+  const [queue, setQueue] = useState(null);
+  const [search, setSearch] = useState(null); // query del modal de búsqueda manual
+
+  const load = async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      setData(await api.labelCompletism(name));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendLidarr = async (m, all) => {
+    const list = all ? data.missing : [m];
+    const mark = {};
+    for (const x of list) mark[x.rg_mbid] = true;
+    setAdded((p) => ({ ...p, ...mark }));
+    try {
+      if (all) await api.lidarrAddBulk(list.map((x) => ({ rg_mbid: x.rg_mbid, artist_mbid: null })));
+      else await api.lidarrAdd(m.rg_mbid, null);
+      pollLidarrQueue(setQueue);
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  return (
+    <div className="card p-4 mb-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+          <Building2 size={15} /> Completismo (MusicBrainz)
+        </h2>
+        {!data && (
+          <Button onClick={load} disabled={loading}>
+            {loading ? 'Calculando…' : 'Calcular'}
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-neutral-600 mt-1">
+        Cruza el catálogo de álbumes de estudio del sello en MusicBrainz con lo que tienes. Consulta MB en vivo: puede
+        tardar.
+      </p>
+
+      {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+      {data && !data.found && <p className="text-sm text-neutral-500 mt-3">MusicBrainz no encuentra este sello.</p>}
+      {data?.found && data.tooBig && (
+        <p className="text-sm text-amber-400/90 mt-3">
+          Sello demasiado grande ({data.total.toLocaleString('es')} lanzamientos en MusicBrainz). El completismo no
+          aplica a un sello de este tamaño (majors, distribuidoras…).
+        </p>
+      )}
+      {data?.found && !data.tooBig && (
+        <div className="mt-3">
+          <div className="text-xs text-neutral-500 mb-1">
+            Casado con <span className="text-neutral-300">{data.label.name}</span>
+            {data.label.disambiguation ? ` (${data.label.disambiguation})` : ''}
+          </div>
+          <ProgressBar pct={data.pct ?? 0} label="Álbumes de estudio del sello" />
+          <p className="text-xs text-neutral-500 mt-2">
+            {data.owned} de {data.total} · faltan {data.missing.length}
+          </p>
+
+          {data.missing.length > 0 && (
+            <>
+              <div className="flex items-center justify-between mt-3 mb-1">
+                <span className="text-sm text-neutral-400">Te faltan {data.missing.length}</span>
+                <Button variant="gold" onClick={() => sendLidarr(null, true)}>
+                  Enviar todos a Lidarr
+                </Button>
+              </div>
+              {queue &&
+                (queue.running ? (
+                  <p className="text-xs text-gold-300/90 mb-2">Lidarr: procesando {queue.done}/{queue.total}…</p>
+                ) : (
+                  <p className="text-xs text-neutral-500 mb-2">
+                    Lidarr: {queue.added} enviados
+                    {queue.pending ? ` · ${queue.pending} pend.` : ''}
+                    {queue.errors?.length ? ` · ${queue.errors.length} error` : ''}.
+                  </p>
+                ))}
+              <div className="max-h-96 overflow-y-auto divide-y divide-ink-850/60">
+                {data.missing.map((m) => (
+                  <div key={m.rg_mbid} className="py-2 flex items-center gap-2 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate">
+                        <span className="text-neutral-300">{m.artist}</span>
+                        <span className="text-neutral-500"> — {m.title}</span>
+                        {m.year ? <span className="text-neutral-600"> · {m.year}</span> : null}
+                      </div>
+                    </div>
+                    <a
+                      href={`https://musicbrainz.org/release-group/${m.rg_mbid}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-gold-400 hover:underline inline-flex items-center gap-0.5 shrink-0"
+                    >
+                      MB <ExternalLink size={11} />
+                    </a>
+                    <button
+                      onClick={() => setSearch(`${m.artist} ${m.title}`)}
+                      className="text-xs px-2 py-1 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 shrink-0"
+                    >
+                      Buscar
+                    </button>
+                    {added[m.rg_mbid] ? (
+                      <span className="text-emerald-400 text-xs inline-flex items-center gap-1 shrink-0">
+                        <Check size={13} /> en cola
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => sendLidarr(m, false)}
+                        className="text-xs px-2 py-1 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 shrink-0"
+                      >
+                        Lidarr
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {search != null && <ProwlarrSearchModal initialQuery={search} onClose={() => setSearch(null)} />}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { db } from './db.js';
 import { releaseEditions, discogsConfigured } from './discogs.js';
 import { isJunkLabel } from './libkey.js';
+import { searchLabel, labelReleaseGroups } from './musicbrainz.js';
+import { normalizeForDup } from './queries.js';
 
 // Ediciones y upgrades: el equivalente (mejor) de JustWatch. Para un álbum tuyo,
 // Discogs lista todas sus ediciones —remaster, deluxe, vinilo con bonus— así
@@ -78,4 +80,37 @@ export function labelAlbums(name) {
        ORDER BY a.year, a.album_artist`
     )
     .all({ name });
+}
+
+// Completismo de un sello contra MusicBrainz (bajo demanda): resuelve el nombre del
+// sello a un sello de MB, trae su catálogo de álbumes de estudio y lo cruza con lo
+// que TIENES (por rg_mbid y por artista+título normalizado, para los no
+// identificados). Para sellos enormes (majors) devuelve {tooBig}: ahí el % no aplica.
+export async function labelCompletism(labelName) {
+  const label = await searchLabel(labelName);
+  if (!label) return { found: false };
+  const cat = await labelReleaseGroups(label.mbid);
+  if (cat.tooBig) return { found: true, label, tooBig: true, total: cat.total };
+
+  const owned = db.prepare("SELECT rg_mbid, album_artist, title FROM albums WHERE match_state != 'dismissed'").all();
+  const ownedRg = new Set(owned.filter((o) => o.rg_mbid).map((o) => o.rg_mbid));
+  const nkey = (artist, title) => `${String(artist || '').toLowerCase().trim()} ${normalizeForDup(title)}`;
+  const ownedName = new Set(owned.map((o) => nkey(o.album_artist, o.title)));
+
+  let ownedCount = 0;
+  const missing = [];
+  for (const rg of cat.releaseGroups) {
+    if (ownedRg.has(rg.rg_mbid) || ownedName.has(nkey(rg.artist, rg.title))) ownedCount++;
+    else missing.push(rg);
+  }
+  missing.sort((a, b) => (a.year || 0) - (b.year || 0) || String(a.artist || '').localeCompare(String(b.artist || '')));
+  const total = cat.releaseGroups.length;
+  return {
+    found: true,
+    label,
+    total,
+    owned: ownedCount,
+    pct: total ? Math.round((ownedCount / total) * 100) : null,
+    missing,
+  };
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, Copy, X } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar } from '../components.jsx';
+import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, ProwlarrSearchModal } from '../components.jsx';
 
 export default function ArtistDetail() {
   const { id } = useParams();
@@ -109,7 +109,7 @@ export default function ArtistDetail() {
       )}
 
       {/* lo que falta */}
-      {comp.missing?.length > 0 && <MissingList items={comp.missing} artistMbid={artist.mbid} />}
+      {comp.missing?.length > 0 && <MissingList items={comp.missing} artistMbid={artist.mbid} artistName={artist.name} />}
 
       {/* por estrenar */}
       {comp.upcoming?.length > 0 && (
@@ -250,10 +250,11 @@ function RelChip({ a }) {
   );
 }
 
-function MissingList({ items, artistMbid }) {
+function MissingList({ items, artistMbid, artistName }) {
   const [added, setAdded] = useState({});
   const [busy, setBusy] = useState(null);
   const [queue, setQueue] = useState(null);
+  const [search, setSearch] = useState(null); // query del modal de búsqueda manual
 
   // Lidarr es lento: el envío se ENCOLA y responde al instante; se sondea el progreso.
   const add = async (rg) => {
@@ -311,11 +312,17 @@ function MissingList({ items, artistMbid }) {
         {items.map((m) => {
           const done = added[m.rg_mbid] || m.in_lidarr;
           return (
-            <div key={m.rg_mbid} className="card px-3 py-2 flex items-center justify-between text-sm">
-              <span className="truncate">
+            <div key={m.rg_mbid} className="card px-3 py-2 flex items-center gap-2 text-sm">
+              <span className="truncate flex-1 min-w-0">
                 {m.title}
                 {m.year ? <span className="text-neutral-600"> · {m.year}</span> : ''}
               </span>
+              <button
+                onClick={() => setSearch(`${artistName || ''} ${m.title}`.trim())}
+                className="text-xs px-2 py-1 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 shrink-0"
+              >
+                Buscar
+              </button>
               {done ? (
                 <span className="text-emerald-400 text-xs inline-flex items-center gap-1 shrink-0">
                   <Check size={14} /> en Lidarr
@@ -334,6 +341,7 @@ function MissingList({ items, artistMbid }) {
           );
         })}
       </div>
+      {search != null && <ProwlarrSearchModal initialQuery={search} onClose={() => setSearch(null)} />}
     </div>
   );
 }

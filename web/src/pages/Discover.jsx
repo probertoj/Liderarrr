@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Compass, Plus, Check, X, RefreshCw, Loader2 } from 'lucide-react';
-import { api } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, Button } from '../components.jsx';
+import { api, pollLidarrQueue } from '../api.js';
+import { PageTitle, Spinner, ErrorMsg, Button, ProwlarrSearchModal } from '../components.jsx';
 
 // Huecos: álbumes de estudio que MusicBrainz conoce de tus artistas y que no
 // tienes. Agrupados por artista, con envío a Lidarr (uno o todos) y opción de
@@ -14,6 +14,8 @@ export default function Discover() {
   const [added, setAdded] = useState({});
   const [busy, setBusy] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [queue, setQueue] = useState(null);
+  const [search, setSearch] = useState(null); // query del modal de búsqueda manual
 
   const load = () => api.gaps(all).then(setData).catch((e) => setErr(e.message));
   useEffect(() => {
@@ -21,15 +23,13 @@ export default function Discover() {
     load();
   }, [all]);
 
+  // Lidarr es lento: el envío se ENCOLA y responde al instante; se sondea el progreso.
   const add = async (rg, artistMbid) => {
     setBusy(rg.rg_mbid);
     try {
-      const r = await api.lidarrAdd(rg.rg_mbid, artistMbid);
-      if (r.pending) {
-        alert(r.note);
-        return;
-      }
+      await api.lidarrAdd(rg.rg_mbid, artistMbid);
       setAdded((p) => ({ ...p, [rg.rg_mbid]: true }));
+      pollLidarrQueue(setQueue);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -41,14 +41,11 @@ export default function Discover() {
     if (!toSend.length) return;
     setBusy(group.artist_id);
     try {
-      const r = await api.lidarrAddBulk(toSend.map((m) => ({ rg_mbid: m.rg_mbid, artist_mbid: group.artist_mbid })));
+      await api.lidarrAddBulk(toSend.map((m) => ({ rg_mbid: m.rg_mbid, artist_mbid: group.artist_mbid })));
       const next = {};
       for (const m of toSend) next[m.rg_mbid] = true;
       setAdded((p) => ({ ...p, ...next }));
-      const bits = [];
-      if (r.pending) bits.push(`${r.pending} pendientes (reintenta)`);
-      if (r.errors?.length) bits.push(`${r.errors.length} con error`);
-      if (bits.length) alert(`${r.added} añadidos · ${bits.join(' · ')}`);
+      pollLidarrQueue(setQueue);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -96,6 +93,17 @@ export default function Discover() {
         Incluir todos los artistas con MBID (no solo los que sigo)
       </label>
 
+      {queue &&
+        (queue.running ? (
+          <p className="text-xs text-gold-300/90 mb-3">Lidarr: procesando {queue.done}/{queue.total}…</p>
+        ) : (
+          <p className="text-xs text-neutral-500 mb-3">
+            Lidarr: {queue.added} enviados
+            {queue.pending ? ` · ${queue.pending} pendientes de importar` : ''}
+            {queue.errors?.length ? ` · ${queue.errors.length} con error` : ''}.
+          </p>
+        ))}
+
       {err && <ErrorMsg>{err}</ErrorMsg>}
       {!data && !err && <Spinner />}
       {data && data.artists.length === 0 && (
@@ -129,6 +137,12 @@ export default function Discover() {
                       {m.year ? <span className="text-neutral-600"> · {m.year}</span> : ''}
                     </span>
                     <div className="flex items-center gap-1 shrink-0 ml-2">
+                      <button
+                        onClick={() => setSearch(`${group.artist} ${m.title}`)}
+                        className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800"
+                      >
+                        Buscar
+                      </button>
                       {done ? (
                         <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
                           <Check size={13} /> Lidarr
@@ -160,6 +174,8 @@ export default function Discover() {
           </div>
         ))}
       </div>
+
+      {search != null && <ProwlarrSearchModal initialQuery={search} onClose={() => setSearch(null)} />}
     </div>
   );
 }

@@ -255,6 +255,58 @@ export async function artistRelations(mbid) {
   return out;
 }
 
+// Busca un SELLO por nombre. Devuelve el mejor candidato (los sellos de Liderarr son
+// texto de la etiqueta, no MBID: hay que resolverlos). null si no hay nada decente.
+export async function searchLabel(name) {
+  if (!name) return null;
+  const data = await mbCached(`label-search:${name}`.toLowerCase(), `/label?query=${enc(lucene(name))}&limit=3`);
+  const l = (data.labels || [])[0];
+  if (!l) return null;
+  return {
+    mbid: l.id,
+    name: l.name,
+    disambiguation: l.disambiguation || '',
+    country: l.country || null,
+    score: Number(l.score) || 0,
+  };
+}
+
+// Catálogo de ÁLBUMES DE ESTUDIO de un sello (primary Album, sin secundarios). Los
+// sellos cuelgan de RELEASES en MusicBrainz, no de release-groups: se recorren las
+// releases del sello y se deduplican a RG. Tope `maxReleases` para no traer miles de
+// un major (ahí el completismo no aplica): si se supera, devuelve {tooBig, total}.
+export async function labelReleaseGroups(labelMbid, { maxReleases = 800 } = {}) {
+  if (!labelMbid) return { tooBig: false, total: 0, releaseGroups: [] };
+  const rgs = new Map();
+  let offset = 0;
+  let total = 0;
+  for (;;) {
+    const data = await mbCached(
+      `label-rels:${labelMbid}:${offset}`,
+      `/release?label=${enc(labelMbid)}&inc=release-groups+artist-credits&limit=100&offset=${offset}`
+    );
+    total = data['release-count'] || 0;
+    if (total > maxReleases) return { tooBig: true, total, releaseGroups: [] };
+    const page = data.releases || [];
+    for (const rel of page) {
+      const rg = rel['release-group'];
+      if (!rg || rgs.has(rg.id)) continue;
+      if ((rg['primary-type'] || null) !== 'Album') continue;
+      if ((rg['secondary-types'] || []).length) continue;
+      rgs.set(rg.id, {
+        rg_mbid: rg.id,
+        title: rg.title,
+        artist: (rel['artist-credit'] || []).map((a) => a.name).join(''),
+        first_release: rg['first-release-date'] || null,
+        year: rg['first-release-date'] ? Number(String(rg['first-release-date']).slice(0, 4)) || null : null,
+      });
+    }
+    offset += page.length;
+    if (!page.length || offset >= total) break;
+  }
+  return { tooBig: false, total, releaseGroups: [...rgs.values()] };
+}
+
 // Busca artistas por nombre (para seguir a alguien que aún no tienes en disco:
 // artistas emergentes, justo para los que existe el auto-Lidarr).
 export async function searchArtists(name, limit = 8) {
