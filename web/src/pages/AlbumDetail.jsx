@@ -113,7 +113,7 @@ export default function AlbumDetail() {
       </div>
 
       {album.match_state !== 'matched' && album.match_state !== 'orphan' && (
-        <IdentifySection albumId={album.id} onDone={load} />
+        <IdentifySection album={album} onDone={load} />
       )}
 
       {album.match_state === 'matched' && <LidarrSection album={album} onDone={load} />}
@@ -358,8 +358,9 @@ function Editions({ albumId }) {
 }
 
 // Identificar ESTE álbum bajo demanda (para álbumes pending/unmatched). Auto corre
-// la cadena (MB/Last.fm/AcoustID) por el carril rápido; manual muestra candidatos.
-function IdentifySection({ albumId, onDone }) {
+// la cadena (MB/Last.fm/AcoustID) por el carril rápido; manual abre un buscador de
+// MusicBrainz donde el usuario escribe y elige entre una lista de candidatos.
+function IdentifySection({ album, onDone }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [err, setErr] = useState(null);
@@ -370,12 +371,12 @@ function IdentifySection({ albumId, onDone }) {
     setErr(null);
     setMsg(null);
     try {
-      const r = await api.identifyAlbum(albumId);
+      const r = await api.identifyAlbum(album.id);
       if (r.matched) {
         setMsg(`Identificado vía ${r.source}.`);
         await onDone();
       } else {
-        setMsg('Ninguna base reconoció este álbum automáticamente. Prueba a elegirlo a mano.');
+        setMsg('Ninguna base lo reconoció automáticamente. Búscalo tú abajo y elige el correcto.');
         setShowManual(true);
       }
     } catch (e) {
@@ -402,13 +403,13 @@ function IdentifySection({ albumId, onDone }) {
       </div>
       <p className="text-xs text-neutral-600 mt-1">
         Busca este disco en MusicBrainz, Last.fm y AcoustID para asignarle su MBID (lo que activa carátula oficial,
-        completismo y envío a Lidarr). Si nada casa, elígelo a mano entre los candidatos.
+        completismo y envío a Lidarr). Si nada casa, «Elegir a mano» abre un buscador de MusicBrainz.
       </p>
       {msg && <p className="text-sm text-neutral-400 mt-3">{msg}</p>}
       {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
       {showManual && (
-        <Candidates
-          id={albumId}
+        <ManualSearch
+          album={album}
           onDone={async () => {
             setShowManual(false);
             await onDone();
@@ -419,60 +420,95 @@ function IdentifySection({ albumId, onDone }) {
   );
 }
 
-// Candidatos de MusicBrainz/Discogs para resolver a mano (mismo flujo que la página
-// «Sin identificar»). Al elegir uno, fija el match y recarga.
-function Candidates({ id, onDone }) {
-  const [data, setData] = useState(null);
+// Buscador manual de MusicBrainz: caja de texto (prerrellena con el título, editable)
+// que devuelve una LISTA de release groups del artista para elegir el correcto. Es el
+// «elegir a mano» de verdad — no la sugerencia única del automático.
+function ManualSearch({ album, onDone }) {
+  const [q, setQ] = useState(album.title || '');
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
-  const [saving, setSaving] = useState(false);
-  useEffect(() => {
-    setData(null);
-    api.candidates(id).then(setData).catch((e) => setErr(e.message));
-  }, [id]);
+  const [saving, setSaving] = useState(null);
 
-  if (err) return <p className="text-sm text-red-400 mt-3">{err}</p>;
-  if (!data) return <Spinner label="Buscando candidatos…" />;
+  const run = async () => {
+    if (!q.trim()) return;
+    setLoading(true);
+    setErr(null);
+    try {
+      setResults(await api.mbReleaseGroups(q, album.album_artist || ''));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // primera búsqueda automática al abrir el panel
+  useEffect(() => {
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const pick = async (rgMbid) => {
+    setSaving(rgMbid);
+    setErr(null);
+    try {
+      await api.match(album.id, rgMbid);
+      await onDone();
+    } catch (e) {
+      setErr(e.message);
+      setSaving(null);
+    }
+  };
 
   return (
-    <div className="mt-3 pt-3 border-t border-ink-800 space-y-2">
-      {data.musicbrainz ? (
-        <div className="flex items-center justify-between gap-3 text-sm">
-          <div className="min-w-0">
-            <span className="text-emerald-400 text-xs mr-2">MusicBrainz {data.musicbrainz.score}%</span>
-            <span className="truncate">
-              {data.musicbrainz.artist} — {data.musicbrainz.title}
-            </span>
-            {data.musicbrainz.primary_type && (
-              <span className="text-neutral-600 text-xs ml-2">{data.musicbrainz.primary_type}</span>
-            )}
-          </div>
-          <Button
-            variant="gold"
-            disabled={saving}
-            onClick={async () => {
-              setSaving(true);
-              try {
-                await api.match(id, data.musicbrainz.rg_mbid);
-                await onDone();
-              } catch (e) {
-                setErr(e.message);
-                setSaving(false);
-              }
-            }}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              <Check size={14} /> Es este
-            </span>
-          </Button>
-        </div>
-      ) : (
-        <p className="text-sm text-neutral-600">MusicBrainz no propone nada.</p>
+    <div className="mt-3 pt-3 border-t border-ink-800">
+      <div className="flex gap-2">
+        <input
+          className="flex-1 bg-ink-850 border border-ink-800 rounded px-2 py-1.5 text-sm outline-none focus:border-gold-500/60"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && run()}
+          placeholder="Buscar álbum en MusicBrainz…"
+        />
+        <Button onClick={run} disabled={loading}>
+          <span className="inline-flex items-center gap-1.5">
+            <Search size={14} /> {loading ? 'Buscando…' : 'Buscar'}
+          </span>
+        </Button>
+      </div>
+      <p className="text-xs text-neutral-600 mt-1">
+        Acotado a <span className="text-neutral-500">{album.album_artist || 'el artista'}</span>. Edita el texto si el
+        título está mal etiquetado.
+      </p>
+
+      {err && <p className="text-sm text-red-400 mt-2">{err}</p>}
+      {results && results.length === 0 && !loading && (
+        <p className="text-sm text-neutral-600 mt-3">Sin resultados. Prueba a cambiar el texto de búsqueda.</p>
       )}
-      {data.discogs && (
-        <div className="text-sm text-neutral-500">
-          <span className="text-xs mr-2 text-neutral-600">Discogs</span>
-          {data.discogs.title} {data.discogs.year ? `(${data.discogs.year})` : ''}
-          {data.discogs.label ? ` · ${data.discogs.label}` : ''}
+      {results && results.length > 0 && (
+        <div className="mt-3 max-h-80 overflow-y-auto divide-y divide-ink-850/60">
+          {results.map((r) => (
+            <div key={r.rg_mbid} className="py-2 flex items-center gap-3 text-sm">
+              <div className="min-w-0 flex-1">
+                <div className="truncate">
+                  <span className="text-neutral-300">{r.artist}</span>
+                  <span className="text-neutral-500"> — {r.title}</span>
+                  {r.year ? <span className="text-neutral-600"> · {r.year}</span> : null}
+                </div>
+                <div className="text-xs text-neutral-600">
+                  <span className="text-emerald-400/80">{r.score}%</span>
+                  {r.primary_type && <span className="ml-2">{r.primary_type}</span>}
+                  {r.secondary_types?.length ? <span className="ml-1 text-neutral-700">· {r.secondary_types.join(', ')}</span> : null}
+                </div>
+              </div>
+              <Button variant="gold" disabled={saving === r.rg_mbid} onClick={() => pick(r.rg_mbid)}>
+                <span className="inline-flex items-center gap-1.5">
+                  <Check size={14} /> {saving === r.rg_mbid ? '…' : 'Es este'}
+                </span>
+              </Button>
+            </div>
+          ))}
         </div>
       )}
     </div>

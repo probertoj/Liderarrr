@@ -9,7 +9,7 @@ import { runScan, scanStatus } from './scanner.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, manualMatch } from './identify.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
 import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab } from './lidarr.js';
-import { mbTest, searchReleaseGroup, searchArtists } from './musicbrainz.js';
+import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists } from './musicbrainz.js';
 import { acoustidTest } from './acoustid.js';
 import { discogsTest, searchRelease } from './discogs.js';
 import { lastfmTest } from './lastfm.js';
@@ -379,6 +379,14 @@ app.get('/api/albums/:id/candidates', async (req, reply) => {
 app.post('/api/albums/:id/match', async (req, reply) => {
   try {
     return await manualMatch(Number(req.params.id), req.body?.rg_mbid);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// búsqueda libre de release groups en MusicBrainz para "elegir a mano" (lista)
+app.get('/api/mb/release-groups', async (req, reply) => {
+  try {
+    return await searchReleaseGroups(req.query?.q, req.query?.artist || null);
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

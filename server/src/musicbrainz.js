@@ -96,15 +96,21 @@ const EDITION_RE = /\b(remaster(ed)?|deluxe|expanded|anniversary|edition|reissue
 // Vol. II" en vez de "Archives Vol. II"), y (2) paréntesis/corchetes finales con
 // año o edición ("(1972 - 1976)", "(Remastered)"). Ambos se quitan; se conservan
 // subtítulos con significado como "(Live)". Si limpiar lo deja vacío, usa el original.
+// Quita el nombre del artista repetido al principio del título ("Neil Young Archives
+// Vol. II" -> "Archives Vol. II"), tolerando un separador (- – — :). Si quitarlo lo
+// deja casi vacío, devuelve el original.
+function stripLeadingArtist(t, artist) {
+  const a = String(artist || '').trim();
+  if (!a) return t;
+  const re = new RegExp('^' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[-–—:]?\\s*', 'i');
+  const s = t.replace(re, '').trim();
+  return s.length >= 2 ? s : t;
+}
+
 export function cleanAlbumTitle(title, artist) {
   let t = String(title || '').trim();
   if (!t) return t;
-  const a = String(artist || '').trim();
-  if (a) {
-    const re = new RegExp('^' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[-–—:]?\\s*', 'i');
-    const stripped = t.replace(re, '').trim();
-    if (stripped.length >= 2) t = stripped;
-  }
+  t = stripLeadingArtist(t, artist);
   // quita paréntesis/corchetes finales que sean año o edición (repetido: puede haber
   // varios, p. ej. "Album (Deluxe) (2009)")
   for (;;) {
@@ -136,6 +142,28 @@ export async function searchReleaseGroup(artist, title) {
     artist_mbid: (rg['artist-credit'] || [])[0]?.artist?.id || null,
     score: Number(rg.score) || 0,
   };
+}
+
+// Búsqueda LIBRE de release groups para la resolución manual ("Elegir a mano"):
+// devuelve una LISTA de candidatos (no solo el mejor). El usuario elige, así que
+// no se filtra por score. Si se pasa `artist`, acota a su catálogo (más preciso).
+export async function searchReleaseGroups(query, artist, limit = 8) {
+  let text = String(query || '').trim();
+  if (!text) return [];
+  // quita el artista repetido al principio (evita que "Neil Young ..." infle álbumes
+  // ajenos); NO quita los años, que aquí ayudan a distinguir Vol. I/II/III.
+  text = stripLeadingArtist(text, artist);
+  const q = artist ? `releasegroup:(${lucene(text)}) AND artist:"${lucene(artist)}"` : lucene(text);
+  const data = await mbCached(`rg-list:${artist || ''}:${text}`.toLowerCase(), `/release-group?query=${enc(q)}&limit=${limit}`);
+  return (data['release-groups'] || []).map((rg) => ({
+    rg_mbid: rg.id,
+    title: rg.title,
+    primary_type: rg['primary-type'] || null,
+    secondary_types: rg['secondary-types'] || [],
+    artist: (rg['artist-credit'] || []).map((a) => a.name).join(''),
+    year: rg['first-release-date'] ? Number(String(rg['first-release-date']).slice(0, 4)) || null : null,
+    score: Number(rg.score) || 0,
+  }));
 }
 
 // Ficha de artista por MBID (país, tipo, fechas).
