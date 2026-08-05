@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseFile } from 'music-metadata';
 import { db, getSetting, setSetting } from './db.js';
-import { albumKey, splitRoots } from './libkey.js';
+import { albumKey, splitRoots, isJunkLabel } from './libkey.js';
 
 // Raíces de la biblioteca para CALCULAR la identidad de cada álbum (clave relativa
 // al root). Se fija al empezar el escaneo desde music_dirs; es independiente de las
@@ -188,7 +188,7 @@ async function ingestFolder({ dir, files }) {
     // Se descartan valores absurdamente largos (suelen ser textos de copyright).
     for (const l of c.label || []) {
       const s = String(l || '').trim();
-      if (s && s.length <= 80) labels.add(s);
+      if (s && s.length <= 80 && !isJunkLabel(s)) labels.add(s);
     }
 
     const fmt = (path.extname(file).slice(1) || f.container || '').toUpperCase();

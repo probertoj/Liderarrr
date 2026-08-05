@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import { releaseEditions, discogsConfigured } from './discogs.js';
+import { isJunkLabel } from './libkey.js';
 
 // Ediciones y upgrades: el equivalente (mejor) de JustWatch. Para un álbum tuyo,
 // Discogs lista todas sus ediciones —remaster, deluxe, vinilo con bonus— así
@@ -64,7 +65,8 @@ export function labelsOverview() {
        JOIN albums a ON a.id=at.album_id AND a.match_state!='dismissed'
        GROUP BY t.name ORDER BY albums DESC, t.name`
     )
-    .all();
+    .all()
+    .filter((r) => !isJunkLabel(r.name));
 }
 
 export function labelAlbums(name) {

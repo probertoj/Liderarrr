@@ -23,3 +23,15 @@ export function albumKey(dir, roots) {
   }
   return sha1(`lk:${d}`);
 }
+
+// «Sellos» que no son sellos: firmas de grupos de scene (PMEDIA), placeholders
+// ([no label], not on label) y basura similar en el tag PUBLISHER. Se descartan al
+// escanear y en la vista de Sellos. Normaliza quitando puntuación para cazar
+// variantes (P.M.E.D.I.A, PMEDIA, [no label], etc.).
+const JUNK_LABELS = new Set(['pmedia', 'nolabel', 'label', 'notonlabel', 'unknown', 'none', 'na']);
+export function isJunkLabel(name) {
+  const n = String(name || '')
+    .toLowerCase()
+    .replace(/[.\s[\]()_/-]/g, '');
+  return !n || JUNK_LABELS.has(n);
+}
