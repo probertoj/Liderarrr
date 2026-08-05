@@ -134,57 +134,67 @@ async function onlineCover(a) {
   return null;
 }
 
-export async function albumCover(albumId) {
+// Resolución RÁPIDA (sin red, sin leer el fichero de audio): carátula local, en
+// caché, o cualquier imagen de la carpeta. Devuelve {status:'ok',path,contentType}
+// si la tiene ya, 'none' si se sabe que no hay, 'pending' si haría falta la
+// resolución cara, o 'notfound' si el álbum no existe. NUNCA bloquea.
+export function coverFast(albumId) {
   const a = getAlbum.get(albumId);
-  if (!a) return null;
-
-  // 1. fichero de carátula con nombre reconocido (del escaneo)
-  if (a.cover && fs.existsSync(a.cover)) return { path: a.cover, contentType: mimeByExt(a.cover) };
-
-  // 2. imagen ya cacheada (incrustada u online)
-  if (fs.existsSync(cachedImg(albumId)) && fs.existsSync(mimeFile(albumId))) {
-    return { path: cachedImg(albumId), contentType: fs.readFileSync(mimeFile(albumId), 'utf8') };
-  }
-
-  // 3. cualquier imagen de la carpeta (nombres no convencionales)
+  if (!a) return { status: 'notfound' };
+  if (a.cover && fs.existsSync(a.cover)) return { status: 'ok', path: a.cover, contentType: mimeByExt(a.cover) };
+  if (fs.existsSync(cachedImg(albumId)) && fs.existsSync(mimeFile(albumId)))
+    return { status: 'ok', path: cachedImg(albumId), contentType: fs.readFileSync(mimeFile(albumId), 'utf8') };
   if (a.path) {
     const img = biggestImage(a.path);
-    if (img) return { path: img, contentType: mimeByExt(img) };
+    if (img) return { status: 'ok', path: img, contentType: mimeByExt(img) };
   }
+  if (fs.existsSync(noneFile(albumId))) return { status: 'none' };
+  return { status: 'pending' };
+}
 
-  // ya intentamos lo caro (incrustada + online) y no había nada
-  if (fs.existsSync(noneFile(albumId))) return null;
-
-  // 4 y 5 (caro): incrustada y online, tras la puerta de concurrencia
-  await acquire();
+// Resolución CARA (lee el fichero para la carátula incrustada y consulta online),
+// tras la puerta de concurrencia. Cachea el resultado (o marca 'none'); no devuelve
+// nada — la siguiente petición lo sirve ya desde coverFast. Deduplica por álbum para
+// no lanzar la misma resolución dos veces a la vez.
+const resolving = new Set();
+export async function resolveCoverSlow(albumId) {
+  if (resolving.has(albumId)) return;
+  resolving.add(albumId);
   try {
-    // re-comprobar la caché por si otra petición la resolvió mientras esperábamos
-    if (fs.existsSync(cachedImg(albumId)) && fs.existsSync(mimeFile(albumId)))
-      return { path: cachedImg(albumId), contentType: fs.readFileSync(mimeFile(albumId), 'utf8') };
-
-    const t = firstTrack.get(albumId);
-    if (t) {
-      try {
-        const mm = await Promise.race([
-          parseFile(t.path, { duration: false }),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 20000)),
-        ]);
-        const pic = mm.common.picture?.[0];
-        if (pic?.data) return cacheAndServe(albumId, Buffer.from(pic.data), pic.format?.includes('/') ? pic.format : 'image/jpeg');
-      } catch {
-        // error transitorio: NO lo marcamos como 'sin carátula' (se reintenta)
+    await acquire();
+    try {
+      if (fs.existsSync(cachedImg(albumId)) && fs.existsSync(mimeFile(albumId))) return;
+      const a = getAlbum.get(albumId);
+      if (!a) return;
+      const t = firstTrack.get(albumId);
+      if (t) {
+        try {
+          const mm = await Promise.race([
+            parseFile(t.path, { duration: false }),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 20000)),
+          ]);
+          const pic = mm.common.picture?.[0];
+          if (pic?.data) {
+            cacheAndServe(albumId, Buffer.from(pic.data), pic.format?.includes('/') ? pic.format : 'image/jpeg');
+            return;
+          }
+        } catch {
+          // error transitorio: NO se marca 'none' (se reintentará)
+        }
       }
+      const online = await onlineCover(a);
+      if (online) {
+        cacheAndServe(albumId, online.buf, online.mime);
+        return;
+      }
+      // nada en ningún sitio: se marca (reintentable). Al identificar el álbum se
+      // borra esta marca (ver clearNone), para reintentar el Cover Art Archive.
+      fs.writeFileSync(noneFile(albumId), '');
+    } finally {
+      release();
     }
-
-    const online = await onlineCover(a);
-    if (online) return cacheAndServe(albumId, online.buf, online.mime);
-
-    // nada en ningún sitio: se marca (reintentable). Al identificarse el álbum se
-    // borra esta marca (ver clearNone), para volver a probar el Cover Art Archive.
-    fs.writeFileSync(noneFile(albumId), '');
-    return null;
   } finally {
-    release();
+    resolving.delete(albumId);
   }
 }
 

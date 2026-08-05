@@ -37,7 +37,7 @@ import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challen
 import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums } from './editions.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
-import { albumCover, retryMissingCovers } from './covers.js';
+import { coverFast, resolveCoverSlow, retryMissingCovers } from './covers.js';
 import { diagnostics, pushEvent } from './diag.js';
 import * as q from './queries.js';
 
@@ -507,12 +507,20 @@ app.post('/api/lidarr/add-bulk', async (req, reply) => {
 });
 
 // --- imágenes locales (carátulas: fichero o incrustada en etiquetas) --------
+// Sirve al INSTANTE lo que está en local/caché; si hace falta la resolución cara
+// (leer el fichero + Cover Art Archive/iTunes), la lanza en segundo plano y responde
+// 404 ya — así navegar nunca se cuelga esperando carátulas online. Aparecerá al
+// recargar (la UI reintenta sola los 404 tras un momento).
 app.get('/api/cover/:id', async (req, reply) => {
-  const cover = await albumCover(Number(req.params.id));
-  if (!cover) return reply.code(404).send();
-  reply.header('Content-Type', cover.contentType);
-  reply.header('Cache-Control', 'public, max-age=86400');
-  return reply.send(fs.createReadStream(cover.path));
+  const id = Number(req.params.id);
+  const r = coverFast(id);
+  if (r.status === 'ok') {
+    reply.header('Content-Type', r.contentType);
+    reply.header('Cache-Control', 'public, max-age=86400');
+    return reply.send(fs.createReadStream(r.path));
+  }
+  if (r.status === 'pending') resolveCoverSlow(id).catch(() => {});
+  return reply.code(404).send();
 });
 
 // vuelve a intentar las carátulas que no se encontraron (útil tras identificar)

@@ -1,4 +1,4 @@
-import { useState, Component } from 'react';
+import { useState, useEffect, useRef, Component } from 'react';
 import { Link } from 'react-router-dom';
 import { Disc3, ImageOff } from 'lucide-react';
 import { coverUrl } from './api.js';
@@ -60,19 +60,41 @@ export function StateBadge({ state }) {
   return <span className={`text-[11px] px-2 py-0.5 rounded-full border ${m.cls}`}>{m.label}</span>;
 }
 
+// La carátula se sirve al instante si está en local/caché; si el backend la está
+// resolviendo en 2º plano (fichero/online), la primera carga da 404. Por eso se
+// reintenta con backoff: al resolverse, aparece sola sin recargar la página.
+const COVER_RETRIES = 3;
 export function Cover({ id, size = 'full', className = '' }) {
-  const [err, setErr] = useState(false);
-  if (err || !id) {
+  const [attempt, setAttempt] = useState(0);
+  const [failed, setFailed] = useState(false);
+  const timer = useRef(null);
+
+  useEffect(() => {
+    setAttempt(0);
+    setFailed(false);
+    return () => clearTimeout(timer.current);
+  }, [id]);
+
+  if (failed || !id) {
     return (
       <div className={`flex items-center justify-center bg-ink-850 text-neutral-700 aspect-square ${className}`}>
         <ImageOff size={size === 'full' ? 32 : 18} />
       </div>
     );
   }
+
+  const onError = () => {
+    if (attempt >= COVER_RETRIES) {
+      setFailed(true);
+      return;
+    }
+    timer.current = setTimeout(() => setAttempt((a) => a + 1), 2500 * (attempt + 1));
+  };
+
   return (
     <img
-      src={coverUrl(id)}
-      onError={() => setErr(true)}
+      src={attempt ? `${coverUrl(id)}?r=${attempt}` : coverUrl(id)}
+      onError={onError}
       loading="lazy"
       className={`object-cover aspect-square w-full ${className}`}
       alt=""
