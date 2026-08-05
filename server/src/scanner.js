@@ -1,8 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { parseFile } from 'music-metadata';
 import { db, getSetting, setSetting } from './db.js';
+import { albumKey, splitRoots } from './libkey.js';
+
+// Raíces de la biblioteca para CALCULAR la identidad de cada álbum (clave relativa
+// al root). Se fija al empezar el escaneo desde music_dirs; es independiente de las
+// carpetas que se recorran (opts.roots puede acotar), para que la identidad sea
+// siempre relativa a la biblioteca real.
+let keyRoots = [];
 
 // El escáner es la espina dorsal: TUS FICHEROS MANDAN. Recorre la raíz de música,
 // agrupa por carpeta (una carpeta = un álbum, el caso normal), lee las etiquetas
@@ -35,7 +41,6 @@ export const scanStatus = {
   error: null,
 };
 
-const sha1 = (s) => crypto.createHash('sha1').update(s).digest('hex');
 const isAudio = (f) => AUDIO_EXT.has(path.extname(f).toLowerCase());
 const isLossless = (fmt) => /flac|alac|wav|ape|wavpack|aiff|pcm/i.test(fmt || '');
 // music-metadata devuelve varios MBID como ARRAY (álbumes con varios artistas).
@@ -211,7 +216,7 @@ async function ingestFolder({ dir, files }) {
   if (!tracks.length) return;
   tracks.sort((a, b) => (a.disc - b.disc) || ((a.num || 0) - (b.num || 0)));
 
-  const localKey = sha1(dir);
+  const localKey = albumKey(dir, keyRoots);
   const albumTitle = albumMeta.album || path.basename(dir);
   const albumArtistName = albumMeta.albumArtist || albumMeta.artist || 'Artista desconocido';
   const artistId = resolveLocalArtist(albumArtistName, albumMeta.artistMbid);
@@ -259,8 +264,11 @@ async function ingestFolder({ dir, files }) {
   scanStatus.tracksDone += trackFileCount;
 }
 
-// scanned_at de un álbum ya en BD por su carpeta, para el salto incremental.
-const scannedAtOf = db.prepare('SELECT scanned_at FROM albums WHERE local_key = ?');
+// datos de un álbum ya en BD por su identidad, para el salto incremental.
+const scannedAtOf = db.prepare('SELECT id, scanned_at, path FROM albums WHERE local_key = ?');
+// si la carpeta se saltó pero su ruta cambió (p. ej. tras cambiar el montaje a /data),
+// se actualiza la ruta sin re-ingerir: identidad intacta, ruta al día.
+const fixAlbumPath = db.prepare('UPDATE albums SET path = ? WHERE id = ?');
 
 // Recorre la biblioteca. `opts.roots` sobrescribe music_dirs; `opts.force` reescanea
 // TODO (ignora el salto incremental).
@@ -271,6 +279,9 @@ export async function runScan(opts = {}) {
     .split(/[\n;]+/)
     .map((s) => s.trim())
     .filter(Boolean);
+  // identidad SIEMPRE relativa a la biblioteca real (music_dirs), aunque opts.roots
+  // acote el recorrido a una subcarpeta.
+  keyRoots = splitRoots(getSetting('music_dirs'));
   Object.assign(scanStatus, {
     running: true,
     phase: 'reading',
@@ -291,7 +302,7 @@ export async function runScan(opts = {}) {
     scanStatus.foldersFound++;
     scanStatus.current = folder.dir;
     if (!force) {
-      const existing = scannedAtOf.get(sha1(folder.dir));
+      const existing = scannedAtOf.get(albumKey(folder.dir, keyRoots));
       if (existing?.scanned_at) {
         let mtime = 0;
         try {
@@ -300,6 +311,9 @@ export async function runScan(opts = {}) {
           /* si no se puede leer el mtime, mejor reescanear */
         }
         if (mtime && mtime <= existing.scanned_at) {
+          // misma identidad y sin cambios: se salta. Pero si la ruta cambió (montaje
+          // nuevo), se actualiza para que carátulas y rutas apunten al sitio real.
+          if (existing.path !== folder.dir) fixAlbumPath.run(folder.dir, existing.id);
           scanStatus.skipped++;
           return;
         }

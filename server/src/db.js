@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { staleCacheSql, versionFor } from './cache-versions.js';
+import { albumKey, splitRoots } from './libkey.js';
 
 export const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), 'data');
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -356,6 +357,37 @@ export function getAllSettings() {
   const out = {};
   for (const row of db.prepare('SELECT key, value FROM settings').all()) out[row.key] = row.value;
   return out;
+}
+
+// Migración one-shot: pasar local_key de ruta ABSOLUTA a RELATIVA al root de la
+// biblioteca (ver libkey.js). Con esto la identidad de los álbumes es estable entre
+// montajes, así que se puede pasar al mount único /data (necesario para hardlinks
+// del layout TRaSH) SIN reescanear ni perder la identificación. No toca match_state
+// ni las relaciones (album_id no cambia): solo recalcula el valor de local_key.
+if (getSetting('lk_relative') !== '1') {
+  try {
+    const roots = splitRoots(getSetting('music_dirs'));
+    if (roots.length) {
+      const rows = db.prepare('SELECT id, path, local_key FROM albums WHERE path IS NOT NULL').all();
+      const upd = db.prepare('UPDATE albums SET local_key = ? WHERE id = ?');
+      const used = new Set(db.prepare('SELECT local_key FROM albums').all().map((r) => r.local_key));
+      let migrated = 0;
+      db.transaction(() => {
+        for (const a of rows) {
+          const nk = albumKey(a.path, roots);
+          if (nk === a.local_key || used.has(nk)) continue; // ya correcto, o colisión: no tocar
+          used.delete(a.local_key);
+          used.add(nk);
+          upd.run(nk, a.id);
+          migrated++;
+        }
+      })();
+      if (migrated) console.log(`[db] identidad de álbum -> ruta relativa: ${migrated} migrados`);
+    }
+    setSetting('lk_relative', '1');
+  } catch (e) {
+    console.warn('[db] migración local_key relativo falló (se reintentará):', String(e.message || e));
+  }
 }
 
 // --- caché de servicios externos --------------------------------------------
