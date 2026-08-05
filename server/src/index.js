@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { db, DATA_DIR, getAllSettings, getSetting, setSetting } from './db.js';
 import { runScan, scanStatus } from './scanner.js';
-import { runIdentify, identifyOne, identifyStatus, setMatchState, manualMatch } from './identify.js';
+import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch } from './identify.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
 import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab } from './lidarr.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists } from './musicbrainz.js';
@@ -357,6 +357,15 @@ app.get('/api/rarities', async () => q.rarities());
 app.post('/api/albums/:id/state', async (req, reply) => {
   try {
     return setMatchState(Number(req.params.id), req.body?.state);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// papelera: listar descartados y restaurar uno (deshacer un "Descartar")
+app.get('/api/dismissed', async () => q.dismissedAlbums());
+app.post('/api/albums/:id/restore', async (req, reply) => {
+  try {
+    return restoreAlbum(Number(req.params.id));
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

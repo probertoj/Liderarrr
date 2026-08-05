@@ -297,6 +297,20 @@ export function duplicates() {
     GROUP BY LOWER(album_artist), LOWER(title) HAVING copies > 1 ORDER BY copies DESC`).all();
 }
 
+// Papelera: álbumes descartados (normalmente copias duplicadas). Siguen en disco;
+// se pueden restaurar. Descartar nunca borra el fichero.
+export function dismissedAlbums() {
+  return db
+    .prepare(
+      `SELECT a.id, a.title, a.year, a.album_artist, a.track_file_count, a.track_count,
+        a.size_bytes, a.path, a.rg_mbid,
+        (SELECT format FROM tracks WHERE album_id=a.id AND format IS NOT NULL AND format<>''
+          GROUP BY format ORDER BY COUNT(*) DESC LIMIT 1) AS format
+       FROM albums a WHERE a.match_state='dismissed' ORDER BY a.album_artist, a.title`
+    )
+    .all();
+}
+
 // Cola de "Sin identificar": lo que la cadena no pudo resolver, para resolución
 // manual. Incluye pistas para el usuario (nº de pistas, formatos).
 export function unidentified() {

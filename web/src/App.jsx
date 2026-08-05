@@ -3,7 +3,7 @@ import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle,
   Sparkles, Settings as SettingsIcon, Menu, X, RefreshCw, Star, Compass, CalendarClock,
-  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope,
+  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2,
 } from 'lucide-react';
 import { api } from './api.js';
 import { Spinner, ErrorBoundary } from './components.jsx';
@@ -25,6 +25,7 @@ const Challenges = lazy(() => import('./pages/Challenges.jsx'));
 const Upgrades = lazy(() => import('./pages/Upgrades.jsx'));
 const Labels = lazy(() => import('./pages/Labels.jsx'));
 const Diagnostics = lazy(() => import('./pages/Diagnostics.jsx'));
+const Trash = lazy(() => import('./pages/Trash.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
 const NAV = [
@@ -60,6 +61,7 @@ const NAV = [
     items: [
       { to: '/sin-identificar', label: 'Sin identificar', Icon: HelpCircle },
       { to: '/rarezas', label: 'Rarezas e inéditos', Icon: Sparkles },
+      { to: '/papelera', label: 'Papelera', Icon: Trash2 },
     ],
   },
   {
@@ -201,6 +203,7 @@ export default function App() {
             <Route path="/diagnostico" element={<Diagnostics />} />
             <Route path="/sin-identificar" element={<Unidentified />} />
             <Route path="/rarezas" element={<Rarities />} />
+            <Route path="/papelera" element={<Trash />} />
             <Route path="/ajustes" element={<Settings />} />
           </Routes>
           </Suspense>

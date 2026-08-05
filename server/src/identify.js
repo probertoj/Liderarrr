@@ -238,6 +238,17 @@ export function setMatchState(albumId, state) {
   return db.prepare('SELECT id, title, match_state FROM albums WHERE id = ?').get(albumId);
 }
 
+// Restaura un álbum descartado (papelera / deshacer): lo devuelve a su estado
+// natural — 'matched' si conserva su MBID, 'pending' si no. Deshace un "Descartar"
+// de la limpieza de duplicados.
+export function restoreAlbum(albumId) {
+  const a = db.prepare('SELECT id, rg_mbid FROM albums WHERE id = ?').get(albumId);
+  if (!a) throw new Error('Álbum no encontrado');
+  const state = a.rg_mbid ? 'matched' : 'pending';
+  db.prepare('UPDATE albums SET match_state = ?, matched_at = ? WHERE id = ?').run(state, Date.now(), albumId);
+  return db.prepare('SELECT id, title, match_state FROM albums WHERE id = ?').get(albumId);
+}
+
 // Fija manualmente un release group de MusicBrainz sobre un álbum (desde la
 // página "Sin identificar", tras elegir un candidato).
 export async function manualMatch(albumId, rgMbid) {

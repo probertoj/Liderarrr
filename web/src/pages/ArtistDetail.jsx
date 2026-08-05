@@ -119,7 +119,7 @@ export default function ArtistDetail() {
         </div>
       )}
 
-      {artist.duplicateGroups?.length > 0 && <Duplicates groups={artist.duplicateGroups} onChange={load} />}
+      {artist.duplicateGroups?.length > 0 && <Duplicates groups={artist.duplicateGroups} />}
 
       <p className="text-sm text-neutral-500 mt-4 mb-3">{artist.albums.length} álbumes en tu colección</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
@@ -313,14 +313,30 @@ function MissingList({ items, artistMbid }) {
 // recomienda la mejor (más completa/mejor calidad) y deja descartar las demás.
 // Descartar SOLO oculta y quita de los recuentos: nunca borra el fichero (la
 // música está en solo lectura). La ruta se muestra para borrar a mano si se quiere.
-function Duplicates({ groups, onChange }) {
+function Duplicates({ groups }) {
   const [busy, setBusy] = useState(null);
+  const [dismissed, setDismissed] = useState({}); // id -> true (descartados esta sesión)
 
   const dismiss = async (id) => {
     setBusy(id);
     try {
       await api.albumState(id, 'dismissed');
-      await onChange();
+      setDismissed((p) => ({ ...p, [id]: true }));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const undo = async (id) => {
+    setBusy(id);
+    try {
+      await api.restoreAlbum(id);
+      setDismissed((p) => {
+        const n = { ...p };
+        delete n[id];
+        return n;
+      });
     } catch (e) {
       alert(e.message);
     } finally {
@@ -336,8 +352,8 @@ function Duplicates({ groups, onChange }) {
       </h2>
       <p className="text-xs text-neutral-600 mt-1">
         La copia <span className="text-emerald-400/90">★ mejor</span> es la más completa y de mejor calidad. «Descartar»
-        oculta una copia y la saca de los recuentos — <b className="font-normal text-neutral-500">no borra el fichero</b>.
-        La ruta está a la vista para que lo borres tú si quieres.
+        oculta una copia y la saca de los recuentos — <b className="font-normal text-neutral-500">no borra el fichero</b>
+        {' '}(puedes deshacerlo aquí o desde la Papelera). La ruta está a la vista para que lo borres tú si quieres.
       </p>
       <div className="mt-3 space-y-4">
         {groups.map((g) => (
@@ -351,7 +367,7 @@ function Duplicates({ groups, onChange }) {
                   key={c.id}
                   className={`flex items-start gap-3 text-sm rounded px-2 py-1.5 ${
                     c.best ? 'bg-emerald-950/20 border border-emerald-900/40' : 'bg-ink-850/40'
-                  }`}
+                  } ${dismissed[c.id] ? 'opacity-45' : ''}`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -382,12 +398,25 @@ function Duplicates({ groups, onChange }) {
                       {c.path}
                     </div>
                   </div>
-                  {!c.best && (
-                    <Button variant="default" disabled={busy === c.id} onClick={() => dismiss(c.id)}>
-                      <span className="inline-flex items-center gap-1.5">
-                        <X size={13} /> {busy === c.id ? '…' : 'Descartar'}
-                      </span>
-                    </Button>
+                  {dismissed[c.id] ? (
+                    <span className="text-xs text-neutral-500 inline-flex items-center gap-2 shrink-0 self-center">
+                      descartado
+                      <button
+                        onClick={() => undo(c.id)}
+                        disabled={busy === c.id}
+                        className="underline hover:text-gold-400 disabled:opacity-50"
+                      >
+                        deshacer
+                      </button>
+                    </span>
+                  ) : (
+                    !c.best && (
+                      <Button variant="default" disabled={busy === c.id} onClick={() => dismiss(c.id)}>
+                        <span className="inline-flex items-center gap-1.5">
+                          <X size={13} /> {busy === c.id ? '…' : 'Descartar'}
+                        </span>
+                      </Button>
+                    )
                   )}
                 </div>
               ))}
