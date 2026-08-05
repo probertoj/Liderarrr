@@ -170,7 +170,14 @@ function GapRow({ g }) {
     try {
       if (g.artist_mbid) await api.followMbid(g.artist_mbid, 'artist');
       else if (g.artist_id) await api.follow(g.artist_id, 'artist');
-      else return alert('Este artista no está en MusicBrainz ni en tu biblioteca; búscalo en Seguidos.');
+      else {
+        // La brecha no trae MBID (no lo tienes en disco): lo resolvemos por nombre en
+        // MusicBrainz y seguimos el mejor resultado.
+        const hits = await api.searchArtistMb(g.artist);
+        const best = hits?.[0];
+        if (!best?.mbid) return alert('MusicBrainz no encuentra a este artista por su nombre.');
+        await api.followMbid(best.mbid, 'artist');
+      }
       setFollowed(true);
     } catch (e) {
       alert(e.message);
