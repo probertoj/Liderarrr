@@ -67,6 +67,7 @@ export const api = {
   lidarrSync: () => req('/lidarr/sync', { method: 'POST' }),
   lidarrAdd: (rg_mbid, artist_mbid) => req('/lidarr/add', { method: 'POST', body: { rg_mbid, artist_mbid } }),
   lidarrAddBulk: (items) => req('/lidarr/add-bulk', { method: 'POST', body: { items } }),
+  lidarrAddStatus: () => req('/lidarr/add/status'),
   prowlarrSearch: (q) => req(`/prowlarr/search?q=${encodeURIComponent(q)}`),
   prowlarrGrab: (guid, indexerId) => req('/prowlarr/grab', { method: 'POST', body: { guid, indexerId } }),
   importsPending: () => req('/imports/pending'),
@@ -111,6 +112,23 @@ export const api = {
 };
 
 export const coverUrl = (id) => `/api/cover/${id}`;
+
+// Sondea la cola de envío a Lidarr (que corre en segundo plano) hasta que termina,
+// llamando a onUpdate(status) en cada paso. Devuelve una función para cancelar.
+export function pollLidarrQueue(onUpdate) {
+  let alive = true;
+  const tick = async () => {
+    if (!alive) return;
+    const s = await api.lidarrAddStatus().catch(() => null);
+    if (!alive) return;
+    if (s) onUpdate(s);
+    if (s?.running) setTimeout(tick, 2500);
+  };
+  tick();
+  return () => {
+    alive = false;
+  };
+}
 
 export function fmtBytes(n) {
   if (!n) return '0 B';

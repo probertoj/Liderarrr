@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send } from 'lucide-react';
-import { api, fmtBytes } from '../api.js';
+import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { Cover, StateBadge, Spinner, ErrorMsg, Button } from '../components.jsx';
 
 export default function AlbumDetail() {
@@ -523,18 +523,21 @@ function LidarrSection({ album, onDone }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [err, setErr] = useState(null);
+  const [queue, setQueue] = useState(null);
   const [releases, setReleases] = useState(null);
   const [searching, setSearching] = useState(false);
   const [grabbing, setGrabbing] = useState(null);
 
+  // Lidarr es lento (su servidor de metadatos): el envío se encola y responde al
+  // instante; sondeamos el progreso para dar feedback sin bloquear el clic.
   const sendAuto = async () => {
     setBusy(true);
     setErr(null);
     setMsg(null);
     try {
-      const r = await api.lidarrAdd(album.rg_mbid, album.artist?.mbid || null);
-      setMsg(r.note || (r.title ? `Enviado a Lidarr: «${r.title}» — búsqueda automática lanzada.` : 'Enviado a Lidarr.'));
-      await onDone();
+      await api.lidarrAdd(album.rg_mbid, album.artist?.mbid || null);
+      setMsg('En cola de Lidarr — se procesa en segundo plano.');
+      pollLidarrQueue(setQueue);
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -602,6 +605,16 @@ function LidarrSection({ album, onDone }) {
       </p>
 
       {msg && <p className="text-sm text-neutral-400 mt-3">{msg}</p>}
+      {queue &&
+        (queue.running ? (
+          <p className="text-xs text-gold-300/90 mt-1">Lidarr: procesando {queue.done}/{queue.total}…</p>
+        ) : (
+          <p className="text-xs text-neutral-500 mt-1">
+            Lidarr: {queue.added} enviados
+            {queue.pending ? ` · ${queue.pending} pendientes de importar` : ''}
+            {queue.errors?.length ? ` · ${queue.errors.length} con error` : ''}.
+          </p>
+        ))}
       {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
 
       {releases && releases.length > 0 && (

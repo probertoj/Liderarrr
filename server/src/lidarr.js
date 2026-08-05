@@ -256,3 +256,71 @@ export async function lidarrGrab({ guid, indexerId }) {
   await lidarrFetch('/release', { method: 'POST', body: { guid, indexerId } });
   return { ok: true };
 }
+
+// --- Envío a Lidarr en SEGUNDO PLANO -----------------------------------------
+// Lidarr puede tardar decenas de segundos por álbum (su servidor de metadatos es
+// lento; se han visto envíos de 90 s y "enviar todos" de 5 min). Para que la UI no
+// se cuelgue, los envíos se ENCOLAN y responden al instante; un worker los procesa
+// de fondo llamando al lidarrAdd de siempre, y la UI puede sondear el progreso.
+export const lidarrAddStatus = {
+  running: false,
+  total: 0,
+  done: 0,
+  added: 0,
+  pending: 0, // "artista presente pero álbum sin importar; refresco pedido"
+  errors: [],
+  current: null,
+  startedAt: null,
+  finishedAt: null,
+};
+
+const addQueue = [];
+let addWorker = null;
+
+export function enqueueLidarrAdd(items) {
+  const toAdd = (items || [])
+    .filter((i) => i && i.rg_mbid)
+    .map((i) => ({ rg_mbid: i.rg_mbid, artist_mbid: i.artist_mbid || null }));
+  if (!toAdd.length) return { queued: 0 };
+  // tanda nueva desde parado: resetea los contadores
+  if (!lidarrAddStatus.running && !addQueue.length) {
+    Object.assign(lidarrAddStatus, {
+      total: 0,
+      done: 0,
+      added: 0,
+      pending: 0,
+      errors: [],
+      startedAt: Date.now(),
+      finishedAt: null,
+    });
+  }
+  addQueue.push(...toAdd);
+  lidarrAddStatus.total += toAdd.length;
+  if (!addWorker)
+    addWorker = runAddQueue().finally(() => {
+      addWorker = null;
+    });
+  return { queued: toAdd.length };
+}
+
+async function runAddQueue() {
+  lidarrAddStatus.running = true;
+  try {
+    while (addQueue.length) {
+      const it = addQueue.shift();
+      lidarrAddStatus.current = it.rg_mbid;
+      try {
+        const r = await lidarrAdd(it.rg_mbid, it.artist_mbid);
+        if (r?.pending) lidarrAddStatus.pending++;
+        else lidarrAddStatus.added++;
+      } catch (e) {
+        lidarrAddStatus.errors.push(String(e.message || e));
+      }
+      lidarrAddStatus.done++;
+    }
+  } finally {
+    lidarrAddStatus.running = false;
+    lidarrAddStatus.current = null;
+    lidarrAddStatus.finishedAt = Date.now();
+  }
+}

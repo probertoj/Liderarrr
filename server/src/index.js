@@ -8,7 +8,7 @@ import { db, DATA_DIR, getAllSettings, getSetting, setSetting } from './db.js';
 import { runScan, scanStatus } from './scanner.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch } from './identify.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
-import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab } from './lidarr.js';
+import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab, enqueueLidarrAdd, lidarrAddStatus } from './lidarr.js';
 import { prowlarrTest, prowlarrSearch, prowlarrGrab } from './prowlarr.js';
 import { pendingImports, importFolder } from './importer.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists } from './musicbrainz.js';
@@ -432,15 +432,13 @@ app.post('/api/lidarr/sync', async (req, reply) => {
     return reply.code(400).send({ error: String(err.message || err) });
   }
 });
+// encola el envío (Lidarr es lento): responde al instante, se procesa en 2º plano
 app.post('/api/lidarr/add', async (req, reply) => {
-  try {
-    const { rg_mbid, artist_mbid } = req.body || {};
-    if (!rg_mbid) return reply.code(400).send({ error: 'Falta rg_mbid' });
-    return await lidarrAdd(rg_mbid, artist_mbid);
-  } catch (err) {
-    return reply.code(400).send({ error: String(err.message || err) });
-  }
+  const { rg_mbid, artist_mbid } = req.body || {};
+  if (!rg_mbid) return reply.code(400).send({ error: 'Falta rg_mbid' });
+  return enqueueLidarrAdd([{ rg_mbid, artist_mbid }]);
 });
+app.get('/api/lidarr/add/status', async () => lidarrAddStatus);
 // descargar (grab) una release elegida en la búsqueda interactiva
 app.post('/api/lidarr/grab', async (req, reply) => {
   try {
@@ -491,19 +489,7 @@ app.post('/api/imports/run', async (req, reply) => {
 app.post('/api/lidarr/add-bulk', async (req, reply) => {
   const items = req.body?.items || [];
   if (!items.length) return reply.code(400).send({ error: 'Nada que añadir' });
-  let added = 0;
-  let pending = 0;
-  const errors = [];
-  for (const it of items) {
-    try {
-      const r = await lidarrAdd(it.rg_mbid, it.artist_mbid);
-      if (r.pending) pending++;
-      else added++;
-    } catch (err) {
-      errors.push({ rg_mbid: it.rg_mbid, error: String(err.message || err) });
-    }
-  }
-  return { added, pending, total: items.length, errors };
+  return enqueueLidarrAdd(items);
 });
 
 // --- imágenes locales (carátulas: fichero o incrustada en etiquetas) --------

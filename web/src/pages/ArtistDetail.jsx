@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, Copy, X } from 'lucide-react';
-import { api, fmtBytes } from '../api.js';
+import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar } from '../components.jsx';
 
 export default function ArtistDetail() {
@@ -253,16 +253,15 @@ function RelChip({ a }) {
 function MissingList({ items, artistMbid }) {
   const [added, setAdded] = useState({});
   const [busy, setBusy] = useState(null);
+  const [queue, setQueue] = useState(null);
 
+  // Lidarr es lento: el envío se ENCOLA y responde al instante; se sondea el progreso.
   const add = async (rg) => {
     setBusy(rg.rg_mbid);
     try {
-      const r = await api.lidarrAdd(rg.rg_mbid, artistMbid);
-      if (r.pending) {
-        alert(r.note);
-        return;
-      }
+      await api.lidarrAdd(rg.rg_mbid, artistMbid);
       setAdded((p) => ({ ...p, [rg.rg_mbid]: true }));
+      pollLidarrQueue(setQueue);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -275,14 +274,11 @@ function MissingList({ items, artistMbid }) {
     if (!toSend.length) return;
     setBusy('all');
     try {
-      const r = await api.lidarrAddBulk(toSend.map((i) => ({ rg_mbid: i.rg_mbid, artist_mbid: artistMbid })));
+      await api.lidarrAddBulk(toSend.map((i) => ({ rg_mbid: i.rg_mbid, artist_mbid: artistMbid })));
       const next = {};
       for (const i of toSend) next[i.rg_mbid] = true;
       setAdded((p) => ({ ...p, ...next }));
-      const bits = [];
-      if (r.pending) bits.push(`${r.pending} pendientes (reintenta en un momento)`);
-      if (r.errors?.length) bits.push(`${r.errors.length} con error`);
-      if (bits.length) alert(`${r.added} añadidos · ${bits.join(' · ')}`);
+      pollLidarrQueue(setQueue);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -297,10 +293,20 @@ function MissingList({ items, artistMbid }) {
         <Button variant="gold" onClick={addAll} disabled={busy === 'all'}>
           <span className="inline-flex items-center gap-1.5">
             {busy === 'all' && <Loader2 size={14} className="animate-spin" />}
-            {busy === 'all' ? 'Enviando…' : 'Enviar todos a Lidarr'}
+            {busy === 'all' ? 'Encolando…' : 'Enviar todos a Lidarr'}
           </span>
         </Button>
       </div>
+      {queue &&
+        (queue.running ? (
+          <p className="text-xs text-gold-300/90 mb-2">Lidarr: procesando {queue.done}/{queue.total}…</p>
+        ) : (
+          <p className="text-xs text-neutral-500 mb-2">
+            Lidarr: {queue.added} enviados
+            {queue.pending ? ` · ${queue.pending} pendientes de importar` : ''}
+            {queue.errors?.length ? ` · ${queue.errors.length} con error` : ''}.
+          </p>
+        ))}
       <div className="space-y-1.5">
         {items.map((m) => {
           const done = added[m.rg_mbid] || m.in_lidarr;
