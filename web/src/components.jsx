@@ -81,10 +81,10 @@ export function Cover({ id, size = 'full', className = '' }) {
 }
 
 // Tarjeta de álbum para las parrillas.
-export function AlbumCard({ album }) {
+export function AlbumCard({ album, onClick }) {
   const incomplete = album.track_file_count < album.track_count;
-  return (
-    <Link to={`/album/${album.id}`} className="group block">
+  const body = (
+    <>
       <div className="relative rounded-lg overflow-hidden card">
         <Cover id={album.id} />
         {incomplete && (
@@ -117,6 +117,19 @@ export function AlbumCard({ album }) {
           {album.year ? ` · ${album.year}` : ''}
         </div>
       </div>
+    </>
+  );
+  // con onClick (p. ej. desplegar duplicados) es un botón; si no, enlaza al álbum
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="group block w-full text-left">
+        {body}
+      </button>
+    );
+  }
+  return (
+    <Link to={`/album/${album.id}`} className="group block">
+      {body}
     </Link>
   );
 }

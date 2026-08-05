@@ -224,7 +224,9 @@ export function artistDetail(id) {
     if (copies.length < 2) continue;
     let best = copies[0];
     for (const c of copies) if (copyScore(c) > copyScore(best)) best = c;
-    for (const c of copies) c.dup = { copies: copies.length }; // para el badge de la rejilla
+    // marca cada copia con su grupo y si es la representante (la mejor): la rejilla
+    // muestra solo la representante con el badge ×N y despliega el grupo al pinchar.
+    for (const c of copies) c.dup = { copies: copies.length, key, best: c.id === best.id };
     duplicateGroups.push({
       key,
       title: best.title,
