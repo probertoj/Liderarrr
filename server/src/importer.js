@@ -53,24 +53,27 @@ function walkKeep(root, rel = '') {
   return out;
 }
 
-// lee artista/álbum/año de la primera pista con etiquetas de una carpeta
-async function readMeta(dir) {
-  const audio = walkKeep(dir).filter((r) => AUDIO_EXT.has(path.extname(r).toLowerCase())).sort();
-  if (!audio.length) return null;
+// ficheros de audio de una carpeta (rutas relativas, ordenadas)
+function audioFiles(dir) {
+  return walkKeep(dir).filter((r) => AUDIO_EXT.has(path.extname(r).toLowerCase())).sort();
+}
+
+// lee artista/álbum/año de las etiquetas de UNA pista (timeout corto: es la ruta del
+// usuario y no debe colgar)
+async function readTags(file) {
   try {
     const mm = await Promise.race([
-      parseFile(path.join(dir, audio[0]), { duration: false }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 15000)),
+      parseFile(file, { duration: false }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000)),
     ]);
     const c = mm.common || {};
     return {
       artist: c.albumartist || c.artist || null,
       album: c.album || null,
       year: c.year || (c.originalyear ? Number(c.originalyear) : null),
-      tracks: audio.length,
     };
   } catch {
-    return { artist: null, album: null, year: null, tracks: audio.length };
+    return { artist: null, album: null, year: null };
   }
 }
 
@@ -79,20 +82,48 @@ async function readMeta(dir) {
 export async function pendingImports() {
   const { source, dest, enabled } = importConfig();
   if (!source || !dest) return { configured: false, enabled, items: [] };
-  let dirs;
+  let dirents;
   try {
-    dirs = fs.readdirSync(source, { withFileTypes: true }).filter((e) => e.isDirectory());
+    dirents = fs.readdirSync(source, { withFileTypes: true }).filter((e) => e.isDirectory());
   } catch (e) {
     return { configured: true, enabled, error: `No se puede leer ${source}: ${e.message}`, items: [] };
   }
   const done = importedSet();
+  // más recientes primero: las descargas nuevas están arriba
+  const dirs = dirents
+    .map((e) => {
+      const full = path.join(source, e.name);
+      let mtime = 0;
+      try {
+        mtime = fs.statSync(full).mtimeMs;
+      } catch {
+        /* noop */
+      }
+      return { name: e.name, full, mtime };
+    })
+    .sort((a, b) => b.mtime - a.mtime);
+
   const items = [];
+  let scanned = 0;
   for (const d of dirs) {
-    const full = path.join(source, d.name);
-    if (done.has(full)) continue;
-    const meta = await readMeta(full);
-    if (!meta) continue; // sin audio: no es una descarga de música
-    items.push({ source_dir: full, name: d.name, ...meta });
+    // cotas: no recorrer un pool de seeding enorme entero en una petición
+    if (items.length >= 60 || scanned >= 300) break;
+    if (done.has(d.full)) continue;
+    const audio = audioFiles(d.full);
+    if (!audio.length) continue; // sin audio: no es una descarga de música
+    scanned++;
+    // ¿ya está en la biblioteca? si su primer fichero tiene más de un enlace duro, ya
+    // se importó (está hardlinkeado en media). nlink==1 => descarga nueva sin importar.
+    // Esto salta baratísimo todo lo que ya importaron Liderarr o Lidarr, sin leer tags.
+    let nlink = 1;
+    try {
+      nlink = fs.statSync(path.join(d.full, audio[0])).nlink;
+    } catch {
+      /* noop */
+    }
+    if (nlink > 1) continue;
+    const tags = await readTags(path.join(d.full, audio[0]));
+    items.push({ source_dir: d.full, name: d.name, tracks: audio.length, ...tags });
   }
   return { configured: true, enabled, items };
 }
@@ -108,13 +139,14 @@ export async function importFolder(sourceDir, override = {}) {
   if (!norm.startsWith(path.resolve(source))) throw new Error('La carpeta de origen está fuera de la carpeta de descargas.');
   if (!fs.existsSync(norm)) throw new Error('La carpeta de origen ya no existe.');
 
-  const meta = { ...(await readMeta(norm)), ...override };
+  const files = walkKeep(norm);
+  const audio = files.filter((r) => AUDIO_EXT.has(path.extname(r).toLowerCase())).sort();
+  if (!audio.length) throw new Error('La carpeta no tiene ficheros de audio que importar.');
+  const tags = await readTags(path.join(norm, audio[0]));
+  const meta = { ...tags, ...override };
   const artist = safe(meta.artist);
   const albumBase = safe(meta.album || path.basename(norm));
   const destDir = path.join(dest, artist, meta.year ? `${albumBase} (${meta.year})` : albumBase);
-
-  const files = walkKeep(norm);
-  if (!files.length) throw new Error('La carpeta no tiene ficheros de audio que importar.');
 
   let linked = 0;
   const errors = [];
