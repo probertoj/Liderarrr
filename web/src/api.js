@@ -69,6 +69,8 @@ export const api = {
   lidarrAddBulk: (items) => req('/lidarr/add-bulk', { method: 'POST', body: { items } }),
   prowlarrSearch: (q) => req(`/prowlarr/search?q=${encodeURIComponent(q)}`),
   prowlarrGrab: (guid, indexerId) => req('/prowlarr/grab', { method: 'POST', body: { guid, indexerId } }),
+  importsPending: () => req('/imports/pending'),
+  importRun: (sourceDir, override = {}) => req('/imports/run', { method: 'POST', body: { sourceDir, ...override } }),
 
   // fase 2 — la caza
   tracked: () => req('/tracked'),

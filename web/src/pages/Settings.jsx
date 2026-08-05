@@ -303,6 +303,32 @@ export default function Settings() {
         </p>
       </section>
 
+      {/* 3c. Importar descargas — hardlink torrents -> biblioteca */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">
+          3c · Importar descargas <span className="text-xs text-neutral-500">(opcional)</span>
+        </h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Cierra el círculo: lo que bajas se enlaza (hardlink) a tu biblioteca organizada, como hace Lidarr pero sin su
+          veto. No borra ni copia el origen (sigues sembrando). Requiere que ambas carpetas estén en el mismo volumen
+          (monta <code className="text-neutral-400">/data</code> completo) y la biblioteca en escritura (<code className="text-neutral-400">:rw</code>).
+        </p>
+        <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={s.allow_import === '1'}
+            onChange={(e) => setS((p) => ({ ...p, allow_import: e.target.checked ? '1' : '0' }))}
+          />
+          Permitir importar (enlazar descargas a la biblioteca)
+        </label>
+        <Field label="Carpeta de descargas" hint="Donde tu cliente guarda la música. Ej.: /data/torrents/music">
+          <input value={s.import_source_dir || ''} onChange={set('import_source_dir')} className={input} placeholder="/data/torrents/music" />
+        </Field>
+        <Field label="Carpeta de la biblioteca (destino)" hint="Tu biblioteca organizada. Ej.: /data/media/music">
+          <input value={s.import_dest_dir || ''} onChange={set('import_dest_dir')} className={input} placeholder="/data/media/music" />
+        </Field>
+      </section>
+
       {/* 4. Auto-Lidarr */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">4 · Auto-Lidarr diario <span className="text-xs text-neutral-500">(opcional)</span></h2>

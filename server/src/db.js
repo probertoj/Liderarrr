@@ -262,6 +262,14 @@ CREATE TABLE IF NOT EXISTS challenge_items (
   PRIMARY KEY (challenge_id, position)
 );
 CREATE INDEX IF NOT EXISTS idx_ci_challenge ON challenge_items(challenge_id);
+-- Importaciones por hardlink (Prowlarr -> biblioteca): registro de descargas ya
+-- enlazadas, para no reimportarlas. NUNCA borra el origen.
+CREATE TABLE IF NOT EXISTS imports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_dir TEXT UNIQUE,
+  dest_dir TEXT,
+  imported_at INTEGER
+);
 `);
 
 // --- migraciones ligeras ----------------------------------------------------

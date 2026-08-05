@@ -10,6 +10,7 @@ import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, 
 import { runFullRefresh, refreshStatus } from './refresh.js';
 import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab } from './lidarr.js';
 import { prowlarrTest, prowlarrSearch, prowlarrGrab } from './prowlarr.js';
+import { pendingImports, importFolder } from './importer.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists } from './musicbrainz.js';
 import { acoustidTest } from './acoustid.js';
 import { discogsTest, searchRelease } from './discogs.js';
@@ -462,6 +463,27 @@ app.post('/api/prowlarr/grab', async (req, reply) => {
   try {
     const { guid, indexerId } = req.body || {};
     return await prowlarrGrab({ guid, indexerId });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+
+// --- Importar descargas (hardlink torrents/music -> media/music) -------------
+app.get('/api/imports/pending', async (req, reply) => {
+  try {
+    return await pendingImports();
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/imports/run', async (req, reply) => {
+  try {
+    const { sourceDir, artist, album, year } = req.body || {};
+    const override = {};
+    if (artist != null) override.artist = artist;
+    if (album != null) override.album = album;
+    if (year != null && year !== '') override.year = Number(year);
+    return await importFolder(sourceDir, override);
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

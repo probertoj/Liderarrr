@@ -3,7 +3,7 @@ import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle,
   Sparkles, Settings as SettingsIcon, Menu, X, RefreshCw, Star, Compass, CalendarClock,
-  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2,
+  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud,
 } from 'lucide-react';
 import { api } from './api.js';
 import { Spinner, ErrorBoundary } from './components.jsx';
@@ -25,6 +25,7 @@ const Challenges = lazy(() => import('./pages/Challenges.jsx'));
 const Upgrades = lazy(() => import('./pages/Upgrades.jsx'));
 const Labels = lazy(() => import('./pages/Labels.jsx'));
 const Diagnostics = lazy(() => import('./pages/Diagnostics.jsx'));
+const Imports = lazy(() => import('./pages/Imports.jsx'));
 const Trash = lazy(() => import('./pages/Trash.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
@@ -47,6 +48,7 @@ const NAV = [
       { to: '/seguidos', label: 'Seguidos', Icon: Star },
       { to: '/huecos', label: 'Huecos', Icon: Compass },
       { to: '/proximos', label: 'Próximos lanzamientos', Icon: CalendarClock },
+      { to: '/importar', label: 'Importar descargas', Icon: DownloadCloud },
     ],
   },
   {
@@ -196,6 +198,7 @@ export default function App() {
             <Route path="/seguidos" element={<Tracked />} />
             <Route path="/huecos" element={<Discover />} />
             <Route path="/proximos" element={<Calendar />} />
+            <Route path="/importar" element={<Imports />} />
             <Route path="/escuchas" element={<Listening />} />
             <Route path="/retos" element={<Challenges />} />
             <Route path="/upgrades" element={<Upgrades />} />
