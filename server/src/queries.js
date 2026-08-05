@@ -175,15 +175,80 @@ export function artists({ q, sort, limit = 5000 } = {}) {
     .all({ ...args, limit });
 }
 
+// Normaliza un título para detectar duplicados difusos: quita paréntesis/corchetes
+// ((Deluxe Edition), [UK CD], [2021]…), palabras de edición/versión/disco, y toda
+// la puntuación. Así "Philophobia", "Philophobia (Deluxe Version)" y "Philophobia
+// (Deluxe Edition) CD2" caen en el mismo grupo.
+const DUP_STRIP = /\b(deluxe|remaster(ed)?|expanded|anniversary|edition|version|reissue|mono|stereo|bonus|remix(es|ed)?|disc\s*\d+|cd\s*\d+)\b/gi;
+function normalizeForDup(title) {
+  return String(title || '')
+    .toLowerCase()
+    .replace(/[([{][^)\]}]*[)\]}]/g, ' ')
+    .replace(DUP_STRIP, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+// Puntúa una copia para recomendar cuál CONSERVAR (mayor = mejor): manda la
+// completitud (pistas que tienes vs las que debería), luego lossless, luego nº de
+// pistas y por último el tamaño. Es una heurística; el usuario decide al final.
+function copyScore(a) {
+  const complete = a.track_count ? a.track_file_count / a.track_count : 1;
+  return complete * 1e12 + (a.lossless ? 1e9 : 0) + (a.track_file_count || 0) * 1e6 + (a.size_bytes || 0);
+}
+
 export function artistDetail(id) {
   const artist = db.prepare('SELECT * FROM artists WHERE id = ?').get(id);
   if (!artist) return null;
-  artist.albums = db
+  const albums = db
     .prepare(
-      `SELECT id, title, year, cover, match_state, track_file_count, track_count, rg_mbid
-       FROM albums WHERE artist_id = ? AND ${DESCRIPTIVE} ORDER BY year, title`
+      `SELECT a.id, a.title, a.year, a.cover, a.match_state, a.track_file_count, a.track_count, a.rg_mbid,
+        a.size_bytes, a.path,
+        (SELECT format FROM tracks WHERE album_id=a.id AND format IS NOT NULL AND format<>''
+          GROUP BY format ORDER BY COUNT(*) DESC LIMIT 1) AS format,
+        (SELECT CASE WHEN COUNT(*)>0 AND MIN(lossless)=1 THEN 1 ELSE 0 END FROM tracks WHERE album_id=a.id) AS lossless
+       FROM albums a WHERE a.artist_id = ? AND a.match_state != 'dismissed' ORDER BY a.year, a.title`
     )
     .all(id);
+
+  // Agrupa duplicados: por release group (identificados) o por título normalizado
+  // (sin identificar). Solo los grupos con más de una copia se marcan.
+  const groups = new Map();
+  for (const a of albums) {
+    const key = a.rg_mbid ? `mb:${a.rg_mbid}` : `t:${normalizeForDup(a.title) || String(a.title || '').toLowerCase().trim()}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(a);
+  }
+  const duplicateGroups = [];
+  for (const [key, copies] of groups) {
+    if (copies.length < 2) continue;
+    let best = copies[0];
+    for (const c of copies) if (copyScore(c) > copyScore(best)) best = c;
+    for (const c of copies) c.dup = { copies: copies.length }; // para el badge de la rejilla
+    duplicateGroups.push({
+      key,
+      title: best.title,
+      copies: copies
+        .map((c) => ({
+          id: c.id,
+          title: c.title,
+          year: c.year,
+          track_file_count: c.track_file_count,
+          track_count: c.track_count,
+          size_bytes: c.size_bytes,
+          path: c.path,
+          format: c.format,
+          lossless: !!c.lossless,
+          matched: !!c.rg_mbid,
+          best: c.id === best.id,
+        }))
+        .sort((x, y) => Number(y.best) - Number(x.best)),
+    });
+  }
+  duplicateGroups.sort((x, y) => y.copies.length - x.copies.length);
+
+  artist.albums = albums;
+  artist.duplicateGroups = duplicateGroups;
   return artist;
 }
 

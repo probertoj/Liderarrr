@@ -92,10 +92,20 @@ export function AlbumCard({ album }) {
             {album.track_file_count}/{album.track_count}
           </span>
         )}
-        {album.match_state === 'orphan' && (
-          <span className="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-violet-600/90 text-violet-50">
-            rareza
-          </span>
+        {(album.dup || album.match_state === 'orphan') && (
+          <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
+            {album.dup && (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded bg-sky-600/90 text-sky-50"
+                title={`${album.dup.copies} copias de este disco en tu colección`}
+              >
+                ×{album.dup.copies}
+              </span>
+            )}
+            {album.match_state === 'orphan' && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-600/90 text-violet-50">rareza</span>
+            )}
+          </div>
         )}
       </div>
       <div className="mt-1.5 px-0.5">

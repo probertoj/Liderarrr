@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2 } from 'lucide-react';
-import { api } from '../api.js';
+import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, Copy, X } from 'lucide-react';
+import { api, fmtBytes } from '../api.js';
 import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar } from '../components.jsx';
 
 export default function ArtistDetail() {
@@ -118,6 +118,8 @@ export default function ArtistDetail() {
           </div>
         </div>
       )}
+
+      {artist.duplicateGroups?.length > 0 && <Duplicates groups={artist.duplicateGroups} onChange={load} />}
 
       <p className="text-sm text-neutral-500 mt-4 mb-3">{artist.albums.length} álbumes en tu colección</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
@@ -302,6 +304,96 @@ function MissingList({ items, artistMbid }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// Limpieza de duplicados: discos con varias copias en tu colección. Liderarr
+// recomienda la mejor (más completa/mejor calidad) y deja descartar las demás.
+// Descartar SOLO oculta y quita de los recuentos: nunca borra el fichero (la
+// música está en solo lectura). La ruta se muestra para borrar a mano si se quiere.
+function Duplicates({ groups, onChange }) {
+  const [busy, setBusy] = useState(null);
+
+  const dismiss = async (id) => {
+    setBusy(id);
+    try {
+      await api.albumState(id, 'dismissed');
+      await onChange();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="card p-4 mb-6 border border-sky-900/40">
+      <h2 className="text-sm text-neutral-300 flex items-center gap-2">
+        <Copy size={15} className="text-sky-400" /> Duplicados — {groups.length}{' '}
+        {groups.length === 1 ? 'disco con copias' : 'discos con copias'}
+      </h2>
+      <p className="text-xs text-neutral-600 mt-1">
+        La copia <span className="text-emerald-400/90">★ mejor</span> es la más completa y de mejor calidad. «Descartar»
+        oculta una copia y la saca de los recuentos — <b className="font-normal text-neutral-500">no borra el fichero</b>.
+        La ruta está a la vista para que lo borres tú si quieres.
+      </p>
+      <div className="mt-3 space-y-4">
+        {groups.map((g) => (
+          <div key={g.key} className="border-t border-ink-800 pt-3">
+            <div className="text-sm text-neutral-300 mb-1.5">
+              {g.title} <span className="text-neutral-600">· {g.copies.length} copias</span>
+            </div>
+            <div className="space-y-1.5">
+              {g.copies.map((c) => (
+                <div
+                  key={c.id}
+                  className={`flex items-start gap-3 text-sm rounded px-2 py-1.5 ${
+                    c.best ? 'bg-emerald-950/20 border border-emerald-900/40' : 'bg-ink-850/40'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      {c.best && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/90 text-emerald-50 shrink-0">
+                          ★ mejor
+                        </span>
+                      )}
+                      <Link to={`/album/${c.id}`} className="truncate hover:text-gold-400">
+                        {c.title}
+                        {c.year ? <span className="text-neutral-600"> · {c.year}</span> : ''}
+                      </Link>
+                    </div>
+                    <div className="text-xs text-neutral-600 flex flex-wrap gap-x-2 mt-0.5">
+                      {c.format && (
+                        <span className={c.lossless ? 'text-emerald-400/80' : ''}>
+                          {c.format}
+                          {c.lossless ? ' · lossless' : ''}
+                        </span>
+                      )}
+                      <span className={c.track_file_count < c.track_count ? 'text-amber-400/80' : ''}>
+                        {c.track_file_count}/{c.track_count} pistas
+                      </span>
+                      <span>{fmtBytes(c.size_bytes)}</span>
+                      {!c.matched && <span className="text-neutral-500">sin identificar</span>}
+                    </div>
+                    <div className="text-[11px] text-neutral-700 truncate mt-0.5" title={c.path}>
+                      {c.path}
+                    </div>
+                  </div>
+                  {!c.best && (
+                    <Button variant="default" disabled={busy === c.id} onClick={() => dismiss(c.id)}>
+                      <span className="inline-flex items-center gap-1.5">
+                        <X size={13} /> {busy === c.id ? '…' : 'Descartar'}
+                      </span>
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
