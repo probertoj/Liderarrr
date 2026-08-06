@@ -61,27 +61,23 @@ export function StateBadge({ state }) {
 }
 
 // La carátula se sirve al instante si está en local/caché; si el backend la está
-// resolviendo en 2º plano (fichero/online), la primera carga da 404. Por eso se
-// reintenta con backoff: al resolverse, aparece sola sin recargar la página.
+// resolviendo en 2º plano (fichero/online), la primera carga da 404. Se reintenta con
+// backoff (al resolverse aparece sola) y, MIENTRAS, se muestra un placeholder de fondo
+// —icono atenuado y pulsante— en vez de un hueco en blanco. Si tras los reintentos no
+// hay carátula, el icono queda estático (estado "sin carátula").
 const COVER_RETRIES = 3;
 export function Cover({ id, size = 'full', className = '' }) {
   const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const timer = useRef(null);
 
   useEffect(() => {
     setAttempt(0);
     setFailed(false);
+    setLoaded(false);
     return () => clearTimeout(timer.current);
   }, [id]);
-
-  if (failed || !id) {
-    return (
-      <div className={`flex items-center justify-center bg-ink-850 text-neutral-700 aspect-square ${className}`}>
-        <ImageOff size={size === 'full' ? 32 : 18} />
-      </div>
-    );
-  }
 
   const onError = () => {
     if (attempt >= COVER_RETRIES) {
@@ -92,13 +88,23 @@ export function Cover({ id, size = 'full', className = '' }) {
   };
 
   return (
-    <img
-      src={attempt ? `${coverUrl(id)}?r=${attempt}` : coverUrl(id)}
-      onError={onError}
-      loading="lazy"
-      className={`object-cover aspect-square w-full ${className}`}
-      alt=""
-    />
+    <div className={`relative bg-ink-850 aspect-square overflow-hidden ${className}`}>
+      {!loaded && (
+        <div className="absolute inset-0 flex items-center justify-center text-neutral-700">
+          <ImageOff size={size === 'full' ? 32 : 18} className={failed ? '' : 'opacity-30 animate-pulse'} />
+        </div>
+      )}
+      {id && !failed && (
+        <img
+          src={attempt ? `${coverUrl(id)}?r=${attempt}` : coverUrl(id)}
+          onLoad={() => setLoaded(true)}
+          onError={onError}
+          loading="lazy"
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity ${loaded ? 'opacity-100' : 'opacity-0'}`}
+          alt=""
+        />
+      )}
+    </div>
   );
 }
 
