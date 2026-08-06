@@ -44,6 +44,7 @@ export const api = {
   library: (params) => req(`/library?${new URLSearchParams(params)}`),
   libraryFilters: () => req('/library/filters'),
   album: (id) => req(`/albums/${id}`),
+  dupGroup: (id) => req(`/albums/${id}/dup-group`),
   albumState: (id, state) => req(`/albums/${id}/state`, { method: 'POST', body: { state } }),
   dismissed: () => req('/dismissed'),
   restoreAlbum: (id) => req(`/albums/${id}/restore`, { method: 'POST' }),

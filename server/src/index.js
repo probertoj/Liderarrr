@@ -204,6 +204,12 @@ app.get('/api/albums/:id', async (req, reply) => {
   a.inLidarr = a.rg_mbid ? owned.has(a.rg_mbid) : false;
   return a;
 });
+// grupo de duplicados de un álbum (para el panel al pinchar ×N en la Discoteca)
+app.get('/api/albums/:id/dup-group', async (req, reply) => {
+  const g = q.albumDupGroup(Number(req.params.id));
+  if (!g) return reply.code(404).send({ error: 'No encontrado' });
+  return g;
+});
 
 app.get('/api/artists', async (req) => q.artists(req.query || {}));
 app.get('/api/artists/:id', async (req, reply) => {

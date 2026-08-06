@@ -1,13 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Disc } from 'lucide-react';
 import { api } from '../api.js';
-import { PageTitle, AlbumCard, Spinner, ErrorMsg } from '../components.jsx';
+import { PageTitle, AlbumCard, Spinner, ErrorMsg, DuplicateGroupPanel } from '../components.jsx';
 
 export default function Library() {
   const [filters, setFilters] = useState(null);
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
+  const [group, setGroup] = useState(null); // grupo de duplicados abierto (al pinchar ×N)
   const [f, setF] = useState({ q: '', genre: '', decade: '', format: '', lossless: '', state: '', sort: 'added' });
+
+  const openDup = async (id) => {
+    try {
+      setGroup(await api.dupGroup(id));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
 
   useEffect(() => {
     api.libraryFilters().then(setFilters).catch(() => {});
@@ -90,10 +99,12 @@ export default function Library() {
       {data && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {data.albums.map((a) => (
-            <AlbumCard key={a.id} album={a} />
+            <AlbumCard key={a.id} album={a} onClick={a.dup ? () => openDup(a.id) : undefined} />
           ))}
         </div>
       )}
+
+      {group && <DuplicateGroupPanel group={group} onClose={() => setGroup(null)} />}
     </div>
   );
 }
