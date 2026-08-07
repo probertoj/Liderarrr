@@ -400,24 +400,41 @@ export default function Settings() {
       {/* 5. Escritura de etiquetas */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">
-          5 · Escritura de etiquetas <span className="text-xs text-neutral-500">(avanzado)</span>
+          5 · Escritura de etiquetas{' '}
+          <span className="text-xs text-red-400/90 border border-red-500/40 bg-red-500/10 rounded px-1.5 py-0.5">
+            no recomendado
+          </span>
         </h2>
         <p className="text-xs text-neutral-500 mb-3">
-          Por defecto Liderarrr <strong>nunca</strong> toca tus ficheros. Si lo activas, podrás escribir los
-          identificadores de MusicBrainz (solo los MBID) en los álbumes identificados con confianza, desde su ficha y
-          con confirmación. Nunca borra otras etiquetas ni toca rarezas.
+          Por defecto Liderarr <strong>nunca</strong> toca tus ficheros, y así debería quedarse. Esta opción existe solo
+          para casos muy concretos: si la activas, podrás escribir identificadores de MusicBrainz (solo los MBID) en los
+          álbumes identificados con confianza, desde su ficha y con confirmación. Nunca borra otras etiquetas ni toca
+          rarezas — pero <strong>modifica el fichero</strong>, y eso tiene consecuencias.
         </p>
+        <div className="text-xs text-red-300/90 bg-red-500/10 border border-red-500/30 rounded p-3 mb-3 space-y-1.5">
+          <p>
+            <strong>⚠️ Si usas hardlinks con torrents (seeding), NO lo actives.</strong> Tu música en{' '}
+            <code>media</code> y el torrent en <code>torrents</code> son <strong>el mismo fichero</strong> (mismo inodo).
+            Escribir una etiqueta cambia ese fichero → cambia su hash → <strong>rompes el torrent</strong>: qBittorrent
+            lo marcará como erróneo y dejarás de seedear (o forzará una recomprobación).
+          </p>
+          <p>
+            Riesgo general: cualquier reescritura de etiquetas puede corromper un fichero si algo falla a media
+            escritura. Ten copia de seguridad. La identificación y el completismo funcionan perfectamente{' '}
+            <strong>sin</strong> esto: Liderarr guarda los MBID en su propia base de datos.
+          </p>
+        </div>
         <label className="flex items-center gap-2 text-sm mb-2 cursor-pointer">
           <input
             type="checkbox"
             checked={s.allow_tag_writing === '1'}
             onChange={(e) => setS((p) => ({ ...p, allow_tag_writing: e.target.checked ? '1' : '0' }))}
           />
-          Permitir escribir etiquetas MBID en mis ficheros
+          Permitir escribir etiquetas MBID en mis ficheros (no recomendado)
         </label>
-        <p className="text-xs text-amber-400/80">
-          Requiere montar tu carpeta de música en modo escritura: cambia <code>/music:ro</code> por{' '}
-          <code>/music:rw</code> en tu Docker. Con <code>:ro</code> (lo recomendado por defecto) esto no tendrá efecto.
+        <p className="text-xs text-neutral-500">
+          Además requiere montar la carpeta de música en modo escritura (<code>:rw</code>) en tu Docker; con el montaje
+          de solo lectura (<code>:ro</code>, lo recomendado) esto no tiene efecto aunque lo marques.
         </p>
       </section>
 
