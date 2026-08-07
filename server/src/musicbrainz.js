@@ -59,15 +59,29 @@ async function pump() {
   }
 }
 
+// MusicBrainz devuelve 503 cuando SU servicio está saturado (no por incumplir el
+// 1 req/s: eso ya lo respeta la cola). Es transitorio; una operación con decenas de
+// páginas no debe abortar por un 503 fugaz. Reintentamos con backoff, respetando la
+// cabecera Retry-After si viene. El sleep ocurre dentro de la cola (pump serializa),
+// así que el hueco global de 1,1 s se sigue respetando durante los reintentos.
+const MB_RETRIES = 3;
 async function mbFetch(pathAndQuery) {
   const url = `${BASE}${pathAndQuery}${pathAndQuery.includes('?') ? '&' : '?'}fmt=json`;
-  const res = await fetch(url, {
-    headers: { 'User-Agent': UA, Accept: 'application/json' },
-    signal: AbortSignal.timeout(20000),
-  });
-  if (res.status === 503) throw new Error('MusicBrainz saturado (503), reintenta luego');
-  if (!res.ok) throw new Error(`MusicBrainz ${res.status} en ${pathAndQuery}`);
-  return res.json();
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': UA, Accept: 'application/json' },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (res.status === 503 && attempt < MB_RETRIES) {
+      const ra = Number(res.headers.get('retry-after'));
+      const backoff = ra > 0 ? Math.min(ra * 1000, 10000) : GAP_MS * Math.pow(2, attempt);
+      await new Promise((r) => setTimeout(r, backoff));
+      continue;
+    }
+    if (res.status === 503) throw new Error('MusicBrainz saturado (503), reintenta luego');
+    if (!res.ok) throw new Error(`MusicBrainz ${res.status} en ${pathAndQuery}`);
+    return res.json();
+  }
 }
 
 // Petición cacheada. `key` es la clave de caché (sin prefijo); se le antepone
