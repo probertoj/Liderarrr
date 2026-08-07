@@ -7,6 +7,25 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [Sin publicar] — 0.3 (en progreso)
+
+### Añadido
+- **Multidiscos: las cajas cuentan como un solo álbum.** Un box-set/deluxe/antología
+  viene como una carpeta por disco (CD 1, CD 2…); como la identidad de álbum es la
+  carpeta y las etiquetas llevan el total de la CAJA, cada disco parecía un incompleto
+  brutal (7/92) y salían N filas casi iguales. Ahora una columna `disc_group` marca los
+  discos de una misma caja y las vistas los colapsan: **Álbumes incompletos** (una fila
+  por caja, con badge "caja · N discos"; una caja completa desaparece), **Discoteca** y
+  el recuento del **Dashboard**. Detección por carpeta padre + artista + total de caja
+  compartido que supera los ficheros, con guardarraíl para no fundir álbumes normales.
+  Es **solo lectura** sobre los ficheros; migración no destructiva (`ADD COLUMN`) con
+  backfill al arrancar (sin reescaneo completo).
+- **Bug de duplicados corregido de paso**: los discos de una caja con el mismo título
+  (p. ej. los 8 CD de *Sign O' The Times (Super Deluxe)*) ya no se cuentan como copias
+  duplicadas.
+
+---
+
 ## [0.2.0] — 2026-08-07
 
 Hito de **completismo de sello**: la función más nueva queda validada contra sellos

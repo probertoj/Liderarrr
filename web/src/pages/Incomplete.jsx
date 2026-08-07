@@ -39,7 +39,14 @@ export default function Incomplete() {
                 <Cover id={a.id} size="sm" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate">{a.title}</div>
+                <div className="truncate flex items-center gap-2">
+                  <span className="truncate">{a.title}</span>
+                  {a.discs > 1 && (
+                    <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-ink-800 border border-ink-700 text-neutral-400">
+                      caja · {a.discs} discos
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs text-neutral-500 truncate">
                   {a.album_artist}
                   {a.year ? ` · ${a.year}` : ''}

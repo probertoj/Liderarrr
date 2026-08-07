@@ -3,6 +3,7 @@ import path from 'node:path';
 import { parseFile } from 'music-metadata';
 import { db, getSetting, setSetting } from './db.js';
 import { albumKey, splitRoots, isJunkLabel } from './libkey.js';
+import { regroupDiscs } from './discgroup.js';
 
 // Raíces de la biblioteca para CALCULAR la identidad de cada álbum (clave relativa
 // al root). Se fija al empezar el escaneo desde music_dirs; es independiente de las
@@ -364,6 +365,12 @@ export async function runScan(opts = {}) {
   } finally {
     scanStatus.running = false;
     scanStatus.finishedAt = Date.now();
+    // reagrupa los discos de cajas multidisco (solo lectura sobre la BD)
+    try {
+      regroupDiscs();
+    } catch (e) {
+      console.warn('[discgroup] fallo al reagrupar tras el escaneo:', String(e.message || e));
+    }
     // resumen persistente, para que el estado sobreviva a un reinicio
     setSetting(
       'last_scan',

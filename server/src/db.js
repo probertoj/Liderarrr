@@ -283,6 +283,10 @@ function ensureColumn(table, column, decl) {
 }
 // Reservado para cuando el esquema evolucione entre versiones.
 ensureColumn('albums', 'disc_count', 'disc_count INTEGER DEFAULT 1');
+// multidiscos: marca qué álbumes son DISCOS de una misma caja, para que las vistas
+// los cuenten como un solo álbum (lo rellena discgroup.js; nullable = álbum normal).
+ensureColumn('albums', 'disc_group', 'disc_group TEXT');
+db.exec('CREATE INDEX IF NOT EXISTS idx_albums_discgroup ON albums(disc_group)');
 // fecha de alta en Lidarr, para «últimas peticiones» del dashboard
 ensureColumn('lidarr_albums', 'added', 'added TEXT');
 

@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { db, DATA_DIR, getAllSettings, getSetting, setSetting } from './db.js';
 import { runScan, scanStatus } from './scanner.js';
+import { regroupDiscs } from './discgroup.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch } from './identify.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
 import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab, enqueueLidarrAdd, lidarrAddStatus } from './lidarr.js';
@@ -581,6 +582,15 @@ app
   .then(() => {
     console.log(`[Liderarrr] escuchando en http://0.0.0.0:${PORT}`);
     scheduleNightly();
+    // backfill de multidiscos: reagrupa cajas sobre lo ya escaneado, sin exigir un
+    // reescaneo completo. Diferido para no retrasar el primer request. Solo lectura.
+    setImmediate(() => {
+      try {
+        regroupDiscs();
+      } catch (e) {
+        console.warn('[discgroup] backfill al arrancar falló:', String(e.message || e));
+      }
+    });
   })
   .catch((err) => {
     app.log.error(err);
