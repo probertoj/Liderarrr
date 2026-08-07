@@ -113,6 +113,14 @@ function LabelCompletism({ name }) {
   const [queue, setQueue] = useState(null);
   const [search, setSearch] = useState(null); // query del modal de búsqueda manual
 
+  // Reenganche: la cola de envío corre en el BACKEND, así que al volver a esta página
+  // (o entrar con un envío ya en marcha) sondeamos su estado en vez de mostrar "como si
+  // no hubiera pasado nada". Si está corriendo, sigue sondeando hasta que termine.
+  useEffect(() => {
+    const stop = pollLidarrQueue(setQueue);
+    return stop;
+  }, []);
+
   const load = async () => {
     setLoading(true);
     setErr(null);
@@ -155,6 +163,13 @@ function LabelCompletism({ name }) {
         Cruza el catálogo de álbumes de estudio del sello en MusicBrainz con lo que tienes. Consulta MB en vivo: puede
         tardar.
       </p>
+
+      {/* Envío en 2º plano en marcha (aunque no hayas pulsado "Calcular" en esta visita) */}
+      {!data && queue?.running && (
+        <p className="text-xs text-gold-300/90 mt-2">
+          Lidarr: procesando {queue.done}/{queue.total}… (envío en segundo plano)
+        </p>
+      )}
 
       {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
       {data && !data.found && <p className="text-sm text-neutral-500 mt-3">MusicBrainz no encuentra este sello.</p>}

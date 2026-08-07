@@ -289,7 +289,14 @@ export async function searchLabel(name) {
 // sellos cuelgan de RELEASES en MusicBrainz, no de release-groups: se recorren las
 // releases del sello y se deduplican a RG. Tope `maxReleases` para no traer miles de
 // un major (ahí el completismo no aplica): si se supera, devuelve {tooBig, total}.
-export async function labelReleaseGroups(labelMbid, { maxReleases = 800 } = {}) {
+//
+// OJO: el tope mide RELEASES BRUTAS (todas las ediciones/formatos/reediciones/
+// singles/EPs/comps), no álbumes de estudio. Un indie consagrado tiene cientos de
+// álbumes escondidos tras miles de releases (Sub Pop ~3200, Merge ~1800), justo el
+// caso de uso. Por eso el tope es alto: solo debe excluir majors de verdad (decenas
+// de miles). Coste: hasta maxReleases/100 páginas a 1,1 s c/u (~55 s el peor caso,
+// cacheado después). Sube el tope si un indie legítimo aún salta como "demasiado grande".
+export async function labelReleaseGroups(labelMbid, { maxReleases = 5000 } = {}) {
   if (!labelMbid) return { tooBig: false, total: 0, releaseGroups: [] };
   const rgs = new Map();
   let offset = 0;

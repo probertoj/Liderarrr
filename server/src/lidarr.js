@@ -305,6 +305,7 @@ export function enqueueLidarrAdd(items) {
 
 async function runAddQueue() {
   lidarrAddStatus.running = true;
+  console.log(`[lidarr] cola de envío iniciada: ${addQueue.length} pendientes (total acumulado ${lidarrAddStatus.total})`);
   try {
     while (addQueue.length) {
       const it = addQueue.shift();
@@ -314,7 +315,12 @@ async function runAddQueue() {
         if (r?.pending) lidarrAddStatus.pending++;
         else lidarrAddStatus.added++;
       } catch (e) {
-        lidarrAddStatus.errors.push(String(e.message || e));
+        // ANTES este catch era mudo: un fallo (p. ej. Lidarr saturado devolviendo
+        // lookup vacío -> "no encuentra al artista") desaparecía sin dejar rastro y
+        // la cola parecía "morir" a mitad. Ahora deja marca en los eventos.
+        const msg = String(e.message || e);
+        lidarrAddStatus.errors.push(msg);
+        console.warn(`[lidarr] ✗ envío ${it.rg_mbid} — ${msg}`);
       }
       lidarrAddStatus.done++;
     }
@@ -322,5 +328,9 @@ async function runAddQueue() {
     lidarrAddStatus.running = false;
     lidarrAddStatus.current = null;
     lidarrAddStatus.finishedAt = Date.now();
+    const secs = lidarrAddStatus.startedAt ? Math.round((Date.now() - lidarrAddStatus.startedAt) / 1000) : 0;
+    console.log(
+      `[lidarr] cola terminada: ${lidarrAddStatus.added} enviados · ${lidarrAddStatus.pending} pend · ${lidarrAddStatus.errors.length} error (${lidarrAddStatus.done}/${lidarrAddStatus.total}, ${secs}s)`
+    );
   }
 }
