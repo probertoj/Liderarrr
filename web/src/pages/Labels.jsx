@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Building2, ArrowLeft, ExternalLink, Check } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
-import { PageTitle, AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, ProwlarrSearchModal } from '../components.jsx';
+import { PageTitle, AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, ProwlarrSearchModal, DuplicateGroupPanel } from '../components.jsx';
 
 // Sellos de tu colección. Los sellos se van capturando de Discogs a medida que
 // consultas ediciones de tus álbumes (y de las etiquetas si las traen), así que
@@ -64,9 +64,19 @@ export default function Labels() {
 
 function LabelDetail({ name, onBack }) {
   const [albums, setAlbums] = useState(null);
+  const [group, setGroup] = useState(null); // grupo de duplicados abierto (×N)
   useEffect(() => {
     api.label(name).then(setAlbums);
   }, [name]);
+
+  const openDup = async (id) => {
+    try {
+      setGroup(await api.dupGroup(id));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
   return (
     <div>
       <button onClick={onBack} className="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-gold-400 mb-4">
@@ -82,10 +92,12 @@ function LabelDetail({ name, onBack }) {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {albums.map((a) => (
-            <AlbumCard key={a.id} album={a} />
+            <AlbumCard key={a.id} album={a} onClick={a.dup ? () => openDup(a.id) : undefined} />
           ))}
         </div>
       )}
+
+      {group && <DuplicateGroupPanel group={group} onClose={() => setGroup(null)} />}
     </div>
   );
 }

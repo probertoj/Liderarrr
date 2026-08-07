@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarClock, Plus, Check, Loader2 } from 'lucide-react';
-import { api } from '../api.js';
+import { CalendarClock, Plus, Check, Loader2, ExternalLink } from 'lucide-react';
+import { api, pollLidarrQueue } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg } from '../components.jsx';
 
 // Próximos lanzamientos: release groups por estrenar de tus artistas seguidos.
@@ -12,21 +12,20 @@ export default function Calendar() {
   const [all, setAll] = useState(false);
   const [added, setAdded] = useState({});
   const [busy, setBusy] = useState(null);
+  const [queue, setQueue] = useState(null);
 
   useEffect(() => {
     setRows(null);
     api.upcoming(all).then(setRows).catch((e) => setErr(e.message));
   }, [all]);
 
+  // Lidarr es lento: el envío se ENCOLA y responde al instante; se sondea el progreso.
   const add = async (r) => {
     setBusy(r.rg_mbid);
     try {
-      const res = await api.lidarrAdd(r.rg_mbid, r.artist_mbid);
-      if (res.pending) {
-        alert(res.note);
-        return;
-      }
+      await api.lidarrAdd(r.rg_mbid, r.artist_mbid);
       setAdded((p) => ({ ...p, [r.rg_mbid]: true }));
+      pollLidarrQueue(setQueue);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -56,6 +55,17 @@ export default function Calendar() {
         Incluir todos los artistas (no solo los que sigo)
       </label>
 
+      {queue &&
+        (queue.running ? (
+          <p className="text-xs text-gold-300/90 mb-3">Lidarr: procesando {queue.done}/{queue.total}…</p>
+        ) : (
+          <p className="text-xs text-neutral-500 mb-3">
+            Lidarr: {queue.added} enviados
+            {queue.pending ? ` · ${queue.pending} pendientes de importar` : ''}
+            {queue.errors?.length ? ` · ${queue.errors.length} con error` : ''}.
+          </p>
+        ))}
+
       {rows.length === 0 ? (
         <div className="card p-6 text-center text-neutral-400">
           Nada anunciado por ahora. Sigue a más artistas o recalcula discografías en «Huecos».
@@ -78,6 +88,14 @@ export default function Calendar() {
                         <span className="text-neutral-600 text-xs ml-2">{r.primary_type}</span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 ml-3">
+                        <a
+                          href={`https://musicbrainz.org/release-group/${r.rg_mbid}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-gold-400 hover:underline inline-flex items-center gap-0.5"
+                        >
+                          MB <ExternalLink size={11} />
+                        </a>
                         <span className="text-neutral-600 text-xs">{r.first_release}</span>
                         {done ? (
                           <span className="text-emerald-400 text-xs inline-flex items-center gap-1">

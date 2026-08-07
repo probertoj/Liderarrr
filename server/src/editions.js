@@ -2,7 +2,7 @@ import { db } from './db.js';
 import { releaseEditions, discogsConfigured } from './discogs.js';
 import { isJunkLabel } from './libkey.js';
 import { searchLabel, labelReleaseGroups } from './musicbrainz.js';
-import { normalizeForDup } from './queries.js';
+import { normalizeForDup, libScore } from './queries.js';
 
 // Ediciones y upgrades: el equivalente (mejor) de JustWatch. Para un álbum tuyo,
 // Discogs lista todas sus ediciones —remaster, deluxe, vinilo con bonus— así
@@ -72,14 +72,41 @@ export function labelsOverview() {
 }
 
 export function labelAlbums(name) {
-  return db
+  const rows = db
     .prepare(
-      `SELECT a.id, a.title, a.album_artist, a.year, a.cover, a.track_file_count, a.track_count, a.match_state
+      `SELECT a.id, a.title, a.album_artist, a.year, a.cover, a.track_file_count, a.track_count, a.match_state,
+        a.size_bytes, a.rg_mbid
        FROM album_tags at JOIN tags t ON t.id=at.tag_id AND t.type='label' AND t.name=@name
-       JOIN albums a ON a.id=at.album_id AND a.match_state!='dismissed'
-       ORDER BY a.year, a.album_artist`
+       JOIN albums a ON a.id=at.album_id AND a.match_state!='dismissed'`
     )
     .all({ name });
+  // colapsa duplicados a un representante con ×N (coherente con la Discoteca y el artista)
+  const groups = new Map();
+  for (const a of rows) {
+    const key = a.rg_mbid
+      ? `mb:${a.rg_mbid}`
+      : `t:${String(a.album_artist || '').toLowerCase().trim()} ${normalizeForDup(a.title)}`;
+    const g = groups.get(key);
+    if (g) g.push(a);
+    else groups.set(key, [a]);
+  }
+  const out = [];
+  for (const copies of groups.values()) {
+    if (copies.length === 1) {
+      out.push(copies[0]);
+      continue;
+    }
+    let best = copies[0];
+    for (const c of copies) if (libScore(c) > libScore(best)) best = c;
+    best.dup = { copies: copies.length };
+    out.push(best);
+  }
+  out.sort(
+    (a, b) =>
+      (a.year || 0) - (b.year || 0) ||
+      String(a.album_artist || '').localeCompare(String(b.album_artist || ''), 'es', { sensitivity: 'base' })
+  );
+  return out;
 }
 
 // Completismo de un sello contra MusicBrainz (bajo demanda): resuelve el nombre del

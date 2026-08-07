@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Compass, Plus, Check, X, RefreshCw, Loader2 } from 'lucide-react';
+import { Compass, Plus, Check, X, RefreshCw, Loader2, ExternalLink } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button, ProwlarrSearchModal } from '../components.jsx';
 
@@ -137,6 +137,14 @@ export default function Discover() {
                       {m.year ? <span className="text-neutral-600"> · {m.year}</span> : ''}
                     </span>
                     <div className="flex items-center gap-1 shrink-0 ml-2">
+                      <a
+                        href={`https://musicbrainz.org/release-group/${m.rg_mbid}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-gold-400 hover:underline inline-flex items-center gap-0.5"
+                      >
+                        MB <ExternalLink size={11} />
+                      </a>
                       <button
                         onClick={() => setSearch(`${group.artist} ${m.title}`)}
                         className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800"

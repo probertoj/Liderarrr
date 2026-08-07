@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, Copy, X } from 'lucide-react';
+import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, ProwlarrSearchModal, DuplicateGroupPanel } from '../components.jsx';
 
@@ -317,6 +317,14 @@ function MissingList({ items, artistMbid, artistName }) {
                 {m.title}
                 {m.year ? <span className="text-neutral-600"> · {m.year}</span> : ''}
               </span>
+              <a
+                href={`https://musicbrainz.org/release-group/${m.rg_mbid}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-gold-400 hover:underline inline-flex items-center gap-0.5 shrink-0"
+              >
+                MB <ExternalLink size={11} />
+              </a>
               <button
                 onClick={() => setSearch(`${artistName || ''} ${m.title}`.trim())}
                 className="text-xs px-2 py-1 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 shrink-0"
