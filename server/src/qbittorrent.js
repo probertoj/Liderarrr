@@ -17,7 +17,11 @@ export function qbConfig() {
 // El 403 tipico de qBittorrent tras un login sin error es la proteccion CSRF /
 // validacion de cabecera Host de la WebUI: la sesion no se acepta. Mensaje accionable.
 const CSRF_HINT =
-  'qBittorrent devolvió 403: la WebUI no aceptó la petición. En qBittorrent → Opciones → WebUI revisa «Habilitar validación de la cabecera Host» (permite la IP/host de Liderarr) y la protección CSRF, y confirma que la URL y las credenciales sean correctas.';
+  'qBittorrent devolvió 403: la WebUI no aceptó la sesión. La causa más común por HTTP es ' +
+  '«Enable cookie Secure flag (requires HTTPS or localhost connection)»: DESMÁRCALA en ' +
+  'qBittorrent → Opciones → WebUI → Security (marca la cookie como Secure y solo vale por ' +
+  'HTTPS/localhost, no por HTTP en la LAN). Si persiste, revisa «Host header validation» ' +
+  '(Server domains) y confirma URL y credenciales.';
 let session = { url: null, sid: null, at: 0 };
 const SID_TTL = 25 * 60 * 1000;
 
