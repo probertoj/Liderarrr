@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, ProwlarrSearchModal, DuplicateGroupPanel } from '../components.jsx';
+import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel } from '../components.jsx';
 
 export default function ArtistDetail() {
   const { id } = useParams();
@@ -349,7 +349,7 @@ function MissingList({ items, artistMbid, artistName }) {
           );
         })}
       </div>
-      {search != null && <ProwlarrSearchModal initialQuery={search} onClose={() => setSearch(null)} />}
+      {search != null && <SearchModal initialQuery={search} onClose={() => setSearch(null)} />}
     </div>
   );
 }

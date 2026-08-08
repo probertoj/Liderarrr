@@ -21,19 +21,21 @@ Objetivo: fiabilidad de la búsqueda y una primera configuración guiada.
   (oculta, recuperable en Papelera), «descartar y borrar» elimina los ficheros de la copia
   peor. Irreversible, con confirmación dura; solo borra dentro de tu biblioteca (nunca
   `torrents/`), y si no puede (biblioteca en solo lectura) no toca nada. Avisa del seeding.
+- **Onboarding en Ajustes (estilo PowaFlex).** Cada sección explicada, y desplegables
+  «¿cómo consigo…?» paso a paso por credencial (AcoustID, Discogs, Last.fm, Lidarr, Prowlarr,
+  Jackett, qBittorrent) — incluida la preparación de la WebUI de qBittorrent con sus gotchas.
+- **El motor de búsqueda elegido se respeta en TODA la UI**, también la búsqueda de la ficha
+  de disco (antes estaba fija a Prowlarr). Componentes renombrados a `SearchModal`/`SearchSection`.
 
 ### Cambiado
 - **Los tests de Ajustes guardan primero.** «Probar» persiste la configuración antes de
   probar, así el test siempre usa lo que hay en pantalla (antes fallaba si no habías guardado).
 
 ### Corregido
-- **qBittorrent 403.** Se envían las cabeceras `Referer` y `Origin` (que la WebUI valida por
-  CSRF) y el error ahora explica cómo arreglarlo (qBittorrent → Opciones → WebUI: validación
-  de cabecera Host / CSRF).
-
-### Planeado
-- **Onboarding paso a paso** (estilo PowaFlex): cada ajuste explicado a fondo (qué es, para
-  qué sirve, cómo obtener las credenciales).
+- **qBittorrent 403.** Causa real: qBittorrent 5.x cambió el nombre de la cookie de sesión
+  (ya no es `SID`) y el login responde 204; el parseo a `SID=` no la capturaba. Ahora se
+  toma la cookie por su nombre real, sea cual sea, y se reenvía. Además se envían `Referer`
+  y `Origin` (CSRF) y el error es accionable (apunta a la WebUI: cookie Secure flag / Host).
 
 ---
 

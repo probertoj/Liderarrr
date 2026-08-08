@@ -128,7 +128,7 @@ export default function AlbumDetail() {
 
       {album.match_state === 'matched' && <LidarrSection album={album} onDone={load} />}
 
-      <ProwlarrSearch album={album} />
+      <SearchSection album={album} />
 
       <Editions albumId={album.id} />
 
@@ -674,7 +674,7 @@ function LidarrSection({ album, onDone }) {
 // Busca en todos tus indexers (RED, OPS, Jackett), listas todas las releases y la
 // que elijas la agarra Prowlarr y la manda a su cliente de descarga. Es la vía para
 // pedir lo que Lidarr veta (compilaciones, directos, ediciones que su perfil excluye).
-function ProwlarrSearch({ album }) {
+function SearchSection({ album }) {
   const [q, setQ] = useState(`${album.artist?.name || album.album_artist || ''} ${album.title || ''}`.trim());
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);

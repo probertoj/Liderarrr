@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Compass, Plus, Check, X, RefreshCw, Loader2, ExternalLink } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, Button, ProwlarrSearchModal } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, Button, SearchModal } from '../components.jsx';
 
 // Huecos: álbumes de estudio que MusicBrainz conoce de tus artistas y que no
 // tienes. Agrupados por artista, con envío a Lidarr (uno o todos) y opción de
@@ -183,7 +183,7 @@ export default function Discover() {
         ))}
       </div>
 
-      {search != null && <ProwlarrSearchModal initialQuery={search} onClose={() => setSearch(null)} />}
+      {search != null && <SearchModal initialQuery={search} onClose={() => setSearch(null)} />}
     </div>
   );
 }

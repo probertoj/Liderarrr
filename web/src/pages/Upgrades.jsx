@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpCircle, Plus, Check, Loader2, ExternalLink } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { PageTitle, Cover, Spinner, ErrorMsg, ProwlarrSearchModal } from '../components.jsx';
+import { PageTitle, Cover, Spinner, ErrorMsg, SearchModal } from '../components.jsx';
 
 // Cola de upgrades: álbumes que tienes SIN ninguna pista sin pérdida. Por cada uno,
 // las dos vías de siempre: enviarlo a Lidarr (que busque una versión mejor) o
@@ -115,7 +115,7 @@ export default function Upgrades() {
         </div>
       )}
 
-      {search != null && <ProwlarrSearchModal initialQuery={search} onClose={() => setSearch(null)} />}
+      {search != null && <SearchModal initialQuery={search} onClose={() => setSearch(null)} />}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Building2, ArrowLeft, ExternalLink, Check } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
-import { PageTitle, AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, ProwlarrSearchModal, DuplicateGroupPanel } from '../components.jsx';
+import { PageTitle, AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel } from '../components.jsx';
 
 // Sellos de tu colección. Los sellos se van capturando de Discogs a medida que
 // consultas ediciones de tus álbumes (y de las etiquetas si las traen), así que
@@ -252,7 +252,7 @@ function LabelCompletism({ name }) {
         </div>
       )}
 
-      {search != null && <ProwlarrSearchModal initialQuery={search} onClose={() => setSearch(null)} />}
+      {search != null && <SearchModal initialQuery={search} onClose={() => setSearch(null)} />}
     </div>
   );
 }

@@ -97,6 +97,19 @@ function Field({ label, hint, children }) {
   );
 }
 
+// Desplegable "¿cómo consigo…?": guía paso a paso, plegada por defecto (estilo PowaFlex).
+function HowTo({ title, children }) {
+  return (
+    <details className="mb-3 rounded-lg border border-ink-800 bg-ink-850/40">
+      <summary className="cursor-pointer select-none px-3 py-2 text-xs text-gold-400/90 hover:text-gold-300">
+        {title}
+      </summary>
+      <div className="px-3 pb-3 pt-0.5 text-xs text-neutral-400 leading-relaxed">{children}</div>
+    </details>
+  );
+}
+const Steps = ({ children }) => <ol className="list-decimal ml-4 space-y-1">{children}</ol>;
+
 const input = 'w-full bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm mt-1';
 
 function TestButton({ service, label, beforeTest }) {
@@ -185,6 +198,14 @@ export default function Settings() {
             className={`${input} font-mono`}
           />
         </Field>
+        <HowTo title="¿Qué ruta pongo aquí?">
+          <p className="mb-1">
+            Son las rutas <b className="font-normal text-neutral-300">dentro del contenedor</b> (la parte izquierda del
+            volumen en tu <code>docker-compose</code>), no las del NAS. Con el layout recomendado suele ser{' '}
+            <code>/library/media/music</code>.
+          </p>
+          <p>Una carpeta por línea si tienes varias. Deben coincidir con el volumen que montaste en Docker.</p>
+        </HowTo>
         <ScanPanel />
         <div className="mt-3 border-t border-ink-800 pt-3 flex items-center justify-between gap-3">
           <span className="text-xs text-neutral-500">
@@ -211,6 +232,14 @@ export default function Settings() {
         <Field label="AcoustID · API key" hint="Gratis en acoustid.org/api-key. Necesita el binario fpcalc (incluido en Docker).">
           <input value={s.acoustid_key || ''} onChange={set('acoustid_key')} className={input} placeholder="••••••••" />
         </Field>
+        <HowTo title="¿Cómo consigo la API key de AcoustID?">
+          <Steps>
+            <li>Entra en <code>acoustid.org</code> y crea una cuenta (o inicia sesión).</li>
+            <li>Ve a <code>acoustid.org/api-key</code> y registra una aplicación si te lo pide.</li>
+            <li>Copia la «API key» que te da.</li>
+          </Steps>
+          <p className="mt-1">Es opcional: solo se usa como último recurso (huella acústica) cuando lo demás no identifica.</p>
+        </HowTo>
         <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer">
           <input
             type="checkbox"
@@ -223,12 +252,27 @@ export default function Settings() {
         <Field label="Discogs · token personal" hint="discogs.com → Ajustes → Developers → Generate token.">
           <input value={s.discogs_token || ''} onChange={set('discogs_token')} className={input} placeholder="••••••••" />
         </Field>
+        <HowTo title="¿Cómo consigo el token de Discogs?">
+          <Steps>
+            <li>En <code>discogs.com</code>, tu avatar → «Settings».</li>
+            <li>Pestaña «Developers».</li>
+            <li>«Generate new token» y copia el token personal.</li>
+          </Steps>
+        </HowTo>
         <Field label="Last.fm · API key" hint="last.fm/api/account/create. Resuelve nombres y trae tus escuchas.">
           <input value={s.lastfm_key || ''} onChange={set('lastfm_key')} className={input} placeholder="••••••••" />
         </Field>
         <Field label="Last.fm · tu usuario" hint="Para importar tu historial de escuchas (la brecha escucha↔propiedad).">
           <input value={s.lastfm_user || ''} onChange={set('lastfm_user')} className={input} placeholder="tu_usuario" />
         </Field>
+        <HowTo title="¿Cómo consigo la API key de Last.fm?">
+          <Steps>
+            <li>Entra en <code>last.fm/api/account/create</code>.</li>
+            <li>Rellena nombre y descripción (la URL puede ser cualquiera).</li>
+            <li>Copia la «API key».</li>
+          </Steps>
+          <p className="mt-1">Pon también tu usuario de Last.fm arriba para importar tus escuchas.</p>
+        </HowTo>
         <div className="flex flex-wrap gap-2 mt-3">
           <TestButton service="musicbrainz" label="MusicBrainz" beforeTest={save} />
           <TestButton service="acoustid" label="AcoustID" beforeTest={save} />
@@ -249,6 +293,13 @@ export default function Settings() {
         <Field label="API key" hint="Lidarr → Settings → General → Security → API Key.">
           <input value={s.lidarr_key || ''} onChange={set('lidarr_key')} className={input} placeholder="••••••••" />
         </Field>
+        <HowTo title="¿Cómo consigo la API key de Lidarr? ¿Y los perfiles?">
+          <Steps>
+            <li>Lidarr → Settings → General → sección «Security» → copia «API Key».</li>
+            <li>Pega URL y key aquí y pulsa «Probar Lidarr».</li>
+            <li>Pulsa «Cargar perfiles» para elegir calidad, metadatos y carpeta raíz (dónde Lidarr guardará lo que pidas).</li>
+          </Steps>
+        </HowTo>
         <div className="flex gap-2 mb-3">
           <TestButton service="lidarr" label="Lidarr" beforeTest={save} />
           <Button onClick={loadProfiles}>Cargar perfiles</Button>
@@ -298,6 +349,15 @@ export default function Settings() {
         <Field label="API key" hint="Prowlarr → Settings → General → Security → API Key.">
           <input value={s.prowlarr_key || ''} onChange={set('prowlarr_key')} className={input} placeholder="••••••••" />
         </Field>
+        <HowTo title="¿Cómo consigo la API key de Prowlarr?">
+          <Steps>
+            <li>Prowlarr → Settings → General → sección «Security» → «API Key».</li>
+          </Steps>
+          <p className="mt-1">
+            Para que descargue de punta a punta, Prowlarr necesita un cliente de descarga en Settings → Download Clients.
+            Si un indexer tiene el freeleech en «Required» y te quedas sin tokens, filtra resultados: ponlo en «Preferred».
+          </p>
+        </HowTo>
         <div className="flex gap-2">
           <TestButton service="prowlarr" label="Prowlarr" beforeTest={save} />
         </div>
@@ -327,6 +387,13 @@ export default function Settings() {
         <Field label="API key" hint="Jackett → arriba a la derecha, «API Key».">
           <input value={s.jackett_key || ''} onChange={set('jackett_key')} className={input} placeholder="••••••••" />
         </Field>
+        <HowTo title="¿Cómo consigo la API key de Jackett?">
+          <Steps>
+            <li>Abre la web de Jackett.</li>
+            <li>Arriba a la derecha verás «API Key»: cópiala.</li>
+          </Steps>
+          <p className="mt-1">Liderarr busca en el indexer agregado «all» (todos tus indexers de Jackett a la vez).</p>
+        </HowTo>
         <TestButton service="jackett" label="Jackett" beforeTest={save} />
       </section>
 
@@ -351,6 +418,18 @@ export default function Settings() {
         <Field label="Categoría (opcional)" hint="Separa en qBittorrent lo que manda Liderarr. Ej.: liderarr">
           <input value={s.qbittorrent_category || ''} onChange={set('qbittorrent_category')} className={input} placeholder="liderarr" />
         </Field>
+        <HowTo title="¿Cómo preparo la WebUI de qBittorrent? (importante)">
+          <Steps>
+            <li>qBittorrent → Opciones → «Web UI»: activa «Web User Interface (Remote control)», y define usuario, contraseña y puerto (ese puerto es el de la URL de arriba).</li>
+            <li>
+              Si accedes por <b className="font-normal text-neutral-300">HTTP en tu red local</b> (no HTTPS):
+              en «Security» <b className="font-normal text-neutral-300">DESMARCA «Enable cookie Secure flag»</b> y pulsa
+              Save. Si no, qBittorrent no acepta la sesión y da 403.
+            </li>
+            <li>Si usas «Enable Host header validation», permite la IP/host de Liderarr (o desactívala para probar).</li>
+          </Steps>
+          <p className="mt-1">Usuario y contraseña son los de la WebUI de qBittorrent, no los del NAS.</p>
+        </HowTo>
         <TestButton service="qbittorrent" label="qBittorrent" beforeTest={save} />
       </section>
 

@@ -265,7 +265,7 @@ export function Button({ children, onClick, variant = 'default', disabled, class
 // desde donde sea (huecos, discografía de artista, completismo de sello): busca en
 // todos los indexers por texto y descarga la release que elijas. Es la alternativa
 // a "enviar a Lidarr": o lo delegas en Lidarr, o lo buscas y descargas tú al momento.
-export function ProwlarrSearchModal({ initialQuery, onClose }) {
+export function SearchModal({ initialQuery, onClose }) {
   const [q, setQ] = useState(initialQuery || '');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
