@@ -77,8 +77,24 @@ async function qbFetch(path, { method = 'GET', body } = {}) {
 }
 
 export async function qbTest() {
-  const version = (await qbFetch('/api/v2/app/version')).trim();
-  return { ok: true, name: `qBittorrent ${version}` };
+  // login explicito para saber si llega la cookie de sesion (diagnostico del 403)
+  await login();
+  const gotCookie = !!session.sid;
+  try {
+    const version = (await qbFetch('/api/v2/app/version')).trim();
+    return { ok: true, name: `qBittorrent ${version}` };
+  } catch (e) {
+    if (/\b403\b/.test(String(e.message)) || String(e.message) === CSRF_HINT) {
+      throw new Error(
+        gotCookie
+          ? 'Login OK y cookie de sesion recibida, pero la llamada dio 403: es la validacion de la WebUI. ' +
+            'Prueba a DESMARCAR «Enable Host header validation» en qBittorrent → Opciones → WebUI → Security (y pulsa Guardar).'
+          : 'Login OK pero qBittorrent NO envio cookie de sesion. Casi siempre es «Enable cookie Secure flag» todavia ' +
+            'activa (o no guardaste): desmarcala en Opciones → WebUI → Security y pulsa GUARDAR en qBittorrent.'
+      );
+    }
+    throw e;
+  }
 }
 
 // Anade una descarga por URL (magnet o .torrent). Categoria opcional (para separar en
