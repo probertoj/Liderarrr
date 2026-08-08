@@ -10,6 +10,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 ## [Sin publicar] — 0.3 (en progreso)
 
 ### Añadido
+- **Logo nuevo** (punk/DIY "Fuck Design"): LIDER en tipos recortados sobre ARRR gritado
+  en oro, con grano de fotocopia (SVG, escala sin pixelar). En la cabecera, adaptado a
+  claro/oscuro; favicon a juego (sello `L!`).
 - **Multidiscos: las cajas cuentan como un solo álbum.** Un box-set/deluxe/antología
   viene como una carpeta por disco (CD 1, CD 2…); como la identidad de álbum es la
   carpeta y las etiquetas llevan el total de la CAJA, cada disco parecía un incompleto

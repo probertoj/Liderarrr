@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="9" fill="#131318"/>
+  <g font-family="Impact,'Haettenschweiler','Arial Narrow',sans-serif" text-anchor="middle">
+    <text x="21" y="49" font-size="48" fill="#d4a24a">L</text>
+    <text x="47" y="49" font-size="48" fill="#e0342a">!</text>
+  </g>
+</svg>

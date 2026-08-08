@@ -114,6 +114,56 @@ function RefreshButton() {
   );
 }
 
+// Logo punk "Fuck Design": LIDER en tipos recortados sobre ARRR gritado (el chiste
+// pirata del sufijo -arrr). SVG inline para que escale sin pixelar y siga el tema:
+// las cajas de LIDER y el subrayado usan --text-body (se voltean claro/oscuro), las
+// letras de LIDER usan --color-ink-900 (el fondo de la barra, así quedan "recortadas");
+// el oro y el rojo son constantes. El grano de fotocopia es un filtro SVG, no imagen.
+const IMPACT = "Impact,'Haettenschweiler','Arial Narrow',sans-serif";
+function Logo() {
+  return (
+    <svg viewBox="0 0 640 236" className="w-full h-auto" role="img" aria-label="Liderarr">
+      <defs>
+        <filter id="logogrit" x="-5%" y="-5%" width="110%" height="118%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="4" />
+        </filter>
+      </defs>
+      <g filter="url(#logogrit)">
+        <polygon
+          className="fill-[#E0342A]"
+          points="300,150 330,96 344,150 400,120 372,166 452,150 380,182 448,214 360,196 372,236 322,200 300,236 288,200 250,214 276,178 214,182 268,158 214,132 286,150"
+        />
+        <g style={{ fontFamily: IMPACT }} textAnchor="middle">
+          {[
+            ['L', 55, 52, -4], ['I', 142, 50, 4], ['D', 229, 53, -3], ['E', 316, 50, 5], ['R', 403, 52, -2],
+          ].map(([ch, x, y, r]) => (
+            <g key={ch + x} transform={`translate(${x},${y}) rotate(${r})`}>
+              <rect x="-40" y="-40" width="80" height="80" className="fill-[var(--text-body)]" />
+              <text y="22" fontSize="64" className="fill-[var(--color-ink-900)]">{ch}</text>
+            </g>
+          ))}
+          {[
+            ['A', 96, 164, 3], ['R', 214, 160, -4], ['R', 332, 164, 5], ['R', 450, 160, -3],
+          ].map(([ch, x, y, r], i) => (
+            <g key={'a' + i} transform={`translate(${x},${y}) rotate(${r})`}>
+              <rect x="-54" y="-58" width="108" height="118" className="fill-gold-400" />
+              <text y="34" fontSize="98" className="fill-[#14110E]">{ch}</text>
+            </g>
+          ))}
+        </g>
+        <path
+          d="M20,224 L90,216 L150,226 L230,214 L300,228 L380,216 L470,228 L520,218"
+          fill="none" strokeWidth="7" strokeLinecap="round" className="stroke-[var(--text-body)]"
+        />
+        <g strokeWidth="5" strokeLinecap="round" className="stroke-[var(--text-body)]">
+          <path d="M516,96 L556,74" /><path d="M520,120 L566,116" /><path d="M512,140 L552,152" />
+        </g>
+      </g>
+    </svg>
+  );
+}
+
 export default function App() {
   const [open, setOpen] = useState(false);
   const [version, setVersion] = useState('');
@@ -142,10 +192,8 @@ export default function App() {
           transition-transform ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
       >
         <div className="px-5 py-5">
-          <div className="font-display text-2xl tracking-wide">
-            Lider<span className="text-gold-400">arrr</span>
-          </div>
-          <div className="text-[11px] text-neutral-600 mt-0.5">completismo musical · v{version}</div>
+          <Logo />
+          <div className="text-[11px] text-neutral-600 mt-1.5">completismo musical · v{version}</div>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 space-y-5">
           {NAV.map((group) => (
