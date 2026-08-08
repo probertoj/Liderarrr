@@ -23,6 +23,7 @@ const CSRF_HINT =
   'HTTPS/localhost, no por HTTP en la LAN). Si persiste, revisa «Host header validation» ' +
   '(Server domains) y confirma URL y credenciales.';
 let session = { url: null, sid: null, at: 0 };
+let lastDiag = null; // diagnostico del ultimo login (sin el token), para el 403
 const SID_TTL = 25 * 60 * 1000;
 
 async function login() {
@@ -43,8 +44,21 @@ async function login() {
   const body = (await res.text()).trim();
   if (!res.ok || /^fails\.?$/i.test(body)) throw new Error('Login de qBittorrent fallido: usuario o contrasena incorrectos.');
   // captura la cookie SID (si la WebUI tiene "bypass para localhost" puede no venir)
-  const setCookie = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie().join('; ') : res.headers.get('set-cookie') || '';
+  const rawList =
+    typeof res.headers.getSetCookie === 'function'
+      ? res.headers.getSetCookie()
+      : res.headers.get('set-cookie')
+        ? [res.headers.get('set-cookie')]
+        : [];
+  const setCookie = rawList.join('; ');
   const m = setCookie.match(/SID=([^;]+)/);
+  lastDiag = {
+    status: res.status,
+    body: body.slice(0, 12),
+    setCookieCount: rawList.length,
+    hasSID: /SID=/.test(setCookie),
+    headers: [...res.headers.keys()].join(','),
+  };
   session = { url, sid: m ? m[1] : null, at: Date.now() };
   return session;
 }
@@ -90,7 +104,10 @@ export async function qbTest() {
           ? 'Login OK y cookie de sesion recibida, pero la llamada dio 403: es la validacion de la WebUI. ' +
             'Prueba a DESMARCAR «Enable Host header validation» en qBittorrent → Opciones → WebUI → Security (y pulsa Guardar).'
           : 'Login OK pero qBittorrent NO envio cookie de sesion. Casi siempre es «Enable cookie Secure flag» todavia ' +
-            'activa (o no guardaste): desmarcala en Opciones → WebUI → Security y pulsa GUARDAR en qBittorrent.'
+            'activa (o no guardaste): desmarcala en Opciones → WebUI → Security y pulsa GUARDAR en qBittorrent. ' +
+            (lastDiag
+              ? `[diag: status=${lastDiag.status}, body="${lastDiag.body}", set-cookie=${lastDiag.setCookieCount}, SID=${lastDiag.hasSID}, cabeceras=${lastDiag.headers}]`
+              : '')
       );
     }
     throw e;
