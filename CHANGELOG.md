@@ -17,13 +17,23 @@ Objetivo: fiabilidad de la búsqueda y una primera configuración guiada.
   —resultados en crudo, sin el filtrado de freeleech de Prowlarr— y la descarga la
   materializa **qBittorrent** (nueva integración: login WebUI + añadir magnet/.torrent).
   Secciones nuevas en Ajustes (Jackett, qBittorrent) con botón de prueba.
+- **Descartar y borrar del disco** en el panel de copias duplicadas: además de «descartar»
+  (oculta, recuperable en Papelera), «descartar y borrar» elimina los ficheros de la copia
+  peor. Irreversible, con confirmación dura; solo borra dentro de tu biblioteca (nunca
+  `torrents/`), y si no puede (biblioteca en solo lectura) no toca nada. Avisa del seeding.
+
+### Cambiado
+- **Los tests de Ajustes guardan primero.** «Probar» persiste la configuración antes de
+  probar, así el test siempre usa lo que hay en pantalla (antes fallaba si no habías guardado).
+
+### Corregido
+- **qBittorrent 403.** Se envían las cabeceras `Referer` y `Origin` (que la WebUI valida por
+  CSRF) y el error ahora explica cómo arreglarlo (qBittorrent → Opciones → WebUI: validación
+  de cabecera Host / CSRF).
 
 ### Planeado
 - **Onboarding paso a paso** (estilo PowaFlex): cada ajuste explicado a fondo (qué es, para
   qué sirve, cómo obtener las credenciales).
-- **Descartar duplicados con opción de borrar de disco**: además de «descartar» (ocultar),
-  «descartar y borrar ya» para eliminar la copia peor del disco, con confirmación dura y
-  aviso de seeding (hardlinks).
 
 ---
 

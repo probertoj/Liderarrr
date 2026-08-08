@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Component } from 'react';
 import { Link } from 'react-router-dom';
-import { Disc3, ImageOff, Search, X, Download, Check, Copy } from 'lucide-react';
+import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2 } from 'lucide-react';
 import { api, coverUrl, fmtBytes } from './api.js';
 
 // Red de seguridad: si una página lanza un error al pintar (o falla la carga de
@@ -393,6 +393,7 @@ export function ProwlarrSearchModal({ initialQuery, onClose }) {
 export function DuplicateGroupPanel({ group, onClose }) {
   const [busy, setBusy] = useState(null);
   const [dismissed, setDismissed] = useState({}); // id -> true (descartados esta sesión)
+  const [deleted, setDeleted] = useState({}); // id -> true (borrados del disco, sin vuelta atrás)
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -426,6 +427,24 @@ export function DuplicateGroupPanel({ group, onClose }) {
       setBusy(null);
     }
   };
+  // Borrado de disco: IRREVERSIBLE. Confirmación dura con la ruta y el aviso de seeding.
+  const del = async (c) => {
+    const ok = window.confirm(
+      `BORRAR DEL DISCO de forma permanente:\n\n${c.title}${c.year ? ` (${c.year})` : ''}\n${c.path || ''}\n\n` +
+        'Se eliminan los ficheros de tu biblioteca. Es IRREVERSIBLE (no va a la Papelera) y, si esa copia está ' +
+        'seedeando en qBittorrent, puede romper el torrent.\n\n¿Borrar de verdad?'
+    );
+    if (!ok) return;
+    setBusy(c.id);
+    try {
+      await api.deleteAlbum(c.id);
+      setDeleted((p) => ({ ...p, [c.id]: true }));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
@@ -442,7 +461,9 @@ export function DuplicateGroupPanel({ group, onClose }) {
         <p className="text-xs text-neutral-600 mb-3">
           La copia <span className="text-emerald-400/90">★ mejor</span> es la más completa y de mejor calidad. «Descartar»
           oculta una copia y la saca de los recuentos — <b className="font-normal text-neutral-500">no borra el fichero</b>
-          {' '}(puedes deshacerlo aquí o desde la Papelera). La ruta está a la vista para que lo borres tú si quieres.
+          {' '}(puedes deshacerlo aquí o desde la Papelera). «Descartar y borrar» sí{' '}
+          <b className="font-normal text-red-400/90">elimina los ficheros del disco</b>: es irreversible, no va a la Papelera
+          y, si esa copia está seedeando, puede romper el torrent.
         </p>
         <div className="space-y-1.5">
           {group.copies.map((c) => (
@@ -481,7 +502,11 @@ export function DuplicateGroupPanel({ group, onClose }) {
                   {c.path}
                 </div>
               </div>
-              {dismissed[c.id] ? (
+              {deleted[c.id] ? (
+                <span className="text-xs text-red-400/80 inline-flex items-center gap-1 shrink-0 self-center">
+                  <Trash2 size={13} /> borrado del disco
+                </span>
+              ) : dismissed[c.id] ? (
                 <span className="text-xs text-neutral-500 inline-flex items-center gap-2 shrink-0 self-center">
                   descartado
                   <button
@@ -494,11 +519,21 @@ export function DuplicateGroupPanel({ group, onClose }) {
                 </span>
               ) : (
                 !c.best && (
-                  <Button variant="default" disabled={busy === c.id} onClick={() => dismiss(c.id)}>
-                    <span className="inline-flex items-center gap-1.5">
-                      <X size={13} /> {busy === c.id ? '…' : 'Descartar'}
-                    </span>
-                  </Button>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <Button variant="default" disabled={busy === c.id} onClick={() => dismiss(c.id)}>
+                      <span className="inline-flex items-center gap-1.5">
+                        <X size={13} /> {busy === c.id ? '…' : 'Descartar'}
+                      </span>
+                    </Button>
+                    <button
+                      onClick={() => del(c)}
+                      disabled={busy === c.id}
+                      title="Elimina los ficheros del disco (irreversible)"
+                      className="text-[11px] px-2 py-1 rounded border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50 inline-flex items-center gap-1"
+                    >
+                      <Trash2 size={12} /> Descartar y borrar
+                    </button>
+                  </div>
                 )
               )}
             </div>

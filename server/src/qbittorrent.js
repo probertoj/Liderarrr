@@ -14,6 +14,10 @@ export function qbConfig() {
   return { url, user, pass };
 }
 
+// El 403 tipico de qBittorrent tras un login sin error es la proteccion CSRF /
+// validacion de cabecera Host de la WebUI: la sesion no se acepta. Mensaje accionable.
+const CSRF_HINT =
+  'qBittorrent devolvió 403: la WebUI no aceptó la petición. En qBittorrent → Opciones → WebUI revisa «Habilitar validación de la cabecera Host» (permite la IP/host de Liderarr) y la protección CSRF, y confirma que la URL y las credenciales sean correctas.';
 let session = { url: null, sid: null, at: 0 };
 const SID_TTL = 25 * 60 * 1000;
 
@@ -24,14 +28,14 @@ async function login() {
   try {
     res = await fetch(`${url}/api/v2/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Referer: url },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Referer: url, Origin: url },
       body: `username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`,
       signal: AbortSignal.timeout(15000),
     });
   } catch (err) {
     throw new Error(`No se pudo contactar con qBittorrent: ${String(err?.message || err)}`);
   }
-  if (res.status === 403) throw new Error('qBittorrent rechazo el login (403): revisa que la WebUI acepte la conexion.');
+  if (res.status === 403) throw new Error(CSRF_HINT);
   const body = (await res.text()).trim();
   if (!res.ok || /^fails\.?$/i.test(body)) throw new Error('Login de qBittorrent fallido: usuario o contrasena incorrectos.');
   // captura la cookie SID (si la WebUI tiene "bypass para localhost" puede no venir)
@@ -49,22 +53,21 @@ async function ensureSession() {
 
 async function qbFetch(path, { method = 'GET', body } = {}) {
   const { url } = qbConfig();
-  const s = await ensureSession();
-  const headers = { Referer: url };
-  if (s.sid) headers.Cookie = `SID=${s.sid}`;
-  if (body) headers['Content-Type'] = 'application/x-www-form-urlencoded';
-  const res = await fetch(`${url}${path}`, { method, headers, body, signal: AbortSignal.timeout(20000) });
+  // Referer + Origin: qBittorrent los valida (CSRF) aunque la sesion sea valida.
+  const attempt = async () => {
+    const s = await ensureSession();
+    const headers = { Referer: url, Origin: url };
+    if (s.sid) headers.Cookie = `SID=${s.sid}`;
+    if (body) headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    return fetch(`${url}${path}`, { method, headers, body, signal: AbortSignal.timeout(20000) });
+  };
+  let res = await attempt();
   if (res.status === 403) {
-    // sesion caducada: reintenta una vez con login fresco
+    // sesion caducada o no aceptada: reintenta una vez con login fresco
     session = { url: null, sid: null, at: 0 };
-    const s2 = await ensureSession();
-    const h2 = { Referer: url };
-    if (s2.sid) h2.Cookie = `SID=${s2.sid}`;
-    if (body) h2['Content-Type'] = 'application/x-www-form-urlencoded';
-    const res2 = await fetch(`${url}${path}`, { method, headers: h2, body, signal: AbortSignal.timeout(20000) });
-    if (!res2.ok) throw new Error(`qBittorrent ${res2.status} en ${path}`);
-    return res2.text();
+    res = await attempt();
   }
+  if (res.status === 403) throw new Error(CSRF_HINT);
   if (!res.ok) throw new Error(`qBittorrent ${res.status} en ${path}`);
   return res.text();
 }

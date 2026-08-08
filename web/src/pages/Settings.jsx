@@ -99,7 +99,7 @@ function Field({ label, hint, children }) {
 
 const input = 'w-full bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm mt-1';
 
-function TestButton({ service, label }) {
+function TestButton({ service, label, beforeTest }) {
   const [state, setState] = useState(null); // null | 'run' | ok | err
   const [msg, setMsg] = useState('');
   return (
@@ -109,6 +109,9 @@ function TestButton({ service, label }) {
           setState('run');
           setMsg('');
           try {
+            // guarda primero: el test corre contra la config del SERVIDOR, así que sin
+            // guardar probaría con lo viejo. Así siempre prueba lo que hay en pantalla.
+            if (beforeTest) await beforeTest();
             const r = await api.test(service);
             setState(r.ok ? 'ok' : 'err');
             setMsg(r.ok ? Object.values(r).filter((v) => typeof v === 'string')[0] || 'OK' : r.error || 'Error');
@@ -227,10 +230,10 @@ export default function Settings() {
           <input value={s.lastfm_user || ''} onChange={set('lastfm_user')} className={input} placeholder="tu_usuario" />
         </Field>
         <div className="flex flex-wrap gap-2 mt-3">
-          <TestButton service="musicbrainz" label="MusicBrainz" />
-          <TestButton service="acoustid" label="AcoustID" />
-          <TestButton service="discogs" label="Discogs" />
-          <TestButton service="lastfm" label="Last.fm" />
+          <TestButton service="musicbrainz" label="MusicBrainz" beforeTest={save} />
+          <TestButton service="acoustid" label="AcoustID" beforeTest={save} />
+          <TestButton service="discogs" label="Discogs" beforeTest={save} />
+          <TestButton service="lastfm" label="Last.fm" beforeTest={save} />
         </div>
       </section>
 
@@ -247,7 +250,7 @@ export default function Settings() {
           <input value={s.lidarr_key || ''} onChange={set('lidarr_key')} className={input} placeholder="••••••••" />
         </Field>
         <div className="flex gap-2 mb-3">
-          <TestButton service="lidarr" label="Lidarr" />
+          <TestButton service="lidarr" label="Lidarr" beforeTest={save} />
           <Button onClick={loadProfiles}>Cargar perfiles</Button>
         </div>
         {profiles && (
@@ -296,7 +299,7 @@ export default function Settings() {
           <input value={s.prowlarr_key || ''} onChange={set('prowlarr_key')} className={input} placeholder="••••••••" />
         </Field>
         <div className="flex gap-2">
-          <TestButton service="prowlarr" label="Prowlarr" />
+          <TestButton service="prowlarr" label="Prowlarr" beforeTest={save} />
         </div>
         <p className="text-xs text-neutral-600 mt-2">
           Para descargar de punta a punta, Prowlarr necesita un cliente de descarga en Settings → Download Clients.
@@ -324,7 +327,7 @@ export default function Settings() {
         <Field label="API key" hint="Jackett → arriba a la derecha, «API Key».">
           <input value={s.jackett_key || ''} onChange={set('jackett_key')} className={input} placeholder="••••••••" />
         </Field>
-        <TestButton service="jackett" label="Jackett" />
+        <TestButton service="jackett" label="Jackett" beforeTest={save} />
       </section>
 
       {/* 3d. qBittorrent — materializa la descarga cuando el motor es Jackett */}
@@ -348,7 +351,7 @@ export default function Settings() {
         <Field label="Categoría (opcional)" hint="Separa en qBittorrent lo que manda Liderarr. Ej.: liderarr">
           <input value={s.qbittorrent_category || ''} onChange={set('qbittorrent_category')} className={input} placeholder="liderarr" />
         </Field>
-        <TestButton service="qbittorrent" label="qBittorrent" />
+        <TestButton service="qbittorrent" label="qBittorrent" beforeTest={save} />
       </section>
 
       {/* 3c. Importar descargas — hardlink torrents -> biblioteca */}

@@ -13,6 +13,7 @@ import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lida
 import { prowlarrTest, prowlarrSearch, prowlarrGrab } from './prowlarr.js';
 import { jackettTest, jackettSearch } from './jackett.js';
 import { qbTest, qbAdd } from './qbittorrent.js';
+import { deleteAlbumFromDisk } from './albumdelete.js';
 import { pendingImports, importFolder } from './importer.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists } from './musicbrainz.js';
 import { acoustidTest } from './acoustid.js';
@@ -389,6 +390,15 @@ app.get('/api/dismissed', async () => q.dismissedAlbums());
 app.post('/api/albums/:id/restore', async (req, reply) => {
   try {
     return restoreAlbum(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// BORRAR DEL DISCO (irreversible): exige confirm:true; solo borra dentro de la
+// biblioteca; si no puede, no toca la BD. Ver albumdelete.js.
+app.post('/api/albums/:id/delete', async (req, reply) => {
+  try {
+    return deleteAlbumFromDisk(Number(req.params.id), { confirm: req.body?.confirm === true });
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }
