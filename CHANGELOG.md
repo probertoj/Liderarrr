@@ -7,7 +7,19 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
-## [Sin publicar] — 0.3 (en progreso)
+## [Sin publicar] — 0.4 (en progreso)
+
+Objetivo: fiabilidad de la búsqueda y una primera configuración guiada.
+
+### Planeado
+- **Jackett como alternativa a Prowlarr** en la búsqueda manual (Prowlarr resulta más
+  inestable). Poder elegir el motor de búsqueda.
+- **Onboarding paso a paso**: cada ajuste explicado a fondo (qué es, para qué sirve, cómo
+  obtener las credenciales), al estilo de PowaFlex.
+
+---
+
+## [0.3.0] — 2026-08-08
 
 ### Añadido
 - **Logo nuevo** (punk/DIY "Fuck Design"): LIDER en tipos recortados sobre ARRR gritado
@@ -26,6 +38,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 - **Bug de duplicados corregido de paso**: los discos de una caja con el mismo título
   (p. ej. los 8 CD de *Sign O' The Times (Super Deluxe)*) ya no se cuentan como copias
   duplicadas.
+
+### Cambiado
+- **Aviso claro en «Escritura de etiquetas»**: marcada como no recomendada, con el peligro
+  concreto para tu montaje — con hardlinks de seeding, `media` y `torrents` son el mismo
+  inodo, así que escribir una etiqueta cambia el hash y **rompe el torrent**. Se recuerda
+  que identificación y completismo funcionan sin tocar los ficheros.
 
 ---
 
