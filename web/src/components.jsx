@@ -273,6 +273,7 @@ export function ProwlarrSearchModal({ initialQuery, onClose }) {
   const [grabbing, setGrabbing] = useState(null);
   const [grabbed, setGrabbed] = useState({});
   const [msg, setMsg] = useState(null);
+  const [engine, setEngine] = useState(null);
 
   const search = async () => {
     if (!q.trim()) return;
@@ -281,7 +282,9 @@ export function ProwlarrSearchModal({ initialQuery, onClose }) {
     setMsg(null);
     setResults(null);
     try {
-      setResults(await api.prowlarrSearch(q));
+      const r = await api.search(q);
+      setEngine(r.engine);
+      setResults(r.results);
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -301,9 +304,9 @@ export function ProwlarrSearchModal({ initialQuery, onClose }) {
     setGrabbing(r.guid);
     setErr(null);
     try {
-      await api.prowlarrGrab(r.guid, r.indexerId);
+      const res = await api.searchGrab({ engine, guid: r.guid, indexerId: r.indexerId, downloadUrl: r.downloadUrl });
       setGrabbed((p) => ({ ...p, [r.guid]: true }));
-      setMsg('Enviado a tu cliente de descarga.');
+      setMsg(res?.via === 'qbittorrent' ? 'Enviado a qBittorrent.' : 'Enviado a tu cliente de descarga.');
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -316,7 +319,12 @@ export function ProwlarrSearchModal({ initialQuery, onClose }) {
       <div className="card p-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-1">
           <h2 className="text-sm text-neutral-300 flex items-center gap-2">
-            <Search size={15} /> Buscar y descargar (Prowlarr)
+            <Search size={15} /> Buscar y descargar
+            {engine && (
+              <span className="text-xs text-neutral-500">
+                ({engine === 'jackett' ? 'Jackett → qBittorrent' : 'Prowlarr'})
+              </span>
+            )}
           </h2>
           <button onClick={onClose} className="text-neutral-500 hover:text-neutral-200 shrink-0" aria-label="Cerrar">
             <X size={18} />

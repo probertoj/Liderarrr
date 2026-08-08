@@ -11,6 +11,8 @@ import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, 
 import { runFullRefresh, refreshStatus } from './refresh.js';
 import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab, enqueueLidarrAdd, lidarrAddStatus } from './lidarr.js';
 import { prowlarrTest, prowlarrSearch, prowlarrGrab } from './prowlarr.js';
+import { jackettTest, jackettSearch } from './jackett.js';
+import { qbTest, qbAdd } from './qbittorrent.js';
 import { pendingImports, importFolder } from './importer.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists } from './musicbrainz.js';
 import { acoustidTest } from './acoustid.js';
@@ -112,7 +114,7 @@ app.get('/api/setup-state', async () => {
 });
 
 // --- ajustes ----------------------------------------------------------------
-const SECRET_KEYS = new Set(['lidarr_key', 'prowlarr_key', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token']);
+const SECRET_KEYS = new Set(['lidarr_key', 'prowlarr_key', 'jackett_key', 'qbittorrent_pass', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token']);
 app.get('/api/settings', async () => {
   const raw = getAllSettings();
   const out = {};
@@ -138,6 +140,8 @@ app.post('/api/settings/test/:service', async (req, reply) => {
     const map = {
       lidarr: lidarrTest,
       prowlarr: prowlarrTest,
+      jackett: jackettTest,
+      qbittorrent: qbTest,
       musicbrainz: mbTest,
       acoustid: acoustidTest,
       discogs: discogsTest,
@@ -476,6 +480,32 @@ app.post('/api/prowlarr/grab', async (req, reply) => {
   try {
     const { guid, indexerId } = req.body || {};
     return await prowlarrGrab({ guid, indexerId });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+
+// --- Búsqueda unificada: usa el motor elegido en Ajustes (Prowlarr | Jackett) -----
+// La UI no necesita saber el motor: pide /search y agarra con /search/grab, que enruta
+// (Prowlarr empuja a su cliente; Jackett -> qBittorrent, que hace la descarga).
+app.get('/api/search', async (req, reply) => {
+  try {
+    const engine = getSetting('search_engine') || 'prowlarr';
+    const results = engine === 'jackett' ? await jackettSearch(req.query?.q) : await prowlarrSearch(req.query?.q);
+    return { engine, results };
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/search/grab', async (req, reply) => {
+  try {
+    const { engine, guid, indexerId, downloadUrl } = req.body || {};
+    if (engine === 'jackett') {
+      await qbAdd({ url: downloadUrl });
+      return { ok: true, via: 'qbittorrent' };
+    }
+    await prowlarrGrab({ guid, indexerId });
+    return { ok: true, via: 'prowlarr' };
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

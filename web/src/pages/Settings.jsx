@@ -303,6 +303,54 @@ export default function Settings() {
         </p>
       </section>
 
+      {/* 3c. Jackett — alternativa de búsqueda (solo busca; descarga vía qBittorrent) */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">
+          3c · Jackett <span className="text-xs text-neutral-500">(alternativa a Prowlarr)</span>
+        </h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Alternativa por si Prowlarr te falla (suele ser más inestable). Jackett solo BUSCA (Torznab); la descarga la
+          hace qBittorrent (sección 3d). Elige aquí qué motor usa el botón «Buscar» de la app.
+        </p>
+        <Field label="Motor de búsqueda activo" hint="El que usa «Buscar» en fichas, sellos y completismo.">
+          <select value={s.search_engine || 'prowlarr'} onChange={set('search_engine')} className={input}>
+            <option value="prowlarr">Prowlarr</option>
+            <option value="jackett">Jackett (descarga → qBittorrent)</option>
+          </select>
+        </Field>
+        <Field label="URL de Jackett" hint="Ej.: http://192.168.1.50:9117">
+          <input value={s.jackett_url || ''} onChange={set('jackett_url')} className={input} placeholder="http://…:9117" />
+        </Field>
+        <Field label="API key" hint="Jackett → arriba a la derecha, «API Key».">
+          <input value={s.jackett_key || ''} onChange={set('jackett_key')} className={input} placeholder="••••••••" />
+        </Field>
+        <TestButton service="jackett" label="Jackett" />
+      </section>
+
+      {/* 3d. qBittorrent — materializa la descarga cuando el motor es Jackett */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">
+          3d · qBittorrent <span className="text-xs text-neutral-500">(para Jackett)</span>
+        </h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Cuando el motor es Jackett, Liderarr envía aquí el magnet/.torrent que elijas. Con Prowlarr no hace falta
+          (empuja a su propio cliente de descarga).
+        </p>
+        <Field label="URL de la WebUI" hint="Ej.: http://192.168.1.50:8080">
+          <input value={s.qbittorrent_url || ''} onChange={set('qbittorrent_url')} className={input} placeholder="http://…:8080" />
+        </Field>
+        <Field label="Usuario" hint="El de la WebUI de qBittorrent.">
+          <input value={s.qbittorrent_user || ''} onChange={set('qbittorrent_user')} className={input} placeholder="admin" />
+        </Field>
+        <Field label="Contraseña">
+          <input type="password" value={s.qbittorrent_pass || ''} onChange={set('qbittorrent_pass')} className={input} placeholder="••••••••" />
+        </Field>
+        <Field label="Categoría (opcional)" hint="Separa en qBittorrent lo que manda Liderarr. Ej.: liderarr">
+          <input value={s.qbittorrent_category || ''} onChange={set('qbittorrent_category')} className={input} placeholder="liderarr" />
+        </Field>
+        <TestButton service="qbittorrent" label="qBittorrent" />
+      </section>
+
       {/* 3c. Importar descargas — hardlink torrents -> biblioteca */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">

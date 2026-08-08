@@ -313,6 +313,9 @@ const SECRET_SETTING_KEYS = new Set([
   'acoustid_key',
   'discogs_token',
   'plex_token',
+  'prowlarr_key',
+  'jackett_key',
+  'qbittorrent_pass',
 ]);
 const secretKey = process.env.LIDERARRR_SECRET
   ? crypto.createHash('sha256').update(process.env.LIDERARRR_SECRET).digest()

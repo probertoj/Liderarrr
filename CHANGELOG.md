@@ -11,11 +11,19 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 Objetivo: fiabilidad de la búsqueda y una primera configuración guiada.
 
+### Añadido
+- **Jackett como motor de búsqueda alternativo a Prowlarr** (Prowlarr resulta más
+  inestable). Selector de motor en Ajustes (Prowlarr | Jackett). Jackett busca vía Torznab
+  —resultados en crudo, sin el filtrado de freeleech de Prowlarr— y la descarga la
+  materializa **qBittorrent** (nueva integración: login WebUI + añadir magnet/.torrent).
+  Secciones nuevas en Ajustes (Jackett, qBittorrent) con botón de prueba.
+
 ### Planeado
-- **Jackett como alternativa a Prowlarr** en la búsqueda manual (Prowlarr resulta más
-  inestable). Poder elegir el motor de búsqueda.
-- **Onboarding paso a paso**: cada ajuste explicado a fondo (qué es, para qué sirve, cómo
-  obtener las credenciales), al estilo de PowaFlex.
+- **Onboarding paso a paso** (estilo PowaFlex): cada ajuste explicado a fondo (qué es, para
+  qué sirve, cómo obtener las credenciales).
+- **Descartar duplicados con opción de borrar de disco**: además de «descartar» (ocultar),
+  «descartar y borrar ya» para eliminar la copia peor del disco, con confirmación dura y
+  aviso de seeding (hardlinks).
 
 ---
 

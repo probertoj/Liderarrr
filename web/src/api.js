@@ -71,6 +71,9 @@ export const api = {
   lidarrAddStatus: () => req('/lidarr/add/status'),
   prowlarrSearch: (q) => req(`/prowlarr/search?q=${encodeURIComponent(q)}`),
   prowlarrGrab: (guid, indexerId) => req('/prowlarr/grab', { method: 'POST', body: { guid, indexerId } }),
+  // búsqueda unificada: usa el motor elegido en Ajustes (Prowlarr | Jackett)
+  search: (q) => req(`/search?q=${encodeURIComponent(q)}`),
+  searchGrab: (item) => req('/search/grab', { method: 'POST', body: item }),
   importsPending: () => req('/imports/pending'),
   importRun: (sourceDir, override = {}) => req('/imports/run', { method: 'POST', body: { sourceDir, ...override } }),
 
