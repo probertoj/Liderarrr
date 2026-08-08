@@ -682,6 +682,7 @@ function ProwlarrSearch({ album }) {
   const [grabbing, setGrabbing] = useState(null);
   const [grabbed, setGrabbed] = useState({});
   const [msg, setMsg] = useState(null);
+  const [engine, setEngine] = useState(null);
 
   const search = async () => {
     if (!q.trim()) return;
@@ -690,7 +691,9 @@ function ProwlarrSearch({ album }) {
     setMsg(null);
     setResults(null);
     try {
-      setResults(await api.prowlarrSearch(q));
+      const r = await api.search(q);
+      setEngine(r.engine);
+      setResults(r.results);
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -702,9 +705,9 @@ function ProwlarrSearch({ album }) {
     setGrabbing(r.guid);
     setErr(null);
     try {
-      await api.prowlarrGrab(r.guid, r.indexerId);
+      const res = await api.searchGrab({ engine, guid: r.guid, indexerId: r.indexerId, downloadUrl: r.downloadUrl });
       setGrabbed((p) => ({ ...p, [r.guid]: true }));
-      setMsg('Enviado a tu cliente de descarga.');
+      setMsg(res?.via === 'qbittorrent' ? 'Enviado a qBittorrent.' : 'Enviado a tu cliente de descarga.');
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -715,12 +718,15 @@ function ProwlarrSearch({ album }) {
   return (
     <div className="card p-4 mb-6">
       <h2 className="text-sm text-neutral-400 flex items-center gap-2">
-        <Search size={15} /> Buscar y descargar (Prowlarr)
+        <Search size={15} /> Buscar y descargar
+        {engine && (
+          <span className="text-xs text-neutral-600">({engine === 'jackett' ? 'Jackett → qBittorrent' : 'Prowlarr'})</span>
+        )}
       </h2>
       <p className="text-xs text-neutral-600 mt-1">
-        Busca en <b className="font-normal text-neutral-500">todos tus indexers</b> (RED, OPS, Jackett) sin el filtro de
-        Lidarr. Elige la release que quieras y Prowlarr la manda a tu cliente de descarga. La búsqueda consulta los
-        trackers en vivo: puede tardar.
+        Busca en <b className="font-normal text-neutral-500">todos tus indexers</b> sin el filtro de Lidarr, con el motor
+        que elijas en Ajustes. Elige la release y se envía a tu cliente de descarga (Prowlarr al suyo; Jackett a
+        qBittorrent). La búsqueda consulta los trackers en vivo: puede tardar.
       </p>
       <div className="flex gap-2 mt-3">
         <input

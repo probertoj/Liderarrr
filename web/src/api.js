@@ -70,9 +70,8 @@ export const api = {
   lidarrAdd: (rg_mbid, artist_mbid) => req('/lidarr/add', { method: 'POST', body: { rg_mbid, artist_mbid } }),
   lidarrAddBulk: (items) => req('/lidarr/add-bulk', { method: 'POST', body: { items } }),
   lidarrAddStatus: () => req('/lidarr/add/status'),
-  prowlarrSearch: (q) => req(`/prowlarr/search?q=${encodeURIComponent(q)}`),
-  prowlarrGrab: (guid, indexerId) => req('/prowlarr/grab', { method: 'POST', body: { guid, indexerId } }),
-  // búsqueda unificada: usa el motor elegido en Ajustes (Prowlarr | Jackett)
+  // búsqueda unificada: usa el motor elegido en Ajustes (Prowlarr | Jackett). Toda la
+  // UI pasa por aquí; no llamar a Prowlarr directo (se saltaría el selector de motor).
   search: (q) => req(`/search?q=${encodeURIComponent(q)}`),
   searchGrab: (item) => req('/search/grab', { method: 'POST', body: item }),
   importsPending: () => req('/imports/pending'),
