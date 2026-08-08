@@ -22,7 +22,7 @@ const CSRF_HINT =
   'qBittorrent → Opciones → WebUI → Security (marca la cookie como Secure y solo vale por ' +
   'HTTPS/localhost, no por HTTP en la LAN). Si persiste, revisa «Host header validation» ' +
   '(Server domains) y confirma URL y credenciales.';
-let session = { url: null, sid: null, at: 0 };
+let session = { url: null, cookie: null, at: 0 };
 let lastDiag = null; // diagnostico del ultimo login (sin el token), para el 403
 const SID_TTL = 25 * 60 * 1000;
 
@@ -50,22 +50,25 @@ async function login() {
       : res.headers.get('set-cookie')
         ? [res.headers.get('set-cookie')]
         : [];
-  const setCookie = rawList.join('; ');
-  const m = setCookie.match(/SID=([^;]+)/);
+  // qBittorrent 5.x cambio el nombre de la cookie de sesion (ya no siempre es SID) y el
+  // login puede responder 204. Capturamos el primer par nombre=valor sea cual sea y lo
+  // reenviamos tal cual: agnostico a la version.
+  const cookiePair = (rawList[0] || '').split(';')[0].trim();
+  const cookie = cookiePair.includes('=') ? cookiePair : null;
   lastDiag = {
     status: res.status,
     body: body.slice(0, 12),
     setCookieCount: rawList.length,
-    hasSID: /SID=/.test(setCookie),
+    cookieName: cookie ? cookie.split('=')[0] : '(ninguna)',
     headers: [...res.headers.keys()].join(','),
   };
-  session = { url, sid: m ? m[1] : null, at: Date.now() };
+  session = { url, cookie, at: Date.now() };
   return session;
 }
 
 async function ensureSession() {
   const { url } = qbConfig();
-  if (session.url === url && session.sid && Date.now() - session.at < SID_TTL) return session;
+  if (session.url === url && session.cookie && Date.now() - session.at < SID_TTL) return session;
   return login();
 }
 
@@ -75,14 +78,14 @@ async function qbFetch(path, { method = 'GET', body } = {}) {
   const attempt = async () => {
     const s = await ensureSession();
     const headers = { Referer: url, Origin: url };
-    if (s.sid) headers.Cookie = `SID=${s.sid}`;
+    if (s.cookie) headers.Cookie = s.cookie;
     if (body) headers['Content-Type'] = 'application/x-www-form-urlencoded';
     return fetch(`${url}${path}`, { method, headers, body, signal: AbortSignal.timeout(20000) });
   };
   let res = await attempt();
   if (res.status === 403) {
     // sesion caducada o no aceptada: reintenta una vez con login fresco
-    session = { url: null, sid: null, at: 0 };
+    session = { url: null, cookie: null, at: 0 };
     res = await attempt();
   }
   if (res.status === 403) throw new Error(CSRF_HINT);
@@ -93,7 +96,7 @@ async function qbFetch(path, { method = 'GET', body } = {}) {
 export async function qbTest() {
   // login explicito para saber si llega la cookie de sesion (diagnostico del 403)
   await login();
-  const gotCookie = !!session.sid;
+  const gotCookie = !!session.cookie;
   try {
     const version = (await qbFetch('/api/v2/app/version')).trim();
     return { ok: true, name: `qBittorrent ${version}` };
@@ -106,7 +109,7 @@ export async function qbTest() {
           : 'Login OK pero qBittorrent NO envio cookie de sesion. Casi siempre es «Enable cookie Secure flag» todavia ' +
             'activa (o no guardaste): desmarcala en Opciones → WebUI → Security y pulsa GUARDAR en qBittorrent. ' +
             (lastDiag
-              ? `[diag: status=${lastDiag.status}, body="${lastDiag.body}", set-cookie=${lastDiag.setCookieCount}, SID=${lastDiag.hasSID}, cabeceras=${lastDiag.headers}]`
+              ? `[diag: status=${lastDiag.status}, body="${lastDiag.body}", set-cookie=${lastDiag.setCookieCount}, cookie=${lastDiag.cookieName}, cabeceras=${lastDiag.headers}]`
               : '')
       );
     }
