@@ -90,6 +90,13 @@ export const api = {
   discographyStatus: () => req('/discography/status'),
   gaps: (all) => req(`/discover/gaps${all ? '?all=1' : ''}`),
   upcoming: (all) => req(`/discover/upcoming${all ? '?all=1' : ''}`),
+  recentReleases: (since, all) => {
+    const p = new URLSearchParams();
+    if (since) p.set('since', since);
+    if (all) p.set('all', '1');
+    const qs = p.toString();
+    return req(`/discover/recent${qs ? `?${qs}` : ''}`);
+  },
   dismiss: (rg_mbid, title) => req('/discover/dismiss', { method: 'POST', body: { rg_mbid, title } }),
   autoLidarr: () => req('/lidarr/auto'),
   autoLidarrRun: (dryRun) => req('/lidarr/auto/run', { method: 'POST', body: { dryRun } }),

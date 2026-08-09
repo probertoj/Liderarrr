@@ -47,7 +47,8 @@ export function upcoming({ onlyTracked = true } = {}) {
     .prepare(
       `SELECT rg.rg_mbid, rg.title, rg.first_release, rg.primary_type, rg.artist_id, rg.artist_mbid,
         ar.name AS artist,
-        (SELECT 1 FROM lidarr_albums la WHERE la.rg_mbid = rg.rg_mbid) AS in_lidarr
+        (SELECT 1 FROM lidarr_albums la WHERE la.rg_mbid = rg.rg_mbid) AS in_lidarr,
+        (SELECT 1 FROM tracked_artists ta WHERE ta.artist_id = rg.artist_id) AS tracked
        FROM release_groups rg
        JOIN artists ar ON ar.id = rg.artist_id
        ${trackedJoin}
@@ -56,7 +57,33 @@ export function upcoming({ onlyTracked = true } = {}) {
        ORDER BY rg.first_release`
     )
     .all()
-    .map((r) => ({ ...r, in_lidarr: !!r.in_lidarr }));
+    .map((r) => ({ ...r, in_lidarr: !!r.in_lidarr, tracked: !!r.tracked }));
+}
+
+// Estrenados recientemente: álbumes de estudio de tus artistas con fecha ya pasada
+// dentro de la ventana [since, hoy]. Por defecto since = 1 de enero de este año.
+// Marca lo que ya tienes (is_owned), lo encargado en Lidarr y si sigues al artista.
+export function recentlyReleased({ since = null, onlyTracked = false } = {}) {
+  const cutoff = since || `${new Date().getFullYear()}-01-01`;
+  const today = new Date().toISOString().slice(0, 10);
+  const trackedJoin = onlyTracked ? 'JOIN tracked_artists t ON t.artist_id = rg.artist_id' : '';
+  return db
+    .prepare(
+      `SELECT rg.rg_mbid, rg.title, rg.first_release, rg.primary_type, rg.artist_id, rg.artist_mbid,
+        ar.name AS artist, rg.is_owned, rg.owned_album_id,
+        (SELECT 1 FROM lidarr_albums la WHERE la.rg_mbid = rg.rg_mbid) AS in_lidarr,
+        (SELECT 1 FROM tracked_artists ta WHERE ta.artist_id = rg.artist_id) AS tracked
+       FROM release_groups rg
+       JOIN artists ar ON ar.id = rg.artist_id
+       ${trackedJoin}
+       WHERE rg.is_upcoming = 0 AND rg.primary_type = 'Album'
+         AND (rg.secondary_types IS NULL OR rg.secondary_types = '[]')
+         AND rg.first_release >= @cutoff AND rg.first_release <= @today
+         AND rg.rg_mbid NOT IN (SELECT rg_mbid FROM dismissed_albums)
+       ORDER BY rg.first_release DESC, ar.name COLLATE NOCASE`
+    )
+    .all({ cutoff, today })
+    .map((r) => ({ ...r, in_lidarr: !!r.in_lidarr, is_owned: !!r.is_owned, tracked: !!r.tracked }));
 }
 
 export function dismissGap(rgMbid, title) {

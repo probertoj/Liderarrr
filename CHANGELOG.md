@@ -9,7 +9,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar] — 0.6 (en progreso)
 
-_Alcance por definir._
+Objetivo: mejorar el calendario de lanzamientos.
+
+### Añadido
+- **Calendario de lanzamientos, fase 1.** La página pasa a «Lanzamientos» con dos pestañas:
+  **Próximos** y **Estrenados recientemente** (ventana de fechas configurable; por defecto
+  este año hasta hoy). En cada fila puedes **seguir al artista** sin entrar en su ficha,
+  **buscar/descargar** la release (motor Prowlarr/Jackett) además de enviarla a Lidarr, y se
+  muestra la **carátula** (Cover Art Archive). Marca lo que ya tienes y a quién ya sigues.
 
 ---
 

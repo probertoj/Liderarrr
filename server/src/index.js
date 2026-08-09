@@ -33,7 +33,7 @@ import {
   isTracked,
   suggestedArtists,
 } from './tracked.js';
-import { gaps, upcoming, dismissGap, undismissGap, dismissedList } from './discover.js';
+import { gaps, upcoming, recentlyReleased, dismissGap, undismissGap, dismissedList } from './discover.js';
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
 import { listeningOverview, ownershipGap, ownedUnplayed, hasScrobbles } from './listening.js';
@@ -270,6 +270,9 @@ app.post('/api/discography/refresh', async (req) => {
 app.get('/api/discography/status', async () => discographyStatus);
 app.get('/api/discover/gaps', async (req) => gaps({ onlyTracked: req.query?.all !== '1' }));
 app.get('/api/discover/upcoming', async (req) => upcoming({ onlyTracked: req.query?.all !== '1' }));
+app.get('/api/discover/recent', async (req) =>
+  recentlyReleased({ since: req.query?.since || null, onlyTracked: req.query?.all === '1' })
+);
 app.get('/api/discover/dismissed', async () => dismissedList());
 app.post('/api/discover/dismiss', async (req) => dismissGap(req.body?.rg_mbid, req.body?.title));
 app.delete('/api/discover/dismiss/:rgMbid', async (req) => undismissGap(req.params.rgMbid));

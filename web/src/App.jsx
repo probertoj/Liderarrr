@@ -47,7 +47,7 @@ const NAV = [
     items: [
       { to: '/seguidos', label: 'Seguidos', Icon: Star },
       { to: '/huecos', label: 'Huecos', Icon: Compass },
-      { to: '/proximos', label: 'Próximos lanzamientos', Icon: CalendarClock },
+      { to: '/proximos', label: 'Lanzamientos', Icon: CalendarClock },
       { to: '/importar', label: 'Importar descargas', Icon: DownloadCloud },
     ],
   },
