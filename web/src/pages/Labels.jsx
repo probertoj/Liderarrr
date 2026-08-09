@@ -52,6 +52,11 @@ export default function Labels() {
                 className="text-sm px-3 py-1.5 rounded-full bg-ink-850 border border-ink-800 hover:border-gold-500/40"
               >
                 {l.name} <span className="text-neutral-600">{l.albums}</span>
+                {l.variants > 1 && (
+                  <span className="text-neutral-600" title="Variantes de nombre fusionadas (acentos/mayúsculas)">
+                    {' '}· {l.variants} variantes
+                  </span>
+                )}
               </button>
             ))}
             {shown.length === 0 && <span className="text-sm text-neutral-500">Ningún sello coincide con «{q}».</span>}

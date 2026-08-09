@@ -9,6 +9,17 @@ import { normalizeForDup, libScore } from './queries.js';
 // sabes si de ese MP3 que tienes existe algo mejor. De paso, cada consulta captura
 // el sello, que alimenta la vista de Sellos (que crece según exploras).
 
+// Clave de fusión SUAVE de sellos: une solo variantes por acentos/mayúsculas/puntuación
+// de las MISMAS palabras («Jabalina Música» = «Jabalina Musica»). NO toca sub-sellos:
+// «Warner» y «Warner Spain» dan claves distintas y no se fusionan.
+const labelKey = (name) =>
+  String(name || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
 const insLabel = db.prepare("INSERT INTO tags (type, name) VALUES ('label', ?) ON CONFLICT DO NOTHING");
 const getLabel = db.prepare("SELECT id FROM tags WHERE type='label' AND name=?");
 const linkLabel = db.prepare('INSERT INTO album_tags (album_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING');
@@ -60,26 +71,63 @@ export function upgradeCandidates() {
 // Sellos de tu colección (según lo capturado de Discogs al explorar ediciones, y
 // lo que traigan las etiquetas). Crece a medida que usas la app.
 export function labelsOverview() {
-  return db
+  const rows = db
     .prepare(
       `SELECT t.name, COUNT(*) AS albums
        FROM album_tags at JOIN tags t ON t.id=at.tag_id AND t.type='label'
        JOIN albums a ON a.id=at.album_id AND a.match_state!='dismissed'
-       GROUP BY t.name ORDER BY albums DESC, t.name`
+       GROUP BY t.name`
     )
     .all()
     .filter((r) => !isJunkLabel(r.name));
+  // fusión suave: variantes por acentos/mayúsculas bajo el nombre más frecuente
+  const groups = new Map();
+  for (const r of rows) {
+    const key = labelKey(r.name);
+    const g = groups.get(key);
+    if (g) {
+      g.albums += r.albums;
+      g._variants.push(r.name);
+      if (r.albums > g._top) {
+        g._top = r.albums;
+        g.name = r.name;
+      }
+    } else {
+      groups.set(key, { name: r.name, albums: r.albums, _top: r.albums, _variants: [r.name] });
+    }
+  }
+  return [...groups.values()]
+    .map((g) => ({ name: g.name, albums: g.albums, variants: g._variants.length > 1 ? g._variants.length : undefined }))
+    .sort((a, b) => b.albums - a.albums || a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
 }
 
 export function labelAlbums(name) {
-  const rows = db
+  // resuelve TODAS las variantes del sello (acentos/mayúsculas) y trae sus álbumes
+  const key = labelKey(name);
+  const names = db
+    .prepare("SELECT DISTINCT name FROM tags WHERE type='label'")
+    .all()
+    .map((r) => r.name)
+    .filter((n) => labelKey(n) === key);
+  if (!names.length) names.push(name);
+  const ph = names.map(() => '?').join(',');
+  const raw = db
     .prepare(
       `SELECT a.id, a.title, a.album_artist, a.year, a.cover, a.track_file_count, a.track_count, a.match_state,
         a.size_bytes, a.rg_mbid
-       FROM album_tags at JOIN tags t ON t.id=at.tag_id AND t.type='label' AND t.name=@name
+       FROM album_tags at JOIN tags t ON t.id=at.tag_id AND t.type='label' AND t.name IN (${ph})
        JOIN albums a ON a.id=at.album_id AND a.match_state!='dismissed'`
     )
-    .all({ name });
+    .all(...names);
+  // un álbum puede tener dos variantes del sello: dedup por id antes de colapsar
+  const seen = new Set();
+  const rows = [];
+  for (const a of raw) {
+    if (!seen.has(a.id)) {
+      seen.add(a.id);
+      rows.push(a);
+    }
+  }
   // colapsa duplicados a un representante con ×N (coherente con la Discoteca y el artista)
   const groups = new Map();
   for (const a of rows) {
