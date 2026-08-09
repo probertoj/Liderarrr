@@ -15,7 +15,7 @@ import { jackettTest, jackettSearch } from './jackett.js';
 import { qbTest, qbAdd } from './qbittorrent.js';
 import { deleteAlbumFromDisk } from './albumdelete.js';
 import { pendingImports, importFolder } from './importer.js';
-import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists } from './musicbrainz.js';
+import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, runBackground } from './musicbrainz.js';
 import { acoustidTest } from './acoustid.js';
 import { discogsTest, searchRelease } from './discogs.js';
 import { lastfmTest } from './lastfm.js';
@@ -346,26 +346,39 @@ app.get('/api/challenges/:id', async (req, reply) => {
   return c;
 });
 app.delete('/api/challenges/:id', async (req) => deleteChallenge(Number(req.params.id)));
-// resuelve los que faltan contra MusicBrainz y los manda a Lidarr en bloque
+// Resuelve los faltantes contra MusicBrainz y los encola a Lidarr EN SEGUNDO PLANO.
+// Antes era bloqueante (resolución MB a 1 req/s + lidarrAdd de decenas de s por ítem
+// dentro del request → un reto grande colgaba minutos). Ahora responde al instante y
+// el progreso se ve en la cola de Lidarr (Diagnóstico / sondeo).
 app.post('/api/challenges/:id/radarr', async (req, reply) => {
   try {
     const missing = challengeMissing(Number(req.params.id));
-    let added = 0;
-    const errors = [];
-    for (const m of missing) {
-      try {
-        const rg = await searchReleaseGroup(m.artist, m.album);
-        if (rg && rg.score >= 80) {
-          await lidarrAdd(rg.rg_mbid, rg.artist_mbid);
-          added++;
-        } else {
-          errors.push({ item: `${m.artist} — ${m.album}`, error: 'sin coincidencia fiable en MusicBrainz' });
+    runBackground(async () => {
+      for (const m of missing) {
+        try {
+          const rg = await searchReleaseGroup(m.artist, m.album);
+          if (rg && rg.score >= 80) enqueueLidarrAdd([{ rg_mbid: rg.rg_mbid, artist_mbid: rg.artist_mbid }]);
+          else console.warn(`[reto] sin coincidencia MB fiable: ${m.artist} — ${m.album}`);
+        } catch (e) {
+          console.warn(`[reto] fallo resolviendo ${m.artist} — ${m.album}: ${String(e.message || e)}`);
         }
-      } catch (err) {
-        errors.push({ item: `${m.artist} — ${m.album}`, error: String(err.message || err) });
       }
-    }
-    return { added, total: missing.length, errors: errors.slice(0, 20) };
+    }).catch((e) => console.warn('[reto] resolución en 2º plano falló:', String(e.message || e)));
+    return { queued: missing.length, background: true };
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// Envío de UN ítem de reto (o cualquier artista+álbum) a Lidarr: resuelve en MB y
+// encola (no bloqueante). Devuelve {ok:false} si MB no da coincidencia fiable.
+app.post('/api/lidarr/add-by-name', async (req, reply) => {
+  try {
+    const { artist, album } = req.body || {};
+    if (!album) return reply.code(400).send({ error: 'Falta el álbum' });
+    const rg = await searchReleaseGroup(artist, album);
+    if (!rg || rg.score < 80) return { ok: false, reason: 'sin coincidencia fiable en MusicBrainz' };
+    enqueueLidarrAdd([{ rg_mbid: rg.rg_mbid, artist_mbid: rg.artist_mbid }]);
+    return { ok: true, queued: 1, title: rg.title };
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

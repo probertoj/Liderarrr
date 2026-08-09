@@ -104,6 +104,7 @@ export const api = {
   challenge: (id) => req(`/challenges/${id}`),
   deleteChallenge: (id) => req(`/challenges/${id}`, { method: 'DELETE' }),
   challengeToLidarr: (id) => req(`/challenges/${id}/radarr`, { method: 'POST' }),
+  lidarrAddByName: (artist, album) => req('/lidarr/add-by-name', { method: 'POST', body: { artist, album } }),
 
   // fase 4 — refinado
   editions: (id) => req(`/albums/${id}/editions`),

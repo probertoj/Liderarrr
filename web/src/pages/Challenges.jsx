@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Trophy, Plus, Trash2, ArrowLeft, Check, Send } from 'lucide-react';
+import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download } from 'lucide-react';
 import { api } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, Button } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, Button, SearchModal } from '../components.jsx';
 
 // Retos: listas de álbumes "que hay que tener/oír". Anillos concéntricos de lo
 // que tienes vs lo que has escuchado, y envío en bloque a Lidarr de lo que falta.
@@ -141,6 +141,8 @@ function Detail({ id, onBack }) {
   const [err, setErr] = useState(null);
   const [sending, setSending] = useState(false);
   const [filter, setFilter] = useState('all'); // all | missing | unheard
+  const [search, setSearch] = useState(null); // query del modal de búsqueda manual
+  const [queued, setQueued] = useState({}); // position -> 'sending' | 'ok' | 'fail'
 
   const load = () => api.challenge(id).then(setC).catch((e) => setErr(e.message));
   useEffect(() => {
@@ -148,15 +150,28 @@ function Detail({ id, onBack }) {
   }, [id]);
 
   const sendMissing = async () => {
-    if (!confirm('¿Buscar en MusicBrainz y enviar a Lidarr todos los que te faltan?')) return;
+    if (!confirm('¿Resolver en MusicBrainz y enviar a Lidarr todos los que te faltan?')) return;
     setSending(true);
     try {
       const r = await api.challengeToLidarr(id);
-      alert(`${r.added} de ${r.total} enviados a Lidarr.` + (r.errors?.length ? `\n\nSin coincidencia:\n${r.errors.map((e) => e.item).join('\n')}` : ''));
+      alert(`Encolados ${r.queued} para resolver y enviar en segundo plano.\nEl progreso está en la cola de Lidarr (Diagnóstico).`);
     } catch (e) {
       alert(e.message);
     } finally {
       setSending(false);
+    }
+  };
+
+  // Envío no bloqueante de UN ítem: resuelve en MB y encola a Lidarr.
+  const sendOne = async (it) => {
+    setQueued((p) => ({ ...p, [it.position]: 'sending' }));
+    try {
+      const r = await api.lidarrAddByName(it.artist, it.album);
+      setQueued((p) => ({ ...p, [it.position]: r.ok ? 'ok' : 'fail' }));
+      if (!r.ok) alert(`No se pudo enviar: ${r.reason || 'sin coincidencia en MusicBrainz'}`);
+    } catch (e) {
+      setQueued((p) => ({ ...p, [it.position]: 'fail' }));
+      alert(e.message);
     }
   };
 
@@ -226,13 +241,35 @@ function Detail({ id, onBack }) {
                   <Check size={13} /> tienes
                 </span>
               ) : (
-                <span className="text-neutral-600">falta</span>
+                <>
+                  <button
+                    onClick={() => setSearch(`${it.artist} ${it.album}`)}
+                    className="px-2 py-1 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1"
+                  >
+                    <Search size={12} /> Buscar
+                  </button>
+                  {queued[it.position] === 'ok' ? (
+                    <span className="text-emerald-400 inline-flex items-center gap-1">
+                      <Check size={13} /> en cola
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => sendOne(it)}
+                      disabled={queued[it.position] === 'sending'}
+                      className="px-2 py-1 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <Download size={12} /> {queued[it.position] === 'sending' ? '…' : 'Lidarr'}
+                    </button>
+                  )}
+                </>
               )}
               {it.listened && <span className="text-emerald-400">oído</span>}
             </div>
           </div>
         ))}
       </div>
+
+      {search != null && <SearchModal initialQuery={search} onClose={() => setSearch(null)} />}
     </div>
   );
 }
