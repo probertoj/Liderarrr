@@ -48,7 +48,10 @@ export function upcoming({ onlyTracked = true } = {}) {
       `SELECT rg.rg_mbid, rg.title, rg.first_release, rg.primary_type, rg.artist_id, rg.artist_mbid,
         ar.name AS artist,
         (SELECT 1 FROM lidarr_albums la WHERE la.rg_mbid = rg.rg_mbid) AS in_lidarr,
-        (SELECT 1 FROM tracked_artists ta WHERE ta.artist_id = rg.artist_id) AS tracked
+        (SELECT 1 FROM tracked_artists ta WHERE ta.artist_id = rg.artist_id) AS tracked,
+        (SELECT GROUP_CONCAT(DISTINCT tl.name) FROM label_release_groups lrg
+          JOIN tracked_labels tl ON tl.label_mbid = lrg.label_mbid
+          WHERE lrg.rg_mbid = rg.rg_mbid) AS labels
        FROM release_groups rg
        JOIN artists ar ON ar.id = rg.artist_id
        ${trackedJoin}
@@ -72,7 +75,10 @@ export function recentlyReleased({ since = null, onlyTracked = false } = {}) {
       `SELECT rg.rg_mbid, rg.title, rg.first_release, rg.primary_type, rg.artist_id, rg.artist_mbid,
         ar.name AS artist, rg.is_owned, rg.owned_album_id,
         (SELECT 1 FROM lidarr_albums la WHERE la.rg_mbid = rg.rg_mbid) AS in_lidarr,
-        (SELECT 1 FROM tracked_artists ta WHERE ta.artist_id = rg.artist_id) AS tracked
+        (SELECT 1 FROM tracked_artists ta WHERE ta.artist_id = rg.artist_id) AS tracked,
+        (SELECT GROUP_CONCAT(DISTINCT tl.name) FROM label_release_groups lrg
+          JOIN tracked_labels tl ON tl.label_mbid = lrg.label_mbid
+          WHERE lrg.rg_mbid = rg.rg_mbid) AS labels
        FROM release_groups rg
        JOIN artists ar ON ar.id = rg.artist_id
        ${trackedJoin}

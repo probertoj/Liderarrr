@@ -98,6 +98,14 @@ export const api = {
     return req(`/discover/recent${qs ? `?${qs}` : ''}`);
   },
   dismiss: (rg_mbid, title) => req('/discover/dismiss', { method: 'POST', body: { rg_mbid, title } }),
+
+  // sellos seguidos (0.6 fase 2)
+  trackedLabels: () => req('/tracked-labels'),
+  searchLabels: (q) => req(`/tracked-labels/search?q=${encodeURIComponent(q)}`),
+  followLabel: (label) => req('/tracked-labels', { method: 'POST', body: label }),
+  unfollowLabel: (mbid) => req(`/tracked-labels/${encodeURIComponent(mbid)}`, { method: 'DELETE' }),
+  refreshLabel: (mbid) => req(`/tracked-labels/${encodeURIComponent(mbid)}/refresh`, { method: 'POST' }),
+  labelReleases: (since) => req(`/tracked-labels/releases${since ? `?since=${since}` : ''}`),
   autoLidarr: () => req('/lidarr/auto'),
   autoLidarrRun: (dryRun) => req('/lidarr/auto/run', { method: 'POST', body: { dryRun } }),
 

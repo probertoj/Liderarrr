@@ -149,6 +149,35 @@ CREATE TABLE IF NOT EXISTS tracked_artists (
   PRIMARY KEY (artist_id, facet)
 );
 
+-- Sellos que sigues por su MBID de MusicBrainz (0.6 fase 2). A diferencia de
+-- tracked_artists (clavado a un artist_id local), esto es un sello de MB con o sin
+-- artistas tuyos: sirve para resaltar sus estrenos aunque no sigas al artista.
+-- El catálogo del sello (label_release_groups) se cachea aparte y se refresca en
+-- el ciclo de "Actualizar todo". too_big = major que supera el tope de MB (§labelReleaseGroups).
+CREATE TABLE IF NOT EXISTS tracked_labels (
+  label_mbid TEXT PRIMARY KEY,
+  name TEXT,
+  disambiguation TEXT,
+  country TEXT,
+  added_at INTEGER,
+  refreshed_at INTEGER,
+  too_big INTEGER DEFAULT 0
+);
+-- Caché del catálogo (álbumes de estudio) de cada sello seguido. Un mismo RG puede
+-- salir en varios sellos → PK compuesta. artist_mbid es el primer crédito (puede faltar).
+CREATE TABLE IF NOT EXISTS label_release_groups (
+  rg_mbid TEXT NOT NULL,
+  label_mbid TEXT NOT NULL,
+  title TEXT,
+  artist_credit TEXT,
+  artist_mbid TEXT,
+  first_release TEXT,
+  fetched_at INTEGER,
+  PRIMARY KEY (rg_mbid, label_mbid)
+);
+CREATE INDEX IF NOT EXISTS idx_lrg_rg ON label_release_groups(rg_mbid);
+CREATE INDEX IF NOT EXISTS idx_lrg_label ON label_release_groups(label_mbid);
+
 -- Escuchas (fase 3): scrobbles de Last.fm y/o play counts locales.
 CREATE TABLE IF NOT EXISTS listens (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -285,6 +285,20 @@ export async function searchLabel(name) {
   };
 }
 
+// Lista de sellos candidatos por nombre (para elegir a cuál seguir, 0.6 fase 2).
+export async function searchLabels(name, limit = 6) {
+  if (!name) return [];
+  const data = await mbCached(`labels-search:${name}:${limit}`.toLowerCase(), `/label?query=${enc(lucene(name))}&limit=${limit}`);
+  return (data.labels || []).map((l) => ({
+    mbid: l.id,
+    name: l.name,
+    disambiguation: l.disambiguation || '',
+    type: l.type || null,
+    country: l.country || null,
+    score: Number(l.score) || 0,
+  }));
+}
+
 // Catálogo de ÁLBUMES DE ESTUDIO de un sello (primary Album, sin secundarios). Los
 // sellos cuelgan de RELEASES en MusicBrainz, no de release-groups: se recorren las
 // releases del sello y se deduplican a RG. Tope `maxReleases` para no traer miles de
@@ -314,10 +328,12 @@ export async function labelReleaseGroups(labelMbid, { maxReleases = 5000 } = {})
       if (!rg || rgs.has(rg.id)) continue;
       if ((rg['primary-type'] || null) !== 'Album') continue;
       if ((rg['secondary-types'] || []).length) continue;
+      const credit = rel['artist-credit'] || [];
       rgs.set(rg.id, {
         rg_mbid: rg.id,
         title: rg.title,
-        artist: (rel['artist-credit'] || []).map((a) => a.name).join(''),
+        artist: credit.map((a) => a.name).join(''),
+        artist_mbid: credit[0]?.artist?.id || null,
         first_release: rg['first-release-date'] || null,
         year: rg['first-release-date'] ? Number(String(rg['first-release-date']).slice(0, 4)) || null : null,
       });

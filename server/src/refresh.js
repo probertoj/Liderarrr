@@ -5,6 +5,8 @@ import { lidarrSync } from './lidarr.js';
 import { enrichAllDiscographies, discographyStatus } from './discography.js';
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
+import { refreshAllLabels } from './followlabels.js';
+import { db } from './db.js';
 
 // La rutina "poner Liderarrr al día", en orden de dependencias: primero el disco
 // (escáner), luego lo que lee de él (identificación), luego el snapshot de
@@ -76,6 +78,15 @@ function buildSteps() {
         const r = await enrichAllDiscographies({ onlyTracked: false });
         if (r.error) throw new Error(r.error);
         return `${discographyStatus.done} artistas al día`;
+      },
+    },
+    {
+      key: 'labels',
+      label: 'Actualizar catálogo de sellos seguidos',
+      enabled: () => !!db.prepare('SELECT 1 FROM tracked_labels LIMIT 1').get(),
+      run: async () => {
+        const r = await refreshAllLabels();
+        return `${r.done} sellos al día de ${r.total}`;
       },
     },
     {

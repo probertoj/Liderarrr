@@ -15,7 +15,7 @@ import { jackettTest, jackettSearch } from './jackett.js';
 import { qbTest, qbAdd } from './qbittorrent.js';
 import { deleteAlbumFromDisk } from './albumdelete.js';
 import { pendingImports, importFolder } from './importer.js';
-import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, runBackground } from './musicbrainz.js';
+import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground } from './musicbrainz.js';
 import { acoustidTest } from './acoustid.js';
 import { discogsTest, searchRelease } from './discogs.js';
 import { lastfmTest } from './lastfm.js';
@@ -34,6 +34,13 @@ import {
   suggestedArtists,
 } from './tracked.js';
 import { gaps, upcoming, recentlyReleased, dismissGap, undismissGap, dismissedList } from './discover.js';
+import {
+  followLabel,
+  unfollowLabel,
+  refreshLabel,
+  trackedLabelsList,
+  labelReleases,
+} from './followlabels.js';
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
 import { listeningOverview, ownershipGap, ownedUnplayed, hasScrobbles } from './listening.js';
@@ -276,6 +283,32 @@ app.get('/api/discover/recent', async (req) =>
 app.get('/api/discover/dismissed', async () => dismissedList());
 app.post('/api/discover/dismiss', async (req) => dismissGap(req.body?.rg_mbid, req.body?.title));
 app.delete('/api/discover/dismiss/:rgMbid', async (req) => undismissGap(req.params.rgMbid));
+
+// --- sellos seguidos (0.6 fase 2) -------------------------------------------
+app.get('/api/tracked-labels', async () => trackedLabelsList());
+app.get('/api/tracked-labels/search', async (req, reply) => {
+  try {
+    return await searchLabels(req.query?.q, 6);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.get('/api/tracked-labels/releases', async (req) => labelReleases({ since: req.query?.since || null }));
+app.post('/api/tracked-labels', async (req, reply) => {
+  try {
+    return await followLabel(req.body || {});
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.delete('/api/tracked-labels/:mbid', async (req) => unfollowLabel(req.params.mbid));
+app.post('/api/tracked-labels/:mbid/refresh', async (req, reply) => {
+  try {
+    return await refreshLabel(req.params.mbid);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 
 // --- auto-Lidarr ------------------------------------------------------------
 app.get('/api/lidarr/auto', async () => ({ ...autoLidarrConfig(), status: autoLidarrStatus }));
