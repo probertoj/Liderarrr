@@ -7,7 +7,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
-## [Sin publicar] — 0.4 (en progreso)
+## [Sin publicar] — 0.5 (en progreso)
+
+_Alcance por definir._
+
+---
+
+## [0.4.0] — 2026-08-08
 
 Objetivo: fiabilidad de la búsqueda y una primera configuración guiada.
 
