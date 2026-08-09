@@ -99,7 +99,9 @@ function Ring({ pct, listenedPct, size = 52 }) {
 function AddForm({ onDone }) {
   const [name, setName] = useState('');
   const [text, setText] = useState('');
+  const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
+
   const submit = async () => {
     if (!text.trim()) return;
     setBusy(true);
@@ -112,25 +114,68 @@ function AddForm({ onDone }) {
       setBusy(false);
     }
   };
+  const importUrl = async () => {
+    if (!url.trim()) return;
+    setBusy(true);
+    try {
+      const r = await api.importChallengeUrl(url, name);
+      alert(
+        `Importados ${r.count} álbumes como reto.` +
+          (r.partial
+            ? '\n\n⚠️ Esa lista carga por scroll y puede haber venido a medias. Para la completa: ábrela, baja hasta el final, copia todo y usa «pegar la lista».'
+            : '')
+      );
+      onDone();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <div className="card p-4 mb-5">
+    <div className="card p-4 mb-5 space-y-4">
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Nombre del reto (p. ej. Rolling Stone 500)"
-        className="w-full bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm mb-2"
+        placeholder="Nombre del reto (opcional; si importas por URL se coge el de la lista)"
+        className="w-full bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
       />
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={8}
-        placeholder={'Una línea por álbum, formato «Artista - Álbum»:\nRadiohead - OK Computer (1997)\nThe Beatles - Revolver\nMiles Davis — Kind of Blue'}
-        className="w-full bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm font-mono"
-      />
-      <div className="flex justify-end mt-2">
-        <Button variant="gold" onClick={submit} disabled={busy}>
-          {busy ? 'Creando…' : 'Crear reto'}
-        </Button>
+
+      <div>
+        <div className="text-xs text-neutral-400 mb-1">Importar una lista por URL (AlbumOfTheYear y similares)</div>
+        <div className="flex gap-2">
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && importUrl()}
+            placeholder="https://www.albumoftheyear.org/list/…"
+            className="flex-1 bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
+          />
+          <Button onClick={importUrl} disabled={busy}>
+            {busy ? '…' : 'Importar'}
+          </Button>
+        </div>
+        <div className="text-[11px] text-neutral-600 mt-1">
+          Usa un lector externo para pasar protecciones anti-bot (AOTY tiene Cloudflare). Las listas largas con scroll
+          pueden venir a medias; para la completa, usa «pegar» de abajo.
+        </div>
+      </div>
+
+      <div>
+        <div className="text-xs text-neutral-400 mb-1">…o pega la lista (una línea «Artista - Álbum»)</div>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={7}
+          placeholder={'Radiohead - OK Computer (1997)\nThe Beatles - Revolver\nMiles Davis — Kind of Blue'}
+          className="w-full bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm font-mono"
+        />
+        <div className="flex justify-end mt-2">
+          <Button variant="gold" onClick={submit} disabled={busy}>
+            {busy ? 'Creando…' : 'Crear reto'}
+          </Button>
+        </div>
       </div>
     </div>
   );

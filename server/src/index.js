@@ -38,6 +38,7 @@ import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
 import { listeningOverview, ownershipGap, ownedUnplayed, hasScrobbles } from './listening.js';
 import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing } from './challenges.js';
+import { importListFromUrl } from './listimport.js';
 import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCompletism } from './editions.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
@@ -336,6 +337,14 @@ app.get('/api/challenges', async () => listChallenges());
 app.post('/api/challenges', async (req, reply) => {
   try {
     return addChallenge(req.body?.name, req.body?.text);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// importar una lista por URL (AOTY y similares) vía lector que ejecuta JS
+app.post('/api/challenges/import', async (req, reply) => {
+  try {
+    return await importListFromUrl(req.body?.url, req.body?.name);
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

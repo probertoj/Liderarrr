@@ -9,7 +9,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar] — 0.5 (en progreso)
 
-_Alcance por definir._
+Objetivo: importar listas de agregadores como retos.
+
+### Añadido
+- **Importar listas por URL** (AlbumOfTheYear y similares) → crea un reto. Como AOTY está
+  tras Cloudflare, se descarga vía un lector que ejecuta JS (r.jina.ai) y se extraen las
+  entradas «Artista - Álbum» (en AOTY, ancladas al ranking); toma el título de la lista
+  automáticamente. Las listas largas con carga por scroll pueden venir a medias: se detecta
+  y se avisa (la vía de pegar es la completa). El formulario de «Nuevo reto» ahora ofrece
+  importar por URL o pegar el texto.
 
 ---
 
