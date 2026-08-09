@@ -11,8 +11,28 @@ const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 // habituales: "Artista - Álbum", "Artista – Álbum (1997)", "1. Artista — Álbum",
 // y opcionalmente una cabecera. Ignora líneas vacías.
 export function parseList(text) {
+  const src = String(text || '');
+  // RateYourMusic (copiar-pegar del chart): cada entrada trae la línea del alt de la
+  // carátula «Artista - Álbum, Cover art». Es el ancla limpia; si la hay, parseamos solo
+  // esas (el resto del bloque —fecha, géneros, nota, nº de valoraciones— es ruido).
+  const rym = [...src.matchAll(/^(.+?)\s+[-–—]\s+(.+?),\s*Cover art\s*$/gim)];
+  if (rym.length) {
+    const items = [];
+    const seen = new Set();
+    for (const m of rym) {
+      const artist = m[1].trim();
+      const album = m[2].trim();
+      const k = `${artist}::${album}`.toLowerCase();
+      if (artist && album && !seen.has(k)) {
+        seen.add(k);
+        items.push({ artist, album, year: null });
+      }
+    }
+    return items;
+  }
+
   const items = [];
-  for (const raw of String(text || '').split(/\r?\n/)) {
+  for (const raw of src.split(/\r?\n/)) {
     let line = raw.trim();
     if (!line) continue;
     line = line.replace(/^\s*\d+[.)]\s*/, ''); // numeración inicial

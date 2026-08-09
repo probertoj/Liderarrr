@@ -16,8 +16,9 @@ Objetivo: importar listas de agregadores como retos.
   descarga vía un lector que ejecuta JS (r.jina.ai); trae la lista **completa** paginando
   (`?p=N`, 50/página) y la ordena por ranking (el nº 1 primero), tomando el título de la
   lista automáticamente. El formulario de «Nuevo reto» ofrece importar por URL o pegar.
-  Nota: **RateYourMusic bloquea incluso al lector** (403) y se avisa; desde ahí no se puede
-  importar por URL.
+  Nota: **RateYourMusic bloquea incluso al lector** (403); desde ahí no se puede por URL, pero
+  **sí pegando**: el parser de «pegar» detecta el formato de un chart de RYM copiado (usa la
+  línea «Artista - Álbum, Cover art» de cada entrada) y descarta el ruido.
 - **Aviso de nueva versión.** Un banner descartable avisa cuando hay una versión más nueva
   que la que corre (compara con los tags publicados en GitHub) y enlaza al CHANGELOG con las
   novedades. Se descarta por versión (reaparece cuando salga otra).

@@ -163,7 +163,10 @@ function AddForm({ onDone }) {
       </div>
 
       <div>
-        <div className="text-xs text-neutral-400 mb-1">…o pega la lista (una línea «Artista - Álbum»)</div>
+        <div className="text-xs text-neutral-400 mb-1">
+          …o pega la lista: una línea «Artista - Álbum», o directamente lo que copies de un chart de
+          RateYourMusic (se detecta su formato).
+        </div>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
