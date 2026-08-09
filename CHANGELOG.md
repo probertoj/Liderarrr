@@ -7,7 +7,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
-## [Sin publicar] — 0.5 (en progreso)
+## [Sin publicar] — 0.6 (en progreso)
+
+_Alcance por definir._
+
+---
+
+## [0.5.0] — 2026-08-08
 
 Objetivo: importar listas de agregadores como retos.
 
