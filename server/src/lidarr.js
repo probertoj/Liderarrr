@@ -1,4 +1,4 @@
-import { db, getSetting } from './db.js';
+import { db, getSetting, setSetting } from './db.js';
 
 // Lidarr es el ACTUADOR, no el catálogo (igual que Radarr en PowaFlex). Solo dos
 // cosas: le mandamos álbumes a monitorizar desde los huecos, y le pedimos un
@@ -277,6 +277,34 @@ export const lidarrAddStatus = {
 const addQueue = [];
 let addWorker = null;
 
+// La cola vive en memoria, pero se PERSISTE en un ajuste para sobrevivir a reinicios
+// o redespliegues del contenedor (antes, una tanda de 2 h se perdía si reiniciabas).
+// Se guarda tras cada ítem; al vaciarse se limpia. `resumeAddQueue()` la reанuda al
+// arrancar. El reproceso de un ítem por un corte a mitad es inofensivo (lidarrAdd es
+// idempotente: si el artista ya está, re-monitoriza).
+function persistQueue() {
+  if (!addQueue.length) return setSetting('lidarr_add_queue', null);
+  const { total, done, added, pending, errors, startedAt } = lidarrAddStatus;
+  setSetting('lidarr_add_queue', JSON.stringify({ q: addQueue, s: { total, done, added, pending, errors, startedAt } }));
+}
+
+export function resumeAddQueue() {
+  let saved = null;
+  try {
+    saved = JSON.parse(getSetting('lidarr_add_queue') || 'null');
+  } catch {
+    saved = null;
+  }
+  if (!saved || !Array.isArray(saved.q) || !saved.q.length) return;
+  addQueue.push(...saved.q);
+  if (saved.s) Object.assign(lidarrAddStatus, saved.s, { running: false, current: null, finishedAt: null });
+  console.log(`[lidarr] reanudando cola de envío tras reinicio: ${addQueue.length} pendientes`);
+  if (!addWorker)
+    addWorker = runAddQueue().finally(() => {
+      addWorker = null;
+    });
+}
+
 export function enqueueLidarrAdd(items) {
   const toAdd = (items || [])
     .filter((i) => i && i.rg_mbid)
@@ -296,6 +324,7 @@ export function enqueueLidarrAdd(items) {
   }
   addQueue.push(...toAdd);
   lidarrAddStatus.total += toAdd.length;
+  persistQueue();
   if (!addWorker)
     addWorker = runAddQueue().finally(() => {
       addWorker = null;
@@ -323,11 +352,13 @@ async function runAddQueue() {
         console.warn(`[lidarr] ✗ envío ${it.rg_mbid} — ${msg}`);
       }
       lidarrAddStatus.done++;
+      persistQueue();
     }
   } finally {
     lidarrAddStatus.running = false;
     lidarrAddStatus.current = null;
     lidarrAddStatus.finishedAt = Date.now();
+    persistQueue();
     const secs = lidarrAddStatus.startedAt ? Math.round((Date.now() - lidarrAddStatus.startedAt) / 1000) : 0;
     console.log(
       `[lidarr] cola terminada: ${lidarrAddStatus.added} enviados · ${lidarrAddStatus.pending} pend · ${lidarrAddStatus.errors.length} error (${lidarrAddStatus.done}/${lidarrAddStatus.total}, ${secs}s)`

@@ -1,6 +1,7 @@
 import { db, getSetting } from './db.js';
 import { scanStatus } from './scanner.js';
 import { identifyStatus } from './identify.js';
+import { lidarrAddStatus } from './lidarr.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -107,6 +108,14 @@ export function diagnostics() {
       matched: identifyStatus.matched,
       unmatched: identifyStatus.unmatched,
       current: identifyStatus.current,
+    },
+    lidarrQueue: {
+      running: lidarrAddStatus.running,
+      total: lidarrAddStatus.total,
+      done: lidarrAddStatus.done,
+      added: lidarrAddStatus.added,
+      pending: lidarrAddStatus.pending,
+      errors: lidarrAddStatus.errors.length,
     },
     events: recentEvents(),
   };

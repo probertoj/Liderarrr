@@ -9,7 +9,7 @@ import { runScan, scanStatus } from './scanner.js';
 import { regroupDiscs } from './discgroup.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch } from './identify.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
-import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab, enqueueLidarrAdd, lidarrAddStatus } from './lidarr.js';
+import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab, enqueueLidarrAdd, lidarrAddStatus, resumeAddQueue } from './lidarr.js';
 import { prowlarrTest, prowlarrSearch, prowlarrGrab } from './prowlarr.js';
 import { jackettTest, jackettSearch } from './jackett.js';
 import { qbTest, qbAdd } from './qbittorrent.js';
@@ -629,6 +629,11 @@ app
         regroupDiscs();
       } catch (e) {
         console.warn('[discgroup] backfill al arrancar falló:', String(e.message || e));
+      }
+      try {
+        resumeAddQueue(); // reanuda una tanda de envío a Lidarr que quedara a medias
+      } catch (e) {
+        console.warn('[lidarr] no se pudo reanudar la cola:', String(e.message || e));
       }
     });
   })

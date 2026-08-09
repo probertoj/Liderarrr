@@ -139,6 +139,27 @@ export default function Diagnostics() {
         )}
       </div>
 
+      {/* cola de envío a Lidarr (persistente; sobrevive a reinicios) */}
+      {d.lidarrQueue?.total > 0 && (
+        <div className="card p-4 mb-4">
+          <h2 className="text-sm text-neutral-400 mb-2">Cola de envío a Lidarr</h2>
+          <div className="flex justify-between text-sm mb-1">
+            <span className={d.lidarrQueue.running ? 'text-gold-300' : 'text-neutral-400'}>
+              {d.lidarrQueue.running ? 'procesando' : 'en reposo'} · {n(d.lidarrQueue.done)} / {n(d.lidarrQueue.total)} ·{' '}
+              {n(d.lidarrQueue.added)} enviados{d.lidarrQueue.pending ? ` · ${n(d.lidarrQueue.pending)} pend.` : ''}
+              {d.lidarrQueue.errors ? ` · ${n(d.lidarrQueue.errors)} error` : ''}
+            </span>
+            <span>{d.lidarrQueue.total ? Math.round((d.lidarrQueue.done / d.lidarrQueue.total) * 100) : 0}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-ink-800 overflow-hidden">
+            <div
+              className="h-full bg-gold-400 transition-all"
+              style={{ width: `${d.lidarrQueue.total ? Math.round((d.lidarrQueue.done / d.lidarrQueue.total) * 100) : 0}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-3 gap-4 mb-4">
         <div className="card p-4">
           <h2 className="text-sm text-neutral-400 mb-2">Álbumes por estado</h2>
@@ -228,6 +249,8 @@ function asText(d) {
   const s = d.scan || {};
   lines.push(`Escaneo: running=${s.running} phase=${s.phase} carpetas=${s.foldersFound} nuevas=${s.albumsDone} sin_cambios=${s.skipped} omitidas=${s.errors}`);
   if (s.lastScan) lines.push(`Último escaneo: ${new Date(s.lastScan.at).toISOString()} nuevas=${s.lastScan.albums} sin_cambios=${s.lastScan.skipped} omitidas=${s.lastScan.errors} carpetas=${s.lastScan.folders}${s.lastScan.error ? ` error=${s.lastScan.error}` : ''}`);
+  const lq = d.lidarrQueue || {};
+  if (lq.total) lines.push(`Cola Lidarr: running=${lq.running} ${lq.done}/${lq.total} · enviados=${lq.added} pend=${lq.pending} error=${lq.errors}`);
   lines.push('');
   lines.push(`--- Eventos (${d.events.length}) ---`);
   for (const e of d.events) lines.push(`${new Date(e.t).toISOString()} [${e.level}] ${e.text}`);
