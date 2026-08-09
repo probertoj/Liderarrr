@@ -44,6 +44,7 @@ import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCom
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
 import { coverFast, resolveCoverSlow, retryMissingCovers } from './covers.js';
 import { diagnostics, pushEvent } from './diag.js';
+import { updateCheck } from './update.js';
 import * as q from './queries.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -100,6 +101,7 @@ app.addHook('onResponse', async (req, reply) => {
 
 // --- meta -------------------------------------------------------------------
 app.get('/api/version', async () => ({ name: 'Liderarrr', version: pkg.version }));
+app.get('/api/update-check', async () => updateCheck());
 app.get('/api/diag', async () => diagnostics());
 
 app.get('/api/setup-state', async () => {

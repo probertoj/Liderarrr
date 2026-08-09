@@ -12,12 +12,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 Objetivo: importar listas de agregadores como retos.
 
 ### Añadido
-- **Importar listas por URL** (AlbumOfTheYear y similares) → crea un reto. Como AOTY está
-  tras Cloudflare, se descarga vía un lector que ejecuta JS (r.jina.ai) y se extraen las
-  entradas «Artista - Álbum» (en AOTY, ancladas al ranking); toma el título de la lista
-  automáticamente. Las listas largas con carga por scroll pueden venir a medias: se detecta
-  y se avisa (la vía de pegar es la completa). El formulario de «Nuevo reto» ahora ofrece
-  importar por URL o pegar el texto.
+- **Importar listas por URL → reto** (AlbumOfTheYear). Como AOTY está tras Cloudflare, se
+  descarga vía un lector que ejecuta JS (r.jina.ai); trae la lista **completa** paginando
+  (`?p=N`, 50/página) y la ordena por ranking (el nº 1 primero), tomando el título de la
+  lista automáticamente. El formulario de «Nuevo reto» ofrece importar por URL o pegar.
+  Nota: **RateYourMusic bloquea incluso al lector** (403) y se avisa; desde ahí no se puede
+  importar por URL.
+- **Aviso de nueva versión.** Un banner descartable avisa cuando hay una versión más nueva
+  que la que corre (compara con los tags publicados en GitHub) y enlaza al CHANGELOG con las
+  novedades. Se descarta por versión (reaparece cuando salga otra).
 
 ---
 

@@ -22,6 +22,7 @@ async function req(path, { method = 'GET', body } = {}) {
 
 export const api = {
   version: () => req('/version'),
+  updateCheck: () => req('/update-check'),
   diag: () => req('/diag'),
   setupState: () => req('/setup-state'),
   settings: () => req('/settings'),

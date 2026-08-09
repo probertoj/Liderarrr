@@ -3,7 +3,7 @@ import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle,
   Sparkles, Settings as SettingsIcon, Menu, X, RefreshCw, Star, Compass, CalendarClock,
-  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud,
+  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud, ExternalLink,
 } from 'lucide-react';
 import { api } from './api.js';
 import { Spinner, ErrorBoundary } from './components.jsx';
@@ -119,6 +119,47 @@ function RefreshButton() {
 // las cajas de LIDER y el subrayado usan --text-body (se voltean claro/oscuro), las
 // letras de LIDER usan --color-ink-900 (el fondo de la barra, así quedan "recortadas");
 // el oro y el rojo son constantes. El grano de fotocopia es un filtro SVG, no imagen.
+// Aviso de nueva versión: compara la que corre con el último tag de GitHub. Descartable
+// por versión (reaparece cuando salga una más nueva). Si no hay novedad, no muestra nada.
+function UpdateBanner() {
+  const [info, setInfo] = useState(null);
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    api.updateCheck().then(setInfo).catch(() => {});
+  }, []);
+  if (!info?.updateAvailable || hidden || localStorage.getItem('update_dismissed') === info.latest) return null;
+  return (
+    <div className="mb-6 flex items-center gap-3 rounded-lg border border-gold-500/40 bg-gold-500/10 px-4 py-2.5 text-sm">
+      <Sparkles size={16} className="text-gold-400 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <span className="text-gold-300">Nueva versión v{info.latest} disponible</span>
+        <span className="text-neutral-400">
+          {' '}(tienes v{info.current}). Actualiza el contenedor:{' '}
+          <code className="text-neutral-300">docker compose pull &amp;&amp; docker compose up -d</code>
+        </span>
+      </div>
+      <a
+        href={info.url}
+        target="_blank"
+        rel="noreferrer"
+        className="shrink-0 text-gold-300 hover:underline inline-flex items-center gap-1"
+      >
+        Ver novedades <ExternalLink size={13} />
+      </a>
+      <button
+        onClick={() => {
+          localStorage.setItem('update_dismissed', info.latest);
+          setHidden(true);
+        }}
+        className="shrink-0 text-neutral-500 hover:text-neutral-200"
+        aria-label="Descartar aviso"
+      >
+        <X size={16} />
+      </button>
+    </div>
+  );
+}
+
 const IMPACT = "Impact,'Haettenschweiler','Arial Narrow',sans-serif";
 function Logo() {
   return (
@@ -233,6 +274,7 @@ export default function App() {
       </aside>
 
       <main className="flex-1 min-w-0 px-4 md:px-8 py-6 md:py-8 max-w-[1400px]">
+        <UpdateBanner />
         <ErrorBoundary key={location.pathname}>
           <Suspense fallback={<Spinner label="Cargando…" />}>
           <Routes>
