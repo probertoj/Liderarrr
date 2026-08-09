@@ -26,6 +26,14 @@ Objetivo: fiabilidad de la búsqueda y una primera configuración guiada.
   Jackett, qBittorrent) — incluida la preparación de la WebUI de qBittorrent con sus gotchas.
 - **El motor de búsqueda elegido se respeta en TODA la UI**, también la búsqueda de la ficha
   de disco (antes estaba fija a Prowlarr). Componentes renombrados a `SearchModal`/`SearchSection`.
+- **Fusión suave de sellos por variante** (backlog 0.3): «Jabalina Música» y «Jabalina Musica»
+  cuentan como un solo sello (normalización de acentos/mayúsculas), bajo el nombre más
+  frecuente y con contador de variantes. Conservador: no toca sub-sellos (Warner ≠ Warner Spain).
+- **Cola de envío a Lidarr persistente** (backlog 0.3): sobrevive a reinicios/redespliegues
+  (se reanuda al arrancar) y su estado sale en el Diagnóstico (línea «Cola Lidarr» + bloque
+  con barra de progreso).
+- **Retos: «Buscar» y «Lidarr» por ítem** (backlog 0.3), y el envío en bloque «Faltantes a
+  Lidarr» ya no bloquea (resuelve en MB + encola en 2º plano; progreso en la cola de Lidarr).
 
 ### Cambiado
 - **Los tests de Ajustes guardan primero.** «Probar» persiste la configuración antes de
