@@ -9,6 +9,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+---
+
+## [0.6.1] — 2026-08-10
+
+Objetivo: seguimiento de sellos, discografía del artista por tipo y herramientas de limpieza de la
+discoteca (además de varios arreglos de feedback y de detección).
+
 ### Añadido
 - **Seguir un sello desde su página.** En la ficha de un sello (Sellos) hay un botón «Seguir
   sello»: lo resuelve en MusicBrainz y lo añade a los seguidos, para que sus lanzamientos salgan
