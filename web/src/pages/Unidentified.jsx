@@ -1,10 +1,71 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Sparkles, Check, ExternalLink, Loader2 } from 'lucide-react';
+import { HelpCircle, Sparkles, Check, ExternalLink, Loader2, Pencil, X } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Cover, Spinner, ErrorMsg, Button } from '../components.jsx';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Corrige el artista de un álbum sin identificar y reintenta identificarlo en el acto.
+// Lo típico para lo que llega sin etiquetar: pones el artista bueno y, si con eso casa,
+// el álbum abandona la lista solo.
+function ArtistInline({ album, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(album.album_artist || '');
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    const name = val.trim();
+    if (!name || name === album.album_artist) {
+      setEditing(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.setAlbumArtist(album.id, name);
+      await api.identifyAlbum(album.id); // ya con el artista bueno, intenta casar
+      await onSaved();
+    } catch (e) {
+      alert(e.message);
+      setBusy(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        title="Corregir el artista"
+        className="inline-flex items-center gap-1 hover:text-gold-400"
+      >
+        <Pencil size={11} className="opacity-70" />
+        {album.album_artist || <span className="italic text-neutral-600">sin artista</span>}
+      </button>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        list="artist-names"
+        value={val}
+        autoFocus
+        disabled={busy}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') save();
+          if (e.key === 'Escape') setEditing(false);
+        }}
+        className="bg-ink-850 border border-ink-800 rounded px-1.5 py-0.5 text-xs w-44 outline-none focus:border-gold-500/60"
+      />
+      <button onClick={save} disabled={busy} title="Guardar y reidentificar" className="text-gold-300 hover:text-gold-200 disabled:opacity-50">
+        {busy ? <Loader2 size={13} className="animate-spin" /> : <Check size={14} />}
+      </button>
+      <button onClick={() => setEditing(false)} className="text-neutral-500 hover:text-neutral-300" title="Cancelar">
+        <X size={13} />
+      </button>
+    </span>
+  );
+}
 
 // Cola de resolución: lo que la cadena no pudo casar. Cada fila se puede
 // resolver a mano (candidatos de MusicBrainz/Discogs) o marcar como rareza para
@@ -14,10 +75,12 @@ export default function Unidentified() {
   const [err, setErr] = useState(null);
   const [openId, setOpenId] = useState(null);
   const [status, setStatus] = useState(null); // progreso/resumen de reidentificación
+  const [names, setNames] = useState([]); // sugerencias de artista (datalist)
 
   const load = () => api.unidentified().then(setRows).catch((e) => setErr(e.message));
   useEffect(() => {
     load();
+    api.artistNames().then(setNames).catch(() => {});
   }, []);
 
   const act = async (fn) => {
@@ -52,6 +115,11 @@ export default function Unidentified() {
 
   return (
     <div>
+      <datalist id="artist-names">
+        {names.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
       <PageTitle
         icon={HelpCircle}
         title="Sin identificar"
@@ -98,8 +166,9 @@ export default function Unidentified() {
                   <Link to={`/album/${a.id}`} className="truncate hover:text-gold-400 block">
                     {a.title}
                   </Link>
-                  <div className="text-xs text-neutral-500 truncate">
-                    {a.album_artist} · {a.track_file_count} pistas
+                  <div className="text-xs text-neutral-500 flex items-center gap-1 min-w-0">
+                    <ArtistInline album={a} onSaved={load} />
+                    <span className="shrink-0">· {a.track_file_count} pistas</span>
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">

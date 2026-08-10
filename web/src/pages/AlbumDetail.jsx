@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2 } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { Cover, StateBadge, Spinner, ErrorMsg, Button } from '../components.jsx';
 
@@ -10,12 +10,39 @@ export default function AlbumDetail() {
   const [album, setAlbum] = useState(null);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [names, setNames] = useState([]);
+  const [editArtist, setEditArtist] = useState(false);
+  const [artistVal, setArtistVal] = useState('');
 
   const load = () => api.album(id).then(setAlbum).catch((e) => setErr(e.message));
   useEffect(() => {
     setAlbum(null);
+    setEditArtist(false);
     load();
   }, [id]);
+  useEffect(() => {
+    api.artistNames().then(setNames).catch(() => {});
+  }, []);
+
+  // Corrige el artista del álbum (metadato interno, no toca ficheros). Protegido de
+  // reescaneos (artist_manual). Útil sobre todo en lo que llegó sin etiquetar.
+  const saveArtist = async () => {
+    const name = artistVal.trim();
+    if (!name || name === album.album_artist) {
+      setEditArtist(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.setAlbumArtist(id, name);
+      setEditArtist(false);
+      await load();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const setState = async (state) => {
     setBusy(true);
@@ -82,9 +109,49 @@ export default function AlbumDetail() {
             )}
           </div>
           <h1 className="text-2xl font-display">{album.title}</h1>
-          <Link to={`/artista/${album.artist_id}`} className="text-gold-400 hover:underline">
-            {album.artist?.name || album.album_artist}
-          </Link>
+          <datalist id="artist-names">
+            {names.map((n) => (
+              <option key={n} value={n} />
+            ))}
+          </datalist>
+          {editArtist ? (
+            <span className="inline-flex items-center gap-1.5">
+              <input
+                list="artist-names"
+                value={artistVal}
+                autoFocus
+                disabled={busy}
+                onChange={(e) => setArtistVal(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveArtist();
+                  if (e.key === 'Escape') setEditArtist(false);
+                }}
+                className="bg-ink-850 border border-ink-800 rounded px-2 py-0.5 text-sm outline-none focus:border-gold-500/60"
+              />
+              <button onClick={saveArtist} disabled={busy} className="text-gold-300 hover:text-gold-200 disabled:opacity-50" title="Guardar">
+                {busy ? <Loader2 size={15} className="animate-spin" /> : <Check size={16} />}
+              </button>
+              <button onClick={() => setEditArtist(false)} className="text-neutral-500 hover:text-neutral-300" title="Cancelar">
+                <X size={15} />
+              </button>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <Link to={`/artista/${album.artist_id}`} className="text-gold-400 hover:underline">
+                {album.artist?.name || album.album_artist}
+              </Link>
+              <button
+                onClick={() => {
+                  setArtistVal(album.album_artist || '');
+                  setEditArtist(true);
+                }}
+                title="Corregir el artista"
+                className="text-neutral-500 hover:text-gold-400"
+              >
+                <Pencil size={13} />
+              </button>
+            </span>
+          )}
           {album.year && <span className="text-neutral-500"> · {album.year}</span>}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-sm">

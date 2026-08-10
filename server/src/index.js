@@ -257,6 +257,14 @@ app.get('/api/artists/:id', async (req, reply) => {
   return a;
 });
 app.post('/api/artists/:id/scope', async (req) => q.setArtistScope(Number(req.params.id), req.body?.scope));
+app.get('/api/artists/names', async () => q.artistNames());
+app.put('/api/albums/:id/artist', async (req, reply) => {
+  try {
+    return q.setAlbumArtist(Number(req.params.id), req.body?.name);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 // recalcular la discografía de un artista bajo demanda
 app.post('/api/artists/:id/refresh-discography', async (req, reply) => {
   try {

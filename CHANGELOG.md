@@ -9,6 +9,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Corregir el artista de un álbum desde la interfaz.** En «Sin identificar» cada fila trae el
+  artista editable en línea (con sugerencias de tu biblioteca): lo corriges y **se reintenta
+  identificar al instante**, así lo que llegó sin etiquetar casa y abandona la lista. También
+  editable desde la ficha del álbum. Es un metadato interno (no toca los ficheros) y queda
+  protegido: un reescaneo posterior ya no lo pisa con la etiqueta del fichero.
+
 ---
 
 ## [0.6.1] — 2026-08-10

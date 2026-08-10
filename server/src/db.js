@@ -361,6 +361,9 @@ ensureColumn('lidarr_albums', 'added', 'added TEXT');
 // estudio) o 'all' (además EPs y singles). Decisión consciente por artista: de unos
 // quieres "todo", de otros solo los discos.
 ensureColumn('artists', 'completism_scope', "completism_scope TEXT DEFAULT 'albums'");
+// artista corregido a mano desde la UI (0.6.2): protege album_artist/artist_id de que
+// un reescaneo posterior los machaque con lo que digan las etiquetas del fichero.
+ensureColumn('albums', 'artist_manual', 'artist_manual INTEGER DEFAULT 0');
 
 // Evita reimportar el mismo scrobble: sin esto, cada importación reinsertaba
 // desde cero. Los scrobbles "sonando ahora" (sin ts) se descartan al importar.

@@ -230,8 +230,17 @@ async function ingestFolder({ dir, files }) {
 
   const localKey = albumKey(dir, keyRoots);
   const albumTitle = albumMeta.album || path.basename(dir);
-  const albumArtistName = albumMeta.albumArtist || albumMeta.artist || 'Artista desconocido';
-  const artistId = resolveLocalArtist(albumArtistName, albumMeta.artistMbid);
+  // si el usuario corrigió el artista a mano, se respeta (no se pisa con la etiqueta).
+  const manual = db.prepare('SELECT artist_manual, album_artist, artist_id FROM albums WHERE local_key = ?').get(localKey);
+  let albumArtistName;
+  let artistId;
+  if (manual?.artist_manual) {
+    albumArtistName = manual.album_artist;
+    artistId = manual.artist_id;
+  } else {
+    albumArtistName = albumMeta.albumArtist || albumMeta.artist || 'Artista desconocido';
+    artistId = resolveLocalArtist(albumArtistName, albumMeta.artistMbid);
+  }
   let stat;
   try {
     stat = fs.statSync(dir);
