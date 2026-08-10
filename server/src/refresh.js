@@ -6,6 +6,7 @@ import { enrichAllDiscographies, discographyStatus } from './discography.js';
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
 import { refreshAllLabels } from './followlabels.js';
+import { refreshAllCurators } from './radar.js';
 import { db } from './db.js';
 
 // La rutina "poner Liderarrr al día", en orden de dependencias: primero el disco
@@ -87,6 +88,15 @@ function buildSteps() {
       run: async () => {
         const r = await refreshAllLabels();
         return `${r.done} sellos al día de ${r.total}`;
+      },
+    },
+    {
+      key: 'radar',
+      label: 'Actualizar radar de curadores (Bandcamp)',
+      enabled: () => !!db.prepare('SELECT 1 FROM curators LIMIT 1').get(),
+      run: async () => {
+        const r = await refreshAllCurators();
+        return `${r.done}/${r.total} curadores · ${r.added} novedades`;
       },
     },
     {

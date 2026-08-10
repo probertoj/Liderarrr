@@ -106,6 +106,21 @@ export const api = {
   unfollowLabel: (mbid) => req(`/tracked-labels/${encodeURIComponent(mbid)}`, { method: 'DELETE' }),
   refreshLabel: (mbid) => req(`/tracked-labels/${encodeURIComponent(mbid)}/refresh`, { method: 'POST' }),
   labelReleases: (since) => req(`/tracked-labels/releases${since ? `?since=${since}` : ''}`),
+
+  // radar de curadores / Bandcamp (0.6 fase 3)
+  curators: () => req('/curators'),
+  followCurator: (username) => req('/curators', { method: 'POST', body: { username } }),
+  unfollowCurator: (id) => req(`/curators/${id}`, { method: 'DELETE' }),
+  refreshCurator: (id) => req(`/curators/${id}/refresh`, { method: 'POST' }),
+  radar: (since, unowned) => {
+    const p = new URLSearchParams();
+    if (since) p.set('since', since);
+    if (unowned) p.set('unowned', '1');
+    const qs = p.toString();
+    return req(`/radar${qs ? `?${qs}` : ''}`);
+  },
+  radarResolve: (id) => req(`/radar/${id}/resolve`, { method: 'POST' }),
+  radarDismiss: (id) => req(`/radar/${id}/dismiss`, { method: 'POST' }),
   autoLidarr: () => req('/lidarr/auto'),
   autoLidarrRun: (dryRun) => req('/lidarr/auto/run', { method: 'POST', body: { dryRun } }),
 

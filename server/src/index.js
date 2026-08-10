@@ -41,6 +41,15 @@ import {
   trackedLabelsList,
   labelReleases,
 } from './followlabels.js';
+import {
+  followCurator,
+  unfollowCurator,
+  refreshCurator,
+  curatorsList,
+  radarFeed,
+  resolveRadarItem,
+  dismissRadarItem,
+} from './radar.js';
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
 import { listeningOverview, ownershipGap, ownedUnplayed, hasScrobbles } from './listening.js';
@@ -309,6 +318,35 @@ app.post('/api/tracked-labels/:mbid/refresh', async (req, reply) => {
     return reply.code(400).send({ error: String(err.message || err) });
   }
 });
+
+// --- radar de novedades curadas (0.6 fase 3) --------------------------------
+app.get('/api/curators', async () => curatorsList());
+app.post('/api/curators', async (req, reply) => {
+  try {
+    return await followCurator(req.body?.username, req.body?.source || 'buymusicclub');
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.delete('/api/curators/:id', async (req) => unfollowCurator(Number(req.params.id)));
+app.post('/api/curators/:id/refresh', async (req, reply) => {
+  try {
+    return await refreshCurator(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.get('/api/radar', async (req) =>
+  radarFeed({ since: req.query?.since || null, unownedOnly: req.query?.unowned === '1' })
+);
+app.post('/api/radar/:id/resolve', async (req, reply) => {
+  try {
+    return await resolveRadarItem(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/radar/:id/dismiss', async (req) => dismissRadarItem(Number(req.params.id)));
 
 // --- auto-Lidarr ------------------------------------------------------------
 app.get('/api/lidarr/auto', async () => ({ ...autoLidarrConfig(), status: autoLidarrStatus }));

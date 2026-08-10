@@ -178,6 +178,45 @@ CREATE TABLE IF NOT EXISTS label_release_groups (
 CREATE INDEX IF NOT EXISTS idx_lrg_rg ON label_release_groups(rg_mbid);
 CREATE INDEX IF NOT EXISTS idx_lrg_label ON label_release_groups(label_mbid);
 
+-- Radar de novedades curadas (0.6 fase 3). Sigues a curadores (hoy: usuarios de
+-- buymusic.club, que publican semanalmente lo mejor de Bandcamp) y sus selecciones
+-- alimentan un radar afín a tu gusto, sin el ruido del MB-por-fecha. Los ítems de
+-- Bandcamp no traen MBID: se resuelve bajo demanda (rg_mbid/artist_mbid) para poder
+-- enviar a Lidarr o seguir al artista.
+CREATE TABLE IF NOT EXISTS curators (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source TEXT NOT NULL DEFAULT 'buymusicclub',
+  username TEXT NOT NULL,
+  name TEXT,
+  added_at INTEGER,
+  refreshed_at INTEGER,
+  UNIQUE (source, username)
+);
+CREATE TABLE IF NOT EXISTS radar_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  curator_id INTEGER NOT NULL,
+  source TEXT,
+  external_id TEXT,           -- id del ítem en la fuente (dedup por curador)
+  list_slug TEXT,
+  list_title TEXT,            -- "New Releases Friday 31.07.2026"
+  list_date TEXT,             -- published_at de la lista (YYYY-MM-DD)
+  artist TEXT,
+  title TEXT,
+  label TEXT,
+  release_date TEXT,          -- YYYY-MM-DD
+  url TEXT,                   -- enlace Bandcamp
+  image TEXT,
+  type TEXT,                  -- album | track
+  rg_mbid TEXT,               -- resuelto contra MB bajo demanda (caché)
+  artist_mbid TEXT,
+  resolved_at INTEGER,
+  dismissed INTEGER DEFAULT 0,
+  first_seen INTEGER,
+  UNIQUE (curator_id, external_id)
+);
+CREATE INDEX IF NOT EXISTS idx_radar_curator ON radar_items(curator_id);
+CREATE INDEX IF NOT EXISTS idx_radar_date ON radar_items(release_date);
+
 -- Escuchas (fase 3): scrobbles de Last.fm y/o play counts locales.
 CREATE TABLE IF NOT EXISTS listens (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

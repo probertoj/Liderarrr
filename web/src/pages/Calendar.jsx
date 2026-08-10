@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarClock, Plus, Check, Loader2, ExternalLink, Search, Star, Tag, X, RefreshCw } from 'lucide-react';
+import { CalendarClock, Plus, Check, Loader2, ExternalLink, Search, Star, Tag, X, RefreshCw, Radio } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, SearchModal } from '../components.jsx';
 
-// Lanzamientos: tres vistas. «Próximos» (release groups por estrenar de tus artistas),
-// «Estrenados recientemente» (ya estrenados dentro de una ventana; por defecto este año)
-// y «De tus sellos» (estrenos de sellos que sigues, aunque no sigas al artista, 0.6 fase 2).
+// Lanzamientos: cuatro vistas. «Próximos» (release groups por estrenar de tus artistas),
+// «Estrenados recientemente» (ya estrenados dentro de una ventana; por defecto este año),
+// «De tus sellos» (estrenos de sellos que sigues, aunque no sigas al artista, 0.6 fase 2)
+// y «Radar» (novedades curadas de Bandcamp vía buymusic.club, 0.6 fase 3).
 // Desde cada fila puedes seguir al artista, buscar/descargar la release o enviarla a Lidarr.
 
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
@@ -236,8 +237,235 @@ function LabelManager({ labels, onChange }) {
   );
 }
 
+// Fila del radar: un ítem de Bandcamp curado. No trae MBID; el botón Lidarr lo
+// resuelve contra MusicBrainz al vuelo (artista+título) y, si acierta, lo envía.
+function RadarRow({ r, onSearch, onFollowMbid, onQueue }) {
+  const [state, setState] = useState('idle'); // idle | resolving | added | notfound
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+
+  const sendLidarr = async () => {
+    setState('resolving');
+    try {
+      const res = await api.radarResolve(r.id);
+      if (!res.rg_mbid) {
+        setState('notfound');
+        return;
+      }
+      await api.lidarrAdd(res.rg_mbid, res.artist_mbid);
+      setState('added');
+      onQueue();
+    } catch (e) {
+      alert(e.message);
+      setState('idle');
+    }
+  };
+  const followArtist = async () => {
+    setState('resolving');
+    try {
+      const res = await api.radarResolve(r.id);
+      if (!res.artist_mbid) {
+        setState('notfound');
+        return;
+      }
+      await onFollowMbid(res.artist_mbid);
+      setState('idle');
+    } catch (e) {
+      alert(e.message);
+      setState('idle');
+    }
+  };
+  const dismiss = async () => {
+    setDismissed(true);
+    api.radarDismiss(r.id).catch(() => {});
+  };
+
+  return (
+    <div className="card px-3 py-2 flex items-center gap-3 text-sm">
+      <img
+        src={r.image}
+        alt=""
+        loading="lazy"
+        onError={(e) => {
+          e.currentTarget.style.visibility = 'hidden';
+        }}
+        className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="truncate">
+          <span>{r.artist}</span>
+          <span className="text-neutral-500"> — {r.title}</span>
+        </div>
+        <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
+          <span>
+            {r.release_date}
+            {r.type && r.type !== 'album' ? ` · ${r.type}` : ''}
+            {r.label ? ` · ${r.label}` : ''}
+          </span>
+          <span className="text-neutral-700">vía {r.curator}</span>
+          {r.tracked_artist && (
+            <span className="inline-flex items-center gap-1 text-gold-400/80">
+              <Star size={11} /> sigues al artista
+            </span>
+          )}
+          {r.tracked_label && (
+            <span className="inline-flex items-center gap-1 text-gold-400/80">
+              <Tag size={11} /> sello seguido
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {!r.tracked_artist && (
+          <button
+            onClick={followArtist}
+            disabled={state === 'resolving'}
+            className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1 disabled:opacity-50"
+          >
+            <Star size={12} /> Seguir
+          </button>
+        )}
+        <button
+          onClick={() => onSearch(`${r.artist} ${r.title}`)}
+          className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1"
+        >
+          <Search size={12} /> Buscar
+        </button>
+        {r.url && (
+          <a
+            href={r.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-gold-400 hover:underline inline-flex items-center gap-0.5"
+          >
+            Bandcamp <ExternalLink size={11} />
+          </a>
+        )}
+        {r.is_owned ? (
+          <span className="text-emerald-400/80 text-xs inline-flex items-center gap-1">
+            <Check size={13} /> en disco
+          </span>
+        ) : state === 'added' ? (
+          <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
+            <Check size={13} /> Lidarr
+          </span>
+        ) : state === 'notfound' ? (
+          <span className="text-neutral-500 text-xs" title="MusicBrainz no lo reconoce con confianza">
+            sin match MB
+          </span>
+        ) : (
+          <button
+            onClick={sendLidarr}
+            disabled={state === 'resolving'}
+            className="text-xs px-1.5 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 disabled:opacity-50"
+          >
+            {state === 'resolving' ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Lidarr
+          </button>
+        )}
+        <button onClick={dismiss} className="text-neutral-600 hover:text-red-400" title="Descartar del radar">
+          <X size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Gestión de curadores: seguir por nombre de usuario de buymusic.club, listar,
+// actualizar y dejar de seguir. Análogo a LabelManager.
+function CuratorManager({ curators, onChange }) {
+  const [u, setU] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const follow = async (e) => {
+    e?.preventDefault();
+    if (!u.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.followCurator(u.trim());
+      setU('');
+      await onChange();
+    } catch (e2) {
+      setErr(e2.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const refresh = async (id) => {
+    setBusy(true);
+    try {
+      await api.refreshCurator(id);
+      await onChange();
+    } catch (e2) {
+      alert(e2.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async (id) => {
+    setBusy(true);
+    try {
+      await api.unfollowCurator(id);
+      await onChange();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card p-3 mb-4 space-y-3">
+      <form onSubmit={follow} className="flex items-center gap-2">
+        <Radio size={15} className="text-gold-400/70 shrink-0" />
+        <input
+          value={u}
+          onChange={(e) => setU(e.target.value)}
+          placeholder="Usuario de buymusic.club a seguir (p. ej. calltheranger)"
+          className="flex-1 bg-ink-850 border border-ink-800 rounded px-2 py-1 text-sm"
+        />
+        <button
+          type="submit"
+          disabled={busy}
+          className="text-xs px-2 py-1 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 disabled:opacity-50"
+        >
+          {busy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Seguir
+        </button>
+      </form>
+      {err && <ErrorMsg>{err}</ErrorMsg>}
+      {curators.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {curators.map((c) => (
+            <span
+              key={c.id}
+              className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border border-ink-700 bg-ink-850"
+              title={`${c.items} novedades en caché`}
+            >
+              <Radio size={11} className="text-gold-400/70" />
+              <a
+                href={`https://www.buymusic.club/user/${c.username}`}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-gold-400"
+              >
+                {c.name || c.username}
+              </a>
+              <span className="text-neutral-600">· {c.items}</span>
+              <button onClick={() => refresh(c.id)} disabled={busy} className="hover:text-gold-400 disabled:opacity-50" title="Actualizar">
+                <RefreshCw size={11} />
+              </button>
+              <button onClick={() => remove(c.id)} className="hover:text-red-400" title="Dejar de seguir">
+                <X size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Calendar() {
-  const [view, setView] = useState('upcoming'); // upcoming | recent | labels
+  const [view, setView] = useState('upcoming'); // upcoming | recent | labels | radar
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
   const [all, setAll] = useState(false);
@@ -248,8 +476,11 @@ export default function Calendar() {
   const [queue, setQueue] = useState(null);
   const [search, setSearch] = useState(null);
   const [labels, setLabels] = useState([]);
+  const [curators, setCurators] = useState([]);
+  const [unowned, setUnowned] = useState(false);
 
   const loadLabels = () => api.trackedLabels().then(setLabels).catch(() => {});
+  const loadCurators = () => api.curators().then(setCurators).catch(() => {});
 
   useEffect(() => {
     setRows(null);
@@ -259,10 +490,13 @@ export default function Calendar() {
         ? api.recentReleases(since, all)
         : view === 'labels'
           ? api.labelReleases(since)
-          : api.upcoming(all);
+          : view === 'radar'
+            ? api.radar(since, unowned)
+            : api.upcoming(all);
     load.then(setRows).catch((e) => setErr(e.message));
     if (view === 'labels') loadLabels();
-  }, [view, all, since]);
+    if (view === 'radar') loadCurators();
+  }, [view, all, since, unowned]);
 
   const add = async (r) => {
     setBusy(r.rg_mbid);
@@ -297,7 +531,7 @@ export default function Calendar() {
 
   const months = {};
   for (const r of rows || []) {
-    const key = (r.first_release || '????').slice(0, 7);
+    const key = (r.first_release || r.release_date || '????').slice(0, 7);
     (months[key] ||= []).push(r);
   }
   const monthKeys = Object.keys(months).sort((a, b) => (view === 'upcoming' ? a.localeCompare(b) : b.localeCompare(a)));
@@ -318,7 +552,15 @@ export default function Calendar() {
     </button>
   );
 
-  const showSince = view === 'recent' || view === 'labels';
+  const showSince = view === 'recent' || view === 'labels' || view === 'radar';
+  const reloadRadar = async () => {
+    await loadCurators();
+    try {
+      setRows(await api.radar(since, unowned));
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
 
   return (
     <div>
@@ -327,7 +569,15 @@ export default function Calendar() {
         title="Lanzamientos"
         sub={
           rows
-            ? `${rows.length} ${view === 'upcoming' ? 'por estrenar' : view === 'labels' ? 'de tus sellos' : 'estrenados en la ventana'}`
+            ? `${rows.length} ${
+                view === 'upcoming'
+                  ? 'por estrenar'
+                  : view === 'labels'
+                    ? 'de tus sellos'
+                    : view === 'radar'
+                      ? 'en el radar'
+                      : 'estrenados en la ventana'
+              }`
             : ''
         }
       />
@@ -336,15 +586,23 @@ export default function Calendar() {
         {tab('upcoming', 'Próximos')}
         {tab('recent', 'Estrenados recientemente')}
         {tab('labels', 'De tus sellos')}
-        {view !== 'labels' && (
+        {tab('radar', 'Radar')}
+        {(view === 'upcoming' || view === 'recent') && (
           <label className="flex items-center gap-2 text-sm text-neutral-400 ml-auto cursor-pointer">
             <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />
             Todos los artistas (no solo los que sigo)
           </label>
         )}
+        {view === 'radar' && (
+          <label className="flex items-center gap-2 text-sm text-neutral-400 ml-auto cursor-pointer">
+            <input type="checkbox" checked={unowned} onChange={(e) => setUnowned(e.target.checked)} />
+            Ocultar lo que ya tengo
+          </label>
+        )}
       </div>
 
       {view === 'labels' && <LabelManager labels={labels} onChange={loadLabels} />}
+      {view === 'radar' && <CuratorManager curators={curators} onChange={reloadRadar} />}
 
       {showSince && (
         <div className="flex flex-wrap gap-2 mb-4">
@@ -387,13 +645,17 @@ export default function Calendar() {
         <Spinner />
       ) : rows && rows.length === 0 ? (
         <div className="card p-6 text-center text-neutral-400">
-          {view === 'labels'
-            ? labels.length === 0
-              ? 'Aún no sigues ningún sello. Busca uno arriba para empezar.'
-              : 'Ningún estreno de tus sellos en esta ventana. Amplía el rango o sigue a más sellos.'
-            : view === 'recent'
-              ? 'Nada estrenado en esa ventana entre tus artistas. Amplía el rango o sigue a más artistas.'
-              : 'Nada anunciado por ahora. Sigue a más artistas o recalcula discografías en «Huecos».'}
+          {view === 'radar'
+            ? curators.length === 0
+              ? 'Aún no sigues ningún curador. Añade uno arriba (p. ej. calltheranger) para empezar.'
+              : 'Nada en el radar en esta ventana. Amplía el rango o sigue a más curadores.'
+            : view === 'labels'
+              ? labels.length === 0
+                ? 'Aún no sigues ningún sello. Busca uno arriba para empezar.'
+                : 'Ningún estreno de tus sellos en esta ventana. Amplía el rango o sigue a más sellos.'
+              : view === 'recent'
+                ? 'Nada estrenado en esa ventana entre tus artistas. Amplía el rango o sigue a más artistas.'
+                : 'Nada anunciado por ahora. Sigue a más artistas o recalcula discografías en «Huecos».'}
         </div>
       ) : (
         <div className="space-y-6">
@@ -401,18 +663,28 @@ export default function Calendar() {
             <div key={month}>
               <h2 className="text-sm text-gold-400/80 mb-2 capitalize">{fmtMonth(month)}</h2>
               <div className="space-y-1.5">
-                {months[month].map((r) => (
-                  <ReleaseRow
-                    key={r.rg_mbid}
-                    r={r}
-                    added={added}
-                    busy={busy}
-                    followed={followed}
-                    onAdd={add}
-                    onFollow={follow}
-                    onSearch={setSearch}
-                  />
-                ))}
+                {view === 'radar'
+                  ? months[month].map((r) => (
+                      <RadarRow
+                        key={r.id}
+                        r={r}
+                        onSearch={setSearch}
+                        onFollowMbid={api.followMbid}
+                        onQueue={() => pollLidarrQueue(setQueue)}
+                      />
+                    ))
+                  : months[month].map((r) => (
+                      <ReleaseRow
+                        key={r.rg_mbid}
+                        r={r}
+                        added={added}
+                        busy={busy}
+                        followed={followed}
+                        onAdd={add}
+                        onFollow={follow}
+                        onSearch={setSearch}
+                      />
+                    ))}
               </div>
             </div>
           ))}
