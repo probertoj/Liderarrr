@@ -1,6 +1,6 @@
 {
   "name": "liderarrr",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "private": true,
   "type": "module",
   "description": "Panel de completismo para tu colección de música digital, junto a Lidarr.",

@@ -9,6 +9,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+---
+
+## [0.6.3] — 2026-08-10
+
+Objetivo: renombrar discos mal nombrados y ordenar la biblioteca en lote (limpieza).
+
 ### Añadido
 - **Renombrar el disco desde la interfaz.** Como el artista, ahora el título del álbum es editable
   (ficha del álbum y «Sin identificar»), para discos mal nombrados que no casan con MusicBrainz;
