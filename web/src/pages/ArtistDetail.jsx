@@ -42,11 +42,43 @@ export default function ArtistDetail() {
     }
   };
 
+  // Ámbito de completismo, persistente por artista: 'albums' (solo álbumes) o 'all'
+  // (además EPs y singles). De unos artistas quieres todo; de otros, solo los discos.
+  const toggleScope = async () => {
+    const cur = artist?.completism_scope || 'albums';
+    setBusy(true);
+    try {
+      await api.setArtistScope(id, cur === 'all' ? 'albums' : 'all');
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!artist) return <Spinner />;
 
   const comp = artist.completeness || {};
   const noMbid = !artist.mbid;
+  const scope = artist.completism_scope || 'albums';
+
+  // Clasifica cada álbum de la colección por tipo (para agrupar la parrilla). Los que
+  // tienen tipos secundarios (recopilatorio, directo, remezcla…) van a "Otros".
+  const parseSec = (s) => {
+    try {
+      return typeof s === 'string' ? JSON.parse(s) : s || [];
+    } catch {
+      return [];
+    }
+  };
+  const typeBucket = (a) => {
+    if (parseSec(a.secondary_types).length) return 'Otros';
+    if (a.primary_type === 'EP') return 'EPs';
+    if (a.primary_type === 'Single') return 'Singles';
+    if (a.primary_type === 'Album' || !a.primary_type) return 'Álbumes';
+    return 'Otros';
+  };
+  const TYPE_ORDER = ['Álbumes', 'EPs', 'Singles', 'Otros'];
 
   // Duplicados: la rejilla muestra solo la copia representante (la mejor) de cada
   // grupo, con badge ×N; al pincharla se despliega el grupo. groupsByKey mapea la
@@ -55,6 +87,9 @@ export default function ArtistDetail() {
   for (const g of artist.duplicateGroups || []) groupsByKey[g.key] = g;
   const gridAlbums = artist.albums.filter((a) => !a.dup || a.dup.best);
   const dupCount = artist.duplicateGroups?.length || 0;
+  const byType = {};
+  for (const a of gridAlbums) (byType[typeBucket(a)] ||= []).push(a);
+  const typeSections = TYPE_ORDER.filter((t) => byType[t]?.length);
 
   return (
     <div>
@@ -108,8 +143,33 @@ export default function ArtistDetail() {
         </div>
       )}
 
+      {/* ámbito de completismo (persistente por artista): solo álbumes vs todo */}
+      {!noMbid && (
+        <div className="flex items-center gap-2 flex-wrap mb-4 text-sm">
+          <span className="text-neutral-500">Completismo:</span>
+          <button
+            onClick={toggleScope}
+            disabled={busy}
+            className={`px-2.5 py-1 rounded-lg border text-xs disabled:opacity-50 ${
+              scope === 'all' ? 'border-gold-500/50 bg-gold-500/15 text-gold-300' : 'border-ink-800 bg-ink-850 text-neutral-400'
+            }`}
+          >
+            {scope === 'all' ? 'Álbumes + EPs + singles' : 'Solo álbumes'}
+          </button>
+          <span className="text-xs text-neutral-600">
+            {scope === 'all' ? 'sigues todo de este artista' : 'pulsa para seguir también EPs y singles'}
+          </span>
+        </div>
+      )}
+
       {/* lo que falta */}
       {comp.missing?.length > 0 && <MissingList items={comp.missing} artistMbid={artist.mbid} artistName={artist.name} />}
+      {scope === 'all' && comp.missingEps?.length > 0 && (
+        <MissingList items={comp.missingEps} artistMbid={artist.mbid} artistName={artist.name} noun="EPs" />
+      )}
+      {scope === 'all' && comp.missingSingles?.length > 0 && (
+        <MissingList items={comp.missingSingles} artistMbid={artist.mbid} artistName={artist.name} noun="singles" />
+      )}
 
       {/* por estrenar */}
       {comp.upcoming?.length > 0 && (
@@ -137,15 +197,36 @@ export default function ArtistDetail() {
           </span>
         )}
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
-        {gridAlbums.map((a) => (
-          <AlbumCard
-            key={a.id}
-            album={{ ...a, album_artist: artist.name }}
-            onClick={a.dup ? () => setOpenKey(a.dup.key) : undefined}
-          />
-        ))}
-      </div>
+      {typeSections.length > 1 ? (
+        <div className="space-y-6 mb-8">
+          {typeSections.map((t) => (
+            <div key={t}>
+              <h2 className="text-sm text-gold-400/80 mb-2">
+                {t} <span className="text-neutral-600">· {byType[t].length}</span>
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {byType[t].map((a) => (
+                  <AlbumCard
+                    key={a.id}
+                    album={{ ...a, album_artist: artist.name }}
+                    onClick={a.dup ? () => setOpenKey(a.dup.key) : undefined}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
+          {gridAlbums.map((a) => (
+            <AlbumCard
+              key={a.id}
+              album={{ ...a, album_artist: artist.name }}
+              onClick={a.dup ? () => setOpenKey(a.dup.key) : undefined}
+            />
+          ))}
+        </div>
+      )}
 
       {openKey && groupsByKey[openKey] && (
         <DuplicateGroupPanel group={groupsByKey[openKey]} onClose={() => setOpenKey(null)} />
@@ -250,7 +331,7 @@ function RelChip({ a }) {
   );
 }
 
-function MissingList({ items, artistMbid, artistName }) {
+function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudio' }) {
   const [added, setAdded] = useState({});
   const [busy, setBusy] = useState(null);
   const [queue, setQueue] = useState(null);
@@ -290,7 +371,7 @@ function MissingList({ items, artistMbid, artistName }) {
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-sm text-neutral-400">Te faltan {items.length} álbumes de estudio</h2>
+        <h2 className="text-sm text-neutral-400">Te faltan {items.length} {noun}</h2>
         <Button variant="gold" onClick={addAll} disabled={busy === 'all'}>
           <span className="inline-flex items-center gap-1.5">
             {busy === 'all' && <Loader2 size={14} className="animate-spin" />}

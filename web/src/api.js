@@ -145,6 +145,8 @@ export const api = {
   labels: () => req('/labels'),
   label: (name) => req(`/labels/${encodeURIComponent(name)}`),
   labelCompletism: (name) => req(`/labels/${encodeURIComponent(name)}/completism`),
+  followLabelByName: (name) => req(`/labels/${encodeURIComponent(name)}/follow`, { method: 'POST' }),
+  setArtistScope: (id, scope) => req(`/artists/${id}/scope`, { method: 'POST', body: { scope } }),
   tagPreview: (id) => req(`/albums/${id}/tag-preview`),
   writeTags: (id) => req(`/albums/${id}/write-tags`, { method: 'POST' }),
 };

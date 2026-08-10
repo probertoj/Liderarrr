@@ -1,23 +1,34 @@
 import { useEffect, useState } from 'react';
-import { Building2, ArrowLeft, ExternalLink, Check } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Building2, ArrowLeft, ExternalLink, Check, Star, Loader2 } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
 import { PageTitle, AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel } from '../components.jsx';
+
+// Coincidencia laxa de nombre de sello (acentos/mayúsculas/signos) para saber si un
+// sello de la colección ya está entre los seguidos (que usan el nombre canónico de MB).
+const labelNorm = (s) => String(s || '').normalize('NFD').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
 // Sellos de tu colección. Los sellos se van capturando de Discogs a medida que
 // consultas ediciones de tus álbumes (y de las etiquetas si las traen), así que
 // esta vista crece con el uso.
 export default function Labels() {
   const [rows, setRows] = useState(null);
-  const [open, setOpen] = useState(null);
+  const [params, setParams] = useSearchParams();
+  const [open, setOpen] = useState(params.get('label'));
   const [q, setQ] = useState('');
   const [err, setErr] = useState(null);
   useEffect(() => {
     api.labels().then(setRows).catch((e) => setErr(e.message));
   }, []);
 
+  const back = () => {
+    setOpen(null);
+    if (params.get('label')) setParams({}, { replace: true });
+  };
+
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!rows) return <Spinner />;
-  if (open) return <LabelDetail name={open} onBack={() => setOpen(null)} />;
+  if (open) return <LabelDetail name={open} onBack={back} />;
 
   const shown = rows.filter((l) => l.name.toLowerCase().includes(q.trim().toLowerCase()));
 
@@ -70,9 +81,29 @@ export default function Labels() {
 function LabelDetail({ name, onBack }) {
   const [albums, setAlbums] = useState(null);
   const [group, setGroup] = useState(null); // grupo de duplicados abierto (×N)
+  const [followed, setFollowed] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
   useEffect(() => {
     api.label(name).then(setAlbums);
+    // ¿ya lo sigo? cruce laxo por nombre contra los sellos seguidos (que usan el
+    // nombre canónico de MusicBrainz, que puede diferir del de la etiqueta).
+    api
+      .trackedLabels()
+      .then((ls) => setFollowed(ls.some((l) => labelNorm(l.name).includes(labelNorm(name)) || labelNorm(name).includes(labelNorm(l.name)))))
+      .catch(() => {});
   }, [name]);
+
+  const follow = async () => {
+    setFollowBusy(true);
+    try {
+      await api.followLabelByName(name);
+      setFollowed(true);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setFollowBusy(false);
+    }
+  };
 
   const openDup = async (id) => {
     try {
@@ -87,7 +118,20 @@ function LabelDetail({ name, onBack }) {
       <button onClick={onBack} className="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-gold-400 mb-4">
         <ArrowLeft size={15} /> Sellos
       </button>
-      <h1 className="text-xl font-display mb-4">{name}</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+        <h1 className="text-xl font-display">{name}</h1>
+        {followed ? (
+          <span className="text-sm text-gold-400/90 inline-flex items-center gap-1.5">
+            <Star size={14} className="fill-current" /> Siguiendo · sale en Lanzamientos
+          </span>
+        ) : (
+          <Button onClick={follow} disabled={followBusy}>
+            <span className="inline-flex items-center gap-1.5">
+              {followBusy ? <Loader2 size={14} className="animate-spin" /> : <Star size={14} />} Seguir sello
+            </span>
+          </Button>
+        )}
+      </div>
 
       <LabelCompletism name={name} />
 
@@ -218,7 +262,22 @@ function LabelCompletism({ name }) {
                   <div key={m.rg_mbid} className="py-2 flex items-center gap-2 text-sm">
                     <div className="min-w-0 flex-1">
                       <div className="truncate">
-                        <span className="text-neutral-300">{m.artist}</span>
+                        {m.artist_id ? (
+                          <Link to={`/artista/${m.artist_id}`} className="text-neutral-300 hover:text-gold-400">
+                            {m.artist}
+                          </Link>
+                        ) : m.artist_mbid ? (
+                          <a
+                            href={`https://musicbrainz.org/artist/${m.artist_mbid}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-neutral-300 hover:text-gold-400"
+                          >
+                            {m.artist}
+                          </a>
+                        ) : (
+                          <span className="text-neutral-300">{m.artist}</span>
+                        )}
                         <span className="text-neutral-500"> — {m.title}</span>
                         {m.year ? <span className="text-neutral-600"> · {m.year}</span> : null}
                       </div>

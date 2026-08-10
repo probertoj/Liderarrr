@@ -35,6 +35,15 @@ export async function followLabel({ mbid, name, disambiguation, country } = {}) 
   return { ok: true, label_mbid: mbid };
 }
 
+// Sigue un sello a partir de su NOMBRE (desde la página de Sellos, que trabaja con
+// nombres de etiqueta, no MBIDs): lo resuelve en MusicBrainz y lo sigue.
+export async function followLabelByName(name) {
+  const l = await mb.searchLabel(name);
+  if (!l) throw new Error('MusicBrainz no encuentra este sello');
+  await followLabel({ mbid: l.mbid, name: l.name, disambiguation: l.disambiguation, country: l.country });
+  return { ok: true, mbid: l.mbid, name: l.name };
+}
+
 export function unfollowLabel(mbid) {
   db.prepare('DELETE FROM tracked_labels WHERE label_mbid = ?').run(mbid);
   db.prepare('DELETE FROM label_release_groups WHERE label_mbid = ?').run(mbid);

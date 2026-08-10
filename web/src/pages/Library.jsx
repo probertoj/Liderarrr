@@ -8,7 +8,7 @@ export default function Library() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [group, setGroup] = useState(null); // grupo de duplicados abierto (al pinchar ×N)
-  const [f, setF] = useState({ q: '', genre: '', decade: '', format: '', lossless: '', state: '', sort: 'added' });
+  const [f, setF] = useState({ q: '', genre: '', decade: '', format: '', lossless: '', state: '', sort: 'added', dupesOnly: '' });
 
   const openDup = async (id) => {
     try {
@@ -47,14 +47,20 @@ export default function Library() {
           placeholder="Buscar álbum o artista…"
           className={`${sel} flex-1 min-w-[180px]`}
         />
-        <select value={f.genre} onChange={set('genre')} className={sel}>
-          <option value="">Género</option>
+        <input
+          list="genre-list"
+          value={f.genre}
+          onChange={set('genre')}
+          placeholder="Género"
+          className={`${sel} w-36`}
+        />
+        <datalist id="genre-list">
           {filters?.genres.map((g) => (
             <option key={g.name} value={g.name}>
-              {g.name} ({g.n})
+              {g.n}
             </option>
           ))}
-        </select>
+        </datalist>
         <select value={f.decade} onChange={set('decade')} className={sel}>
           <option value="">Década</option>
           {filters?.decades.map((d) => (
@@ -90,6 +96,14 @@ export default function Library() {
           <option value="size">Tamaño</option>
           <option value="random">Aleatorio</option>
         </select>
+        <button
+          type="button"
+          onClick={() => setF((p) => ({ ...p, dupesOnly: p.dupesOnly ? '' : '1' }))}
+          className={`${sel} ${f.dupesOnly ? 'border-gold-500/50 bg-gold-500/15 text-gold-300' : 'text-neutral-400'}`}
+          title="Mostrar solo álbumes con copias duplicadas"
+        >
+          Con duplicados
+        </button>
       </div>
 
       {err && <ErrorMsg>{err}</ErrorMsg>}

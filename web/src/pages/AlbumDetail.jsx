@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2 } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { Cover, StateBadge, Spinner, ErrorMsg, Button } from '../components.jsx';
 
 export default function AlbumDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [album, setAlbum] = useState(null);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -24,6 +25,22 @@ export default function AlbumDetail() {
     } catch (e) {
       setErr(e.message);
     } finally {
+      setBusy(false);
+    }
+  };
+
+  // Borrado de disco: acción de limpieza/mantenimiento. Irreversible (sin Papelera) y
+  // con guardarraíles en el backend (solo dentro de music_dirs, nunca torrents/). Doble
+  // confirmación dura antes de tocar nada.
+  const deleteFromDisk = async () => {
+    if (!window.confirm(`¿Borrar del disco «${album.album_artist} — ${album.title}»?\n\nSe eliminan los ficheros de su carpeta en la biblioteca. Esto NO se puede deshacer.`))
+      return;
+    setBusy(true);
+    try {
+      await api.deleteAlbum(id);
+      navigate('/discoteca');
+    } catch (e) {
+      alert(e.message);
       setBusy(false);
     }
   };
@@ -102,6 +119,21 @@ export default function AlbumDetail() {
             </div>
           )}
 
+          {album.labels?.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-3">
+              <Tag size={13} className="text-neutral-500" />
+              {album.labels.map((l) => (
+                <Link
+                  key={l}
+                  to={`/sellos?label=${encodeURIComponent(l)}`}
+                  className="text-xs px-2 py-0.5 rounded-full bg-ink-850 border border-ink-800 hover:border-gold-500/40 hover:text-gold-400"
+                >
+                  {l}
+                </Link>
+              ))}
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2 mt-5">
             {album.match_state !== 'orphan' ? (
               <Button variant="default" onClick={() => setState('orphan')} disabled={busy}>
@@ -117,6 +149,14 @@ export default function AlbumDetail() {
               </Button>
             )}
             {album.inLidarr && <span className="text-sm text-emerald-400 self-center">✓ en Lidarr</span>}
+            <button
+              onClick={deleteFromDisk}
+              disabled={busy}
+              title="Elimina los ficheros de este álbum de la biblioteca (irreversible)"
+              className="text-sm px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20 inline-flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Trash2 size={14} /> Borrar del disco
+            </button>
           </div>
           <p className="text-xs text-neutral-600 mt-2 break-all">{album.path}</p>
         </div>

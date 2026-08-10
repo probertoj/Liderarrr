@@ -162,17 +162,25 @@ export async function enrichAllDiscographies({ onlyTracked = false, maxAgeDays =
 
 // Completismo de un artista para su ficha: barra + lista de lo que falta y lo que
 // está por estrenar, con filtro de tipos.
-export function artistCompleteness(artistId, { includeTypes } = {}) {
+export function artistCompleteness(artistId) {
   const stats = db.prepare('SELECT * FROM artist_stats WHERE artist_id = ?').get(artistId);
   const rgs = db
     .prepare('SELECT * FROM release_groups WHERE artist_id = ? ORDER BY first_release, title')
     .all(artistId)
     .map((r) => ({ ...r, secondary_types: r.secondary_types ? JSON.parse(r.secondary_types) : [] }));
 
-  const studioMissing = rgs.filter(
-    (r) => isStudioAlbum(r.primary_type, r.secondary_types) && !r.is_owned && !r.is_upcoming
-  );
-  const upcoming = rgs.filter((r) => r.is_upcoming);
+  // "Por estrenar" se decide por FECHA en vivo, no por el flag is_upcoming guardado:
+  // ese flag se fijaba al enriquecer la discografía y quedaba obsoleto cuando pasaba
+  // la fecha, así que discos ya salidos seguían apareciendo como "Por estrenar".
+  const today = new Date().toISOString().slice(0, 10);
+  const isUpcoming = (r) => r.first_release && r.first_release > today;
+  const noSecondary = (r) => !r.secondary_types || r.secondary_types.length === 0;
+  const missingOf = (type) => rgs.filter((r) => r.primary_type === type && noSecondary(r) && !r.is_owned && !isUpcoming(r));
+
+  const missing = rgs.filter((r) => isStudioAlbum(r.primary_type, r.secondary_types) && !r.is_owned && !isUpcoming(r));
+  const missingEps = missingOf('EP');
+  const missingSingles = missingOf('Single');
+  const upcoming = rgs.filter(isUpcoming);
   const pct = stats && stats.studio_total ? Math.round((stats.studio_owned / stats.studio_total) * 100) : null;
-  return { stats, pct, missing: studioMissing, upcoming, all: rgs };
+  return { stats, pct, missing, missingEps, missingSingles, upcoming, all: rgs };
 }

@@ -3,6 +3,7 @@ import { releaseEditions, discogsConfigured } from './discogs.js';
 import { isJunkLabel } from './libkey.js';
 import { searchLabel, labelReleaseGroups } from './musicbrainz.js';
 import { normalizeForDup, libScore } from './queries.js';
+import { normName } from './matchkey.js';
 
 // Ediciones y upgrades: el equivalente (mejor) de JustWatch. Para un álbum tuyo,
 // Discogs lista todas sus ediciones —remaster, deluxe, vinilo con bonus— así
@@ -179,6 +180,14 @@ export async function labelCompletism(labelName) {
     else missing.push(rg);
   }
   missing.sort((a, b) => (a.year || 0) - (b.year || 0) || String(a.artist || '').localeCompare(String(b.artist || '')));
+  // resuelve el artista LOCAL de cada hueco (para enlazar a su ficha en la UI): por
+  // MBID y, si no, por nombre normalizado. Si no lo tienes en local, queda null y la
+  // UI enlaza a MusicBrainz por artist_mbid.
+  const byMbid = new Map(db.prepare('SELECT id, mbid FROM artists WHERE mbid IS NOT NULL').all().map((a) => [a.mbid, a.id]));
+  const byName = new Map(db.prepare('SELECT id, name FROM artists').all().map((a) => [normName(a.name), a.id]));
+  for (const m of missing) {
+    m.artist_id = (m.artist_mbid && byMbid.get(m.artist_mbid)) || byName.get(normName(m.artist)) || null;
+  }
   const total = cat.releaseGroups.length;
   return {
     found: true,

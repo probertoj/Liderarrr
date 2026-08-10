@@ -9,6 +9,33 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Seguir un sello desde su página.** En la ficha de un sello (Sellos) hay un botón «Seguir
+  sello»: lo resuelve en MusicBrainz y lo añade a los seguidos, para que sus lanzamientos salgan
+  en el calendario.
+- **Sello en la ficha del álbum.** La ficha de un álbum muestra ahora su(s) sello(s), con enlace
+  a la página de ese sello.
+- **Discografía del artista por tipo.** La colección del artista se agrupa por tipo (Álbumes,
+  EPs, Singles, Otros). Además, por artista puedes elegir el **ámbito de completismo**: solo
+  álbumes (por defecto) o «álbumes + EPs + singles» — una decisión consciente y persistente, para
+  seguir «todo» de unos artistas y solo los discos de otros.
+- **Discoteca: filtro «con duplicados»** para ver de un vistazo los álbumes con copias, como
+  herramienta de limpieza.
+- **Borrar del disco desde la ficha del álbum.** Acción de mantenimiento (no solo para
+  duplicados), con los mismos guardarraíles: solo dentro de la biblioteca, nunca `torrents/`,
+  irreversible y con confirmación.
+
+### Corregido
+- **«Por estrenar» obsoleto.** Los discos con fecha ya pasada dejaban de figurar como «por
+  estrenar»: el estado se calcula ahora por fecha en vivo, no por un flag guardado que quedaba
+  rancio. (Afecta a la ficha de artista y al calendario.)
+
+### Cambiado
+- **Selector de género de la Discoteca** convertido en un campo con autocompletado (antes era un
+  desplegable enorme).
+- En el completismo de un sello, el **artista de cada hueco es ahora un enlace** (a su ficha si lo
+  tienes, o a MusicBrainz si no).
+
 ---
 
 ## [0.6.0] — 2026-08-10

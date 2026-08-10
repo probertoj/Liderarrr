@@ -357,6 +357,10 @@ ensureColumn('albums', 'disc_group', 'disc_group TEXT');
 db.exec('CREATE INDEX IF NOT EXISTS idx_albums_discgroup ON albums(disc_group)');
 // fecha de alta en Lidarr, para «últimas peticiones» del dashboard
 ensureColumn('lidarr_albums', 'added', 'added TEXT');
+// ámbito de completismo por artista (0.6.1): 'albums' (por defecto, solo álbumes de
+// estudio) o 'all' (además EPs y singles). Decisión consciente por artista: de unos
+// quieres "todo", de otros solo los discos.
+ensureColumn('artists', 'completism_scope', "completism_scope TEXT DEFAULT 'albums'");
 
 // Evita reimportar el mismo scrobble: sin esto, cada importación reinsertaba
 // desde cero. Los scrobbles "sonando ahora" (sin ts) se descartan al importar.

@@ -36,6 +36,7 @@ import {
 import { gaps, upcoming, recentlyReleased, dismissGap, undismissGap, dismissedList } from './discover.js';
 import {
   followLabel,
+  followLabelByName,
   unfollowLabel,
   refreshLabel,
   trackedLabelsList,
@@ -243,11 +244,19 @@ app.get('/api/artists/:id', async (req, reply) => {
   if (!a) return reply.code(404).send({ error: 'No encontrado' });
   a.tracked = isTracked(id);
   const comp = artistCompleteness(id);
-  a.completeness = { pct: comp.pct, stats: comp.stats, missing: comp.missing, upcoming: comp.upcoming };
+  a.completeness = {
+    pct: comp.pct,
+    stats: comp.stats,
+    missing: comp.missing,
+    missingEps: comp.missingEps,
+    missingSingles: comp.missingSingles,
+    upcoming: comp.upcoming,
+  };
   const owned = lidarrOwnedIds();
-  for (const m of a.completeness.missing) m.in_lidarr = owned.has(m.rg_mbid);
+  for (const m of [...comp.missing, ...comp.missingEps, ...comp.missingSingles]) m.in_lidarr = owned.has(m.rg_mbid);
   return a;
 });
+app.post('/api/artists/:id/scope', async (req) => q.setArtistScope(Number(req.params.id), req.body?.scope));
 // recalcular la discografía de un artista bajo demanda
 app.post('/api/artists/:id/refresh-discography', async (req, reply) => {
   try {
@@ -377,6 +386,15 @@ app.get('/api/labels/:name', async (req) => labelAlbums(req.params.name));
 app.get('/api/labels/:name/completism', async (req, reply) => {
   try {
     return await labelCompletism(req.params.name);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// seguir un sello (de la colección) por su nombre → lo resuelve a MBID y lo sigue,
+// para que sus lanzamientos salgan en el calendario (0.6 fase 2, desde la pág. de sellos)
+app.post('/api/labels/:name/follow', async (req, reply) => {
+  try {
+    return await followLabelByName(req.params.name);
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }
