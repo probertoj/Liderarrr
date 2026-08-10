@@ -6,6 +6,65 @@ import { PageTitle, Cover, Spinner, ErrorMsg, Button } from '../components.jsx';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Renombra un disco mal nombrado y reintenta identificarlo en el acto. Mismo patrón
+// que ArtistInline: a veces el problema no es el artista sino un título imposible.
+function TitleInline({ album, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(album.title || '');
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    const t = val.trim();
+    if (!t || t === album.title) {
+      setEditing(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.setAlbumTitle(album.id, t);
+      await api.identifyAlbum(album.id);
+      await onSaved();
+    } catch (e) {
+      alert(e.message);
+      setBusy(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <span className="flex items-center gap-1 min-w-0">
+        <Link to={`/album/${album.id}`} className="truncate hover:text-gold-400">
+          {album.title}
+        </Link>
+        <button onClick={() => setEditing(true)} title="Renombrar el disco" className="text-neutral-600 hover:text-gold-400 shrink-0">
+          <Pencil size={11} />
+        </button>
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1">
+      <input
+        value={val}
+        autoFocus
+        disabled={busy}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') save();
+          if (e.key === 'Escape') setEditing(false);
+        }}
+        className="bg-ink-850 border border-ink-800 rounded px-1.5 py-0.5 text-sm flex-1 min-w-0 outline-none focus:border-gold-500/60"
+      />
+      <button onClick={save} disabled={busy} title="Guardar y reidentificar" className="text-gold-300 hover:text-gold-200 disabled:opacity-50 shrink-0">
+        {busy ? <Loader2 size={13} className="animate-spin" /> : <Check size={14} />}
+      </button>
+      <button onClick={() => setEditing(false)} className="text-neutral-500 hover:text-neutral-300 shrink-0" title="Cancelar">
+        <X size={13} />
+      </button>
+    </span>
+  );
+}
+
 // Corrige el artista de un álbum sin identificar y reintenta identificarlo en el acto.
 // Lo típico para lo que llega sin etiquetar: pones el artista bueno y, si con eso casa,
 // el álbum abandona la lista solo.
@@ -163,9 +222,7 @@ export default function Unidentified() {
                   <Cover id={a.id} size="sm" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <Link to={`/album/${a.id}`} className="truncate hover:text-gold-400 block">
-                    {a.title}
-                  </Link>
+                  <TitleInline album={a} onSaved={load} />
                   <div className="text-xs text-neutral-500 flex items-center gap-1 min-w-0">
                     <ArtistInline album={a} onSaved={load} />
                     <span className="shrink-0">· {a.track_file_count} pistas</span>

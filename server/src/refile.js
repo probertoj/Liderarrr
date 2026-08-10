@@ -53,6 +53,12 @@ export function refileAlbum(albumId, { confirm } = {}) {
     throw new Error(`No se pudo mover la carpeta: ${e.message}`);
   }
 
+  return applyMove(albumId, a, cur, destDir, roots);
+}
+
+// aplica el movimiento en BD (extraído para reutilizar): path, local_key (la ruta
+// relativa cambia), rutas de pistas y carátula.
+function applyMove(albumId, a, cur, destDir, roots) {
   const newKey = albumKey(destDir, roots);
   const tx = db.transaction(() => {
     db.prepare('UPDATE albums SET path = ?, local_key = ? WHERE id = ?').run(destDir, newKey, albumId);
@@ -67,4 +73,70 @@ export function refileAlbum(albumId, { confirm } = {}) {
   });
   tx();
   return { ok: true, moved: true, from: cur, to: destDir };
+}
+
+// Álbumes corregidos a mano (artista o título) para la pestaña «Correcciones»: con su
+// carpeta actual y el destino que tendrían en la estructura configurada, y si hace
+// falta moverlos o hay algo que lo impide (fuera de la biblioteca, caja multidisco…).
+export function correctedAlbums() {
+  const roots = splitRoots(getSetting('music_dirs')).map(norm).filter(Boolean);
+  const naming = getSetting('import_naming');
+  const rows = db
+    .prepare(
+      `SELECT id, album_artist, title, year, path, artist_manual, title_manual, disc_group
+       FROM albums WHERE (artist_manual = 1 OR title_manual = 1) AND match_state != 'dismissed'
+       ORDER BY album_artist COLLATE NOCASE, title COLLATE NOCASE`
+    )
+    .all();
+  return rows.map((a) => {
+    const cur = norm(a.path);
+    let target = null;
+    let needsMove = false;
+    let blocked = null;
+    if (!a.path) blocked = 'sin carpeta conocida';
+    else if (a.disc_group) blocked = 'caja multidisco';
+    else if (!roots.length) blocked = 'sin biblioteca configurada';
+    else {
+      const root = roots.find((r) => cur === r || cur.startsWith(r + '/'));
+      if (!root) blocked = 'fuera de la biblioteca';
+      else {
+        const rel = renderPath(naming, {
+          artist: a.album_artist || 'Artista desconocido',
+          album: a.title || path.basename(cur),
+          year: a.year || null,
+        }).replace(/\\/g, '/');
+        target = norm(`${root}/${rel}`);
+        needsMove = target !== cur;
+      }
+    }
+    return {
+      id: a.id,
+      album_artist: a.album_artist,
+      title: a.title,
+      year: a.year,
+      path: cur,
+      target,
+      needsMove,
+      blocked,
+      artist_manual: !!a.artist_manual,
+      title_manual: !!a.title_manual,
+    };
+  });
+}
+
+// Mueve TODOS los corregidos que lo necesiten (y puedan). Un fallo en uno no tumba
+// a los demás.
+export function refileAll() {
+  const list = correctedAlbums().filter((a) => a.needsMove && !a.blocked);
+  let moved = 0;
+  const errors = [];
+  for (const a of list) {
+    try {
+      refileAlbum(a.id, { confirm: true });
+      moved++;
+    } catch (e) {
+      errors.push({ id: a.id, title: a.title, error: String(e.message || e) });
+    }
+  }
+  return { candidates: list.length, moved, errors };
 }

@@ -150,6 +150,9 @@ export const api = {
   setArtistScope: (id, scope) => req(`/artists/${id}/scope`, { method: 'POST', body: { scope } }),
   artistNames: () => req('/artists/names'),
   setAlbumArtist: (id, name) => req(`/albums/${id}/artist`, { method: 'PUT', body: { name } }),
+  setAlbumTitle: (id, title) => req(`/albums/${id}/title`, { method: 'PUT', body: { title } }),
+  corrections: () => req('/corrections'),
+  refileAllCorrections: () => req('/corrections/refile-all', { method: 'POST' }),
   tagPreview: (id) => req(`/albums/${id}/tag-preview`),
   writeTags: (id) => req(`/albums/${id}/write-tags`, { method: 'POST' }),
 };

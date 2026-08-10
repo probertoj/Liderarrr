@@ -3,7 +3,7 @@ import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle,
   Sparkles, Settings as SettingsIcon, Menu, X, RefreshCw, Star, Compass, CalendarClock,
-  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud, ExternalLink,
+  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud, ExternalLink, Wrench,
 } from 'lucide-react';
 import { api } from './api.js';
 import { Spinner, ErrorBoundary } from './components.jsx';
@@ -26,6 +26,7 @@ const Upgrades = lazy(() => import('./pages/Upgrades.jsx'));
 const Labels = lazy(() => import('./pages/Labels.jsx'));
 const Diagnostics = lazy(() => import('./pages/Diagnostics.jsx'));
 const Imports = lazy(() => import('./pages/Imports.jsx'));
+const Corrections = lazy(() => import('./pages/Corrections.jsx'));
 const Trash = lazy(() => import('./pages/Trash.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
@@ -62,6 +63,7 @@ const NAV = [
     label: 'Identificación',
     items: [
       { to: '/sin-identificar', label: 'Sin identificar', Icon: HelpCircle },
+      { to: '/correcciones', label: 'Correcciones', Icon: Wrench },
       { to: '/rarezas', label: 'Rarezas e inéditos', Icon: Sparkles },
       { to: '/papelera', label: 'Papelera', Icon: Trash2 },
     ],
@@ -289,6 +291,7 @@ export default function App() {
             <Route path="/huecos" element={<Discover />} />
             <Route path="/proximos" element={<Calendar />} />
             <Route path="/importar" element={<Imports />} />
+            <Route path="/correcciones" element={<Corrections />} />
             <Route path="/escuchas" element={<Listening />} />
             <Route path="/retos" element={<Challenges />} />
             <Route path="/upgrades" element={<Upgrades />} />

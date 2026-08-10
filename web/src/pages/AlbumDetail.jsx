@@ -13,11 +13,14 @@ export default function AlbumDetail() {
   const [names, setNames] = useState([]);
   const [editArtist, setEditArtist] = useState(false);
   const [artistVal, setArtistVal] = useState('');
+  const [editTitle, setEditTitle] = useState(false);
+  const [titleVal, setTitleVal] = useState('');
 
   const load = () => api.album(id).then(setAlbum).catch((e) => setErr(e.message));
   useEffect(() => {
     setAlbum(null);
     setEditArtist(false);
+    setEditTitle(false);
     load();
   }, [id]);
   useEffect(() => {
@@ -68,6 +71,25 @@ export default function AlbumDetail() {
       navigate('/discoteca');
     } catch (e) {
       alert(e.message);
+      setBusy(false);
+    }
+  };
+
+  // Renombrar el disco (para discos mal nombrados que no casan). Metadato interno.
+  const saveTitle = async () => {
+    const t = titleVal.trim();
+    if (!t || t === album.title) {
+      setEditTitle(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.setAlbumTitle(id, t);
+      setEditTitle(false);
+      await load();
+    } catch (e) {
+      alert(e.message);
+    } finally {
       setBusy(false);
     }
   };
@@ -130,7 +152,41 @@ export default function AlbumDetail() {
               </a>
             )}
           </div>
-          <h1 className="text-2xl font-display">{album.title}</h1>
+          {editTitle ? (
+            <div className="flex items-center gap-1.5 my-1">
+              <input
+                value={titleVal}
+                autoFocus
+                disabled={busy}
+                onChange={(e) => setTitleVal(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveTitle();
+                  if (e.key === 'Escape') setEditTitle(false);
+                }}
+                className="text-xl font-display bg-ink-850 border border-ink-800 rounded px-2 py-0.5 outline-none focus:border-gold-500/60 w-full max-w-md"
+              />
+              <button onClick={saveTitle} disabled={busy} className="text-gold-300 hover:text-gold-200 disabled:opacity-50" title="Guardar">
+                {busy ? <Loader2 size={16} className="animate-spin" /> : <Check size={18} />}
+              </button>
+              <button onClick={() => setEditTitle(false)} className="text-neutral-500 hover:text-neutral-300" title="Cancelar">
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <h1 className="text-2xl font-display inline-flex items-center gap-2 group">
+              {album.title}
+              <button
+                onClick={() => {
+                  setTitleVal(album.title || '');
+                  setEditTitle(true);
+                }}
+                title="Renombrar el disco"
+                className="text-neutral-600 hover:text-gold-400"
+              >
+                <Pencil size={15} />
+              </button>
+            </h1>
+          )}
           <datalist id="artist-names">
             {names.map((n) => (
               <option key={n} value={n} />

@@ -9,6 +9,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Renombrar el disco desde la interfaz.** Como el artista, ahora el título del álbum es editable
+  (ficha del álbum y «Sin identificar»), para discos mal nombrados que no casan con MusicBrainz;
+  al guardarlo en «Sin identificar» se reintenta identificar en el acto. Metadato interno (no toca
+  ficheros), protegido de reescaneos.
+- **Pestaña «Correcciones».** Reúne todos los álbumes cuyo artista o título has corregido a mano,
+  con su carpeta actual y el destino que tendrían en `{artist}/{album} ({year})`. Desde ahí los
+  «ordenas en su carpeta» todos a la vez («Mover todos») o uno a uno, como en «Importar». Los que
+  no se pueden reubicar (fuera de la biblioteca, caja multidisco) se marcan con el motivo.
+
 ---
 
 ## [0.6.2] — 2026-08-10

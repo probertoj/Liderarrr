@@ -14,7 +14,7 @@ import { prowlarrTest, prowlarrSearch, prowlarrGrab } from './prowlarr.js';
 import { jackettTest, jackettSearch } from './jackett.js';
 import { qbTest, qbAdd } from './qbittorrent.js';
 import { deleteAlbumFromDisk } from './albumdelete.js';
-import { refileAlbum } from './refile.js';
+import { refileAlbum, correctedAlbums, refileAll } from './refile.js';
 import { pendingImports, importFolder } from './importer.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground } from './musicbrainz.js';
 import { acoustidTest } from './acoustid.js';
@@ -262,6 +262,22 @@ app.get('/api/artists/names', async () => q.artistNames());
 app.put('/api/albums/:id/artist', async (req, reply) => {
   try {
     return q.setAlbumArtist(Number(req.params.id), req.body?.name);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.put('/api/albums/:id/title', async (req, reply) => {
+  try {
+    return q.setAlbumTitle(Number(req.params.id), req.body?.title);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// pestaña «Correcciones»: álbumes corregidos a mano + mover todos a su carpeta
+app.get('/api/corrections', async () => correctedAlbums());
+app.post('/api/corrections/refile-all', async (req, reply) => {
+  try {
+    return refileAll();
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

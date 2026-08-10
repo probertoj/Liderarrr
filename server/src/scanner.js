@@ -229,9 +229,11 @@ async function ingestFolder({ dir, files }) {
   tracks.sort((a, b) => (a.disc - b.disc) || ((a.num || 0) - (b.num || 0)));
 
   const localKey = albumKey(dir, keyRoots);
-  const albumTitle = albumMeta.album || path.basename(dir);
-  // si el usuario corrigió el artista a mano, se respeta (no se pisa con la etiqueta).
-  const manual = db.prepare('SELECT artist_manual, album_artist, artist_id FROM albums WHERE local_key = ?').get(localKey);
+  // si el usuario corrigió artista/título a mano, se respetan (no se pisan con la etiqueta).
+  const manual = db
+    .prepare('SELECT artist_manual, album_artist, artist_id, title_manual, title FROM albums WHERE local_key = ?')
+    .get(localKey);
+  const albumTitle = manual?.title_manual ? manual.title : albumMeta.album || path.basename(dir);
   let albumArtistName;
   let artistId;
   if (manual?.artist_manual) {

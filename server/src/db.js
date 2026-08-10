@@ -364,6 +364,9 @@ ensureColumn('artists', 'completism_scope', "completism_scope TEXT DEFAULT 'albu
 // artista corregido a mano desde la UI (0.6.2): protege album_artist/artist_id de que
 // un reescaneo posterior los machaque con lo que digan las etiquetas del fichero.
 ensureColumn('albums', 'artist_manual', 'artist_manual INTEGER DEFAULT 0');
+// título corregido a mano desde la UI (0.6.3): igual que artist_manual, protege el
+// título de que un reescaneo lo pise con la etiqueta del fichero.
+ensureColumn('albums', 'title_manual', 'title_manual INTEGER DEFAULT 0');
 
 // Evita reimportar el mismo scrobble: sin esto, cada importación reinsertaba
 // desde cero. Los scrobbles "sonando ahora" (sin ts) se descartan al importar.
