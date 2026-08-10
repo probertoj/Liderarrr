@@ -529,8 +529,19 @@ export default function Calendar() {
     { label: 'Últimos 7 días', value: daysAgo(7) },
   ];
 
+  // En el Radar, los pre-pedidos / futuros van a su propia sección arriba (no
+  // mezclados con lo ya estrenado dentro de la ventana), ordenados por fecha de
+  // estreno ascendente (lo que sale antes, primero).
+  const radarUpcoming =
+    view === 'radar'
+      ? (rows || [])
+          .filter((r) => r.is_upcoming)
+          .sort((a, b) => (a.release_date || '').localeCompare(b.release_date || ''))
+      : [];
+
   const months = {};
   for (const r of rows || []) {
+    if (view === 'radar' && r.is_upcoming) continue; // van en radarUpcoming
     const key = (r.first_release || r.release_date || '????').slice(0, 7);
     (months[key] ||= []).push(r);
   }
@@ -659,6 +670,22 @@ export default function Calendar() {
         </div>
       ) : (
         <div className="space-y-6">
+          {view === 'radar' && radarUpcoming.length > 0 && (
+            <div>
+              <h2 className="text-sm text-gold-400/80 mb-2">Próximos / pre-pedidos</h2>
+              <div className="space-y-1.5">
+                {radarUpcoming.map((r) => (
+                  <RadarRow
+                    key={r.id}
+                    r={r}
+                    onSearch={setSearch}
+                    onFollowMbid={api.followMbid}
+                    onQueue={() => pollLidarrQueue(setQueue)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
           {monthKeys.map((month) => (
             <div key={month}>
               <h2 className="text-sm text-gold-400/80 mb-2 capitalize">{fmtMonth(month)}</h2>

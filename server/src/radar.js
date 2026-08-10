@@ -169,6 +169,7 @@ function libraryIndex() {
 // unownedOnly oculta lo que ya tienes.
 export function radarFeed({ since = null, unownedOnly = false } = {}) {
   const cutoff = since || `${new Date().getFullYear()}-01-01`;
+  const today = new Date().toISOString().slice(0, 10);
   const idx = libraryIndex();
   const rows = db
     .prepare(
@@ -200,6 +201,7 @@ export function radarFeed({ since = null, unownedOnly = false } = {}) {
       artist_mbid: r.artist_mbid,
       resolved: !!r.resolved_at,
       is_owned,
+      is_upcoming: r.release_date > today,
       tracked_artist: idx.trackedArtists.has(pa),
       tracked_label: r.label ? idx.trackedLabels.has(norm(r.label)) : false,
     });
