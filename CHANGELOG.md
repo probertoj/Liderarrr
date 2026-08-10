@@ -9,6 +9,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+---
+
+## [0.6.2] — 2026-08-10
+
+Objetivo: corregir metadatos y ordenar la biblioteca desde la interfaz (limpieza y mantenimiento).
+
 ### Añadido
 - **Corregir el artista de un álbum desde la interfaz.** En «Sin identificar» cada fila trae el
   artista editable en línea (con sugerencias de tu biblioteca): lo corriges y **se reintenta
