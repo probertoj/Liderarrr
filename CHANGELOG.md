@@ -26,6 +26,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   irreversible y con confirmación.
 
 ### Corregido
+- **«Reintentar identificación» sin feedback.** En «Sin identificar» el botón disparaba el proceso
+  (que corre en segundo plano) y recargaba la lista al instante, cuando aún no había cambiado nada:
+  parecía que no hacía nada. Ahora muestra progreso en vivo (X/Y) y un resumen al terminar
+  («N identificados · M siguen sin coincidencia»), y refresca la lista al final.
 - **«Por estrenar» obsoleto.** Los discos con fecha ya pasada dejaban de figurar como «por
   estrenar»: el estado se calcula ahora por fecha en vivo, no por un flag guardado que quedaba
   rancio. (Afecta a la ficha de artista y al calendario.)

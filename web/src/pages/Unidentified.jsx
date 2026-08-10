@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Sparkles, Check, ExternalLink } from 'lucide-react';
+import { HelpCircle, Sparkles, Check, ExternalLink, Loader2 } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Cover, Spinner, ErrorMsg, Button } from '../components.jsx';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Cola de resolución: lo que la cadena no pudo casar. Cada fila se puede
 // resolver a mano (candidatos de MusicBrainz/Discogs) o marcar como rareza para
@@ -11,6 +13,7 @@ export default function Unidentified() {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
   const [openId, setOpenId] = useState(null);
+  const [status, setStatus] = useState(null); // progreso/resumen de reidentificación
 
   const load = () => api.unidentified().then(setRows).catch((e) => setErr(e.message));
   useEffect(() => {
@@ -20,6 +23,28 @@ export default function Unidentified() {
   const act = async (fn) => {
     await fn();
     await load();
+  };
+
+  // Reidentificar corre en 2º plano: se dispara y se SONDEA el estado hasta que
+  // termina, mostrando progreso en vivo y un resumen al final (antes no daba feedback:
+  // recargaba la lista al instante, cuando aún no había cambiado nada).
+  const reidentify = async () => {
+    setErr(null);
+    setStatus({ running: true, done: 0, total: 0, matched: 0, unmatched: 0 });
+    try {
+      await api.identify(true);
+      let s;
+      do {
+        await sleep(1200);
+        s = await api.identifyStatus();
+        setStatus(s);
+      } while (s.running);
+      if (s.error) setErr(s.error);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+      setStatus(null);
+    }
   };
 
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
@@ -32,10 +57,30 @@ export default function Unidentified() {
         title="Sin identificar"
         sub={rows.length ? `${rows.length} álbumes sin coincidencia en ninguna base` : ''}
       >
-        <Button variant="gold" onClick={() => act(() => api.identify(true))}>
-          Reintentar identificación
+        <Button variant="gold" onClick={reidentify} disabled={status?.running}>
+          <span className="inline-flex items-center gap-1.5">
+            {status?.running && <Loader2 size={14} className="animate-spin" />}
+            {status?.running ? 'Reidentificando…' : 'Reintentar identificación'}
+          </span>
         </Button>
       </PageTitle>
+
+      {status && (
+        <div className="card px-3 py-2 mb-4 text-sm">
+          {status.running ? (
+            <p className="text-gold-300/90">
+              Reidentificando… {status.done}/{status.total}
+              {status.current ? ` · ${status.current}` : ''}
+            </p>
+          ) : (
+            <p className="text-neutral-400">
+              Reidentificación terminada: <span className="text-emerald-400">{status.matched} identificados</span>
+              {' · '}
+              {status.unmatched} siguen sin coincidencia.
+            </p>
+          )}
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <div className="card p-8 text-center text-neutral-400">
