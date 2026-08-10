@@ -31,6 +31,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   rancio. (Afecta a la ficha de artista y al calendario.)
 
 ### Cambiado
+- **Favicon** rediseñado fiel al logo punk (monograma «LA» con las cajas recortadas crema/oro y la
+  estrella roja, en vez del «L!» genérico anterior).
 - **Selector de género de la Discoteca** convertido en un campo con autocompletado (antes era un
   desplegable enorme).
 - En el completismo de un sello, el **artista de cada hueco es ahora un enlace** (a su ficha si lo

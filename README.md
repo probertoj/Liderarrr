@@ -113,6 +113,8 @@ música y Lidarr.
 Gracias en especial:
 
 - A **ForeverRamone**, por PowaFlex y por la idea de la que sale todo esto.
+- A **[calltheranger](https://www.buymusic.club/user/calltheranger)**, por su selección semanal de
+  novedades en Bandcamp, que alimenta el radar de la app.
 - A **los hipersónicos**.
 - A **Sanpitopato**. Seguimosseguimos. 
 

@@ -165,10 +165,10 @@ export default function ArtistDetail() {
       {/* lo que falta */}
       {comp.missing?.length > 0 && <MissingList items={comp.missing} artistMbid={artist.mbid} artistName={artist.name} />}
       {scope === 'all' && comp.missingEps?.length > 0 && (
-        <MissingList items={comp.missingEps} artistMbid={artist.mbid} artistName={artist.name} noun="EPs" />
+        <MissingList items={comp.missingEps} artistMbid={artist.mbid} artistName={artist.name} noun="EPs" singular="EP" />
       )}
       {scope === 'all' && comp.missingSingles?.length > 0 && (
-        <MissingList items={comp.missingSingles} artistMbid={artist.mbid} artistName={artist.name} noun="singles" />
+        <MissingList items={comp.missingSingles} artistMbid={artist.mbid} artistName={artist.name} noun="singles" singular="single" />
       )}
 
       {/* por estrenar */}
@@ -331,7 +331,7 @@ function RelChip({ a }) {
   );
 }
 
-function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudio' }) {
+function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudio', singular = 'álbum de estudio' }) {
   const [added, setAdded] = useState({});
   const [busy, setBusy] = useState(null);
   const [queue, setQueue] = useState(null);
@@ -371,7 +371,9 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-sm text-neutral-400">Te faltan {items.length} {noun}</h2>
+        <h2 className="text-sm text-neutral-400">
+          {items.length === 1 ? `Te falta 1 ${singular}` : `Te faltan ${items.length} ${noun}`}
+        </h2>
         <Button variant="gold" onClick={addAll} disabled={busy === 'all'}>
           <span className="inline-flex items-center gap-1.5">
             {busy === 'all' && <Loader2 size={14} className="animate-spin" />}

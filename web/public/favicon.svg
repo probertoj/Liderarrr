@@ -1,7 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="9" fill="#131318"/>
-  <g font-family="Impact,'Haettenschweiler','Arial Narrow',sans-serif" text-anchor="middle">
-    <text x="21" y="49" font-size="48" fill="#d4a24a">L</text>
-    <text x="47" y="49" font-size="48" fill="#e0342a">!</text>
+  <rect width="64" height="64" rx="12" fill="#131318"/>
+  <!-- estrella punk detrás (como el estallido rojo del logo) -->
+  <polygon points="45,7 48,16 57,13 51,21 60,25 50,27 53,36 46,30 41,38 40,28 31,30 37,22 31,17 41,17"
+           fill="#E0342A"/>
+  <!-- caja "LIDER": crema con letra negra recortada, ligeramente girada -->
+  <g transform="rotate(-6 24 34)" font-family="Impact,'Haettenschweiler','Arial Narrow',sans-serif" text-anchor="middle">
+    <rect x="9" y="19" width="30" height="30" rx="2" fill="#EDE9E0"/>
+    <text x="24" y="44" font-size="30" fill="#14110E">L</text>
+  </g>
+  <!-- caja "ARRR": oro con letra oscura, girada al otro lado y solapando -->
+  <g transform="rotate(6 42 37)" font-family="Impact,'Haettenschweiler','Arial Narrow',sans-serif" text-anchor="middle">
+    <rect x="26" y="21" width="32" height="32" rx="2" fill="#D4A24A"/>
+    <text x="42" y="49" font-size="34" fill="#14110E">A</text>
   </g>
 </svg>
