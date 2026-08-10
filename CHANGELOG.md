@@ -7,9 +7,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
-## [Sin publicar] — 0.6 (en progreso)
+## [Sin publicar]
 
-Objetivo: mejorar el calendario de lanzamientos.
+---
+
+## [0.6.0] — 2026-08-10
+
+Objetivo: mejorar el calendario de lanzamientos (seguimiento y descubrimiento).
 
 ### Añadido
 - **Calendario de lanzamientos, fase 1.** La página pasa a «Lanzamientos» con dos pestañas:
@@ -17,6 +21,27 @@ Objetivo: mejorar el calendario de lanzamientos.
   este año hasta hoy). En cada fila puedes **seguir al artista** sin entrar en su ficha,
   **buscar/descargar** la release (motor Prowlarr/Jackett) además de enviarla a Lidarr, y se
   muestra la **carátula** (Cover Art Archive). Marca lo que ya tienes y a quién ya sigues.
+- **Seguir sellos, fase 2.** Nueva pestaña **«De tus sellos»**: sigues un sello por su MBID de
+  MusicBrainz (buscándolo por nombre) y el radar resalta sus estrenos —recientes y futuros—
+  **aunque no sigas al artista**. Además, en las pestañas Próximos y Estrenados recientemente
+  aparece una **insignia de sello** en las filas que edite un sello que sigues. El catálogo de
+  cada sello se refresca en «Actualizar todo».
+- **Radar de novedades curadas (Bandcamp), fase 3.** Nueva pestaña **«Radar»**: sigues a
+  curadores de [buymusic.club](https://www.buymusic.club) (que publican semanalmente lo mejor de
+  Bandcamp) y sus selecciones alimentan un radar afín a tu gusto. Cada ítem cruza con tu
+  biblioteca (marca *ya lo tienes*, *sigues al artista*, *sello seguido*) y ofrece abrir en
+  Bandcamp, buscar/descargar, o enviarlo a Lidarr **resolviendo su MBID contra MusicBrainz al
+  vuelo** (los ítems de Bandcamp no traen MBID). Filtro «ocultar lo que ya tengo» y sección
+  aparte para **pre-pedidos / futuros**. Se refresca en «Actualizar todo».
+
+### Corregido
+- **Detección de «lo que ya tengo» en retos y radar.** El cruce artista+título era una
+  comparación exacta de cadenas y fallaba de forma sistemática: los retos guardaban el año como
+  sufijo del título (p. ej. «Marquee Moon - 1977», porque el parser solo entendía «(1977)») y no
+  casaba nunca (un reto de 500 salía 0/500); y cualquier morralla del título en disco (carpetas
+  tipo «On the Beach (1974) [FLAC 16bit]», ediciones «(Deluxe)»/«(2009 Remaster)») rompía la
+  coincidencia. Ahora hay un normalizador de cruce compartido que quita solo morralla inequívoca
+  (año, formato, edición) antes de comparar. Los retos ya guardados se corrigen solos al reabrirlos.
 
 ---
 
