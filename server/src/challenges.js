@@ -1,11 +1,10 @@
 import { db } from './db.js';
+import { matchKey } from './matchkey.js';
 
 // Retos: listas de álbumes "que hay que tener/oír" (1001 Albums, Rolling Stone
 // 500, o cualquier lista que pegues). Se cruzan con tu biblioteca (lo que tienes)
 // y con tus escuchas de Last.fm (lo que has oído), con anillos de progreso. Mismo
 // mecanismo que custom_canons + retos de Letterboxd de PowaFlex.
-
-const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
 // Parsea texto pegado a una lista de {artist, album, year}. Acepta formatos
 // habituales: "Artista - Álbum", "Artista – Álbum (1997)", "1. Artista — Álbum",
@@ -37,7 +36,8 @@ export function parseList(text) {
     if (!line) continue;
     line = line.replace(/^\s*\d+[.)]\s*/, ''); // numeración inicial
     let year = null;
-    const ym = line.match(/\((\d{4})\)\s*$/);
+    // año final en "(1977)" o como sufijo " - 1977" / " – 1977" (formato de muchas listas)
+    const ym = line.match(/\((\d{4})\)\s*$/) || line.match(/\s[-–—]\s*(\d{4})\s*$/);
     if (ym) {
       year = Number(ym[1]);
       line = line.slice(0, ym.index).trim();
@@ -53,18 +53,26 @@ export function parseList(text) {
 
 // Resuelve cada ítem de un reto contra tu biblioteca (owned_album_id).
 function resolveItems(challengeId) {
+  // Cruza por album_artist Y por el artista canónico (artists.name): a veces el tag
+  // albumartist difiere del nombre resuelto, y queremos casar por cualquiera de los dos.
   const owned = db
-    .prepare("SELECT id, album_artist, title FROM albums WHERE match_state != 'dismissed'")
-    .all()
-    .map((a) => ({ id: a.id, key: norm(a.album_artist) + '::' + norm(a.title) }));
-  const ownedMap = new Map(owned.map((o) => [o.key, o.id]));
+    .prepare(
+      `SELECT a.id, a.album_artist, ar.name AS artist_name, a.title
+       FROM albums a LEFT JOIN artists ar ON ar.id = a.artist_id
+       WHERE a.match_state != 'dismissed'`
+    )
+    .all();
+  const ownedMap = new Map();
+  for (const a of owned) {
+    ownedMap.set(matchKey(a.album_artist, a.title), a.id);
+    if (a.artist_name) ownedMap.set(matchKey(a.artist_name, a.title), a.id);
+  }
 
   const items = db.prepare('SELECT rowid, * FROM challenge_items WHERE challenge_id = ?').all(challengeId);
   const upd = db.prepare('UPDATE challenge_items SET owned_album_id = ? WHERE challenge_id = ? AND position = ?');
   const tx = db.transaction(() => {
     for (const it of items) {
-      const key = norm(it.artist) + '::' + norm(it.album);
-      upd.run(ownedMap.get(key) ?? null, challengeId, it.position);
+      upd.run(ownedMap.get(matchKey(it.artist, it.album)) ?? null, challengeId, it.position);
     }
   });
   tx();

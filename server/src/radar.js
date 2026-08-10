@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import * as mb from './musicbrainz.js';
+import { normName, matchKey } from './matchkey.js';
 
 // Radar de novedades curadas (0.6 fase 3). Sigues a curadores de buymusic.club
 // (usuarios que publican semanalmente lo mejor de Bandcamp) y sus selecciones
@@ -9,14 +10,6 @@ import * as mb from './musicbrainz.js';
 
 const UA = 'Mozilla/5.0 (compatible; Liderarrr/0.6; +https://github.com/probertoj/Liderarrr)';
 const BMC = 'https://www.buymusic.club';
-
-// Normaliza para cruzar con tu biblioteca: NFD descompone los acentos y el strip
-// final de no-alfanuméricos se lleva las marcas combinantes de paso. Minúsculas.
-const norm = (s) =>
-  String(s || '')
-    .normalize('NFD')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '');
 
 // El "artista" de Bandcamp puede venir como "Artista, Various" o "A & B": para cruzar
 // nos quedamos con el primer nombre (el principal), que es como está en tu biblioteca.
@@ -151,17 +144,26 @@ export function curatorsList() {
 // Índices en memoria (Sets/Maps, como manda el diseño) para marcar cada ítem sin
 // consultas pesadas por fila: lo que tienes, a quién sigues, qué sellos sigues.
 function libraryIndex() {
-  const owned = new Map(); // norm(artist)+'|'+norm(title) -> album_id
-  for (const a of db.prepare('SELECT a.id, a.title, ar.name FROM albums a JOIN artists ar ON ar.id = a.artist_id').all()) {
-    owned.set(`${norm(a.name)}|${norm(a.title)}`, a.id);
+  // owned: clave matchKey(artista, título). Se indexa por el artista canónico y por
+  // el album_artist del tag (pueden diferir), para casar por cualquiera de los dos.
+  const owned = new Map();
+  for (const a of db
+    .prepare(
+      `SELECT a.id, a.title, a.album_artist, ar.name AS artist_name
+       FROM albums a LEFT JOIN artists ar ON ar.id = a.artist_id
+       WHERE a.match_state != 'dismissed'`
+    )
+    .all()) {
+    if (a.artist_name) owned.set(matchKey(a.artist_name, a.title), a.id);
+    owned.set(matchKey(a.album_artist, a.title), a.id);
   }
   const trackedArtists = new Set(
     db
       .prepare('SELECT ar.name FROM tracked_artists t JOIN artists ar ON ar.id = t.artist_id')
       .all()
-      .map((r) => norm(r.name))
+      .map((r) => normName(r.name))
   );
-  const trackedLabels = new Set(db.prepare('SELECT name FROM tracked_labels').all().map((r) => norm(r.name)));
+  const trackedLabels = new Set(db.prepare('SELECT name FROM tracked_labels').all().map((r) => normName(r.name)));
   return { owned, trackedArtists, trackedLabels };
 }
 
@@ -181,8 +183,8 @@ export function radarFeed({ since = null, unownedOnly = false } = {}) {
     .all({ cutoff });
   const out = [];
   for (const r of rows) {
-    const pa = norm(primaryArtist(r.artist));
-    const is_owned = idx.owned.has(`${pa}|${norm(r.title)}`);
+    const pa = normName(primaryArtist(r.artist));
+    const is_owned = idx.owned.has(matchKey(primaryArtist(r.artist), r.title));
     if (unownedOnly && is_owned) continue;
     out.push({
       id: r.id,
@@ -203,7 +205,7 @@ export function radarFeed({ since = null, unownedOnly = false } = {}) {
       is_owned,
       is_upcoming: r.release_date > today,
       tracked_artist: idx.trackedArtists.has(pa),
-      tracked_label: r.label ? idx.trackedLabels.has(norm(r.label)) : false,
+      tracked_label: r.label ? idx.trackedLabels.has(normName(r.label)) : false,
     });
   }
   return out;
