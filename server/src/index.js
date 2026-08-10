@@ -14,6 +14,7 @@ import { prowlarrTest, prowlarrSearch, prowlarrGrab } from './prowlarr.js';
 import { jackettTest, jackettSearch } from './jackett.js';
 import { qbTest, qbAdd } from './qbittorrent.js';
 import { deleteAlbumFromDisk } from './albumdelete.js';
+import { refileAlbum } from './refile.js';
 import { pendingImports, importFolder } from './importer.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground } from './musicbrainz.js';
 import { acoustidTest } from './acoustid.js';
@@ -523,6 +524,14 @@ app.post('/api/albums/:id/restore', async (req, reply) => {
 app.post('/api/albums/:id/delete', async (req, reply) => {
   try {
     return deleteAlbumFromDisk(Number(req.params.id), { confirm: req.body?.confirm === true });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// re-ubicar en disco: mueve la carpeta del álbum a la estructura {artist}/{album} ({year})
+app.post('/api/albums/:id/refile', async (req, reply) => {
+  try {
+    return refileAlbum(Number(req.params.id), { confirm: req.body?.confirm === true });
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { Cover, StateBadge, Spinner, ErrorMsg, Button } from '../components.jsx';
 
@@ -68,6 +68,28 @@ export default function AlbumDetail() {
       navigate('/discoteca');
     } catch (e) {
       alert(e.message);
+      setBusy(false);
+    }
+  };
+
+  // Re-ubicar en disco: mueve la carpeta a {artista}/{álbum} ({año}) dentro de la
+  // biblioteca. Útil para limpiar lo antiguo mal archivado (p. ej. tras corregir el
+  // artista). No toca el origen de descargas; el seeding sobrevive (mismo volumen).
+  const refile = async () => {
+    if (
+      !window.confirm(
+        `¿Ordenar en su carpeta «${album.album_artist} — ${album.title}»?\n\nMueve la carpeta del álbum a la estructura {artista}/{álbum} dentro de la biblioteca. No toca el origen de descargas.`
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const r = await api.refileAlbum(id);
+      alert(r.moved ? `Movido a:\n${r.to}` : r.message || 'Ya estaba en su carpeta.');
+      await load();
+    } catch (e) {
+      alert(e.message);
+    } finally {
       setBusy(false);
     }
   };
@@ -216,6 +238,14 @@ export default function AlbumDetail() {
               </Button>
             )}
             {album.inLidarr && <span className="text-sm text-emerald-400 self-center">✓ en Lidarr</span>}
+            <button
+              onClick={refile}
+              disabled={busy}
+              title="Mueve la carpeta a {artista}/{álbum} dentro de la biblioteca"
+              className="text-sm px-3 py-1.5 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <FolderInput size={14} /> Ordenar en su carpeta
+            </button>
             <button
               onClick={deleteFromDisk}
               disabled={busy}

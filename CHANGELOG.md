@@ -15,6 +15,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   identificar al instante**, así lo que llegó sin etiquetar casa y abandona la lista. También
   editable desde la ficha del álbum. Es un metadato interno (no toca los ficheros) y queda
   protegido: un reescaneo posterior ya no lo pisa con la etiqueta del fichero.
+- **Ordenar en su carpeta (re-ubicar en disco).** Acción en la ficha del álbum que mueve su
+  carpeta a la estructura configurada `{artist}/{album} ({year})` dentro de la biblioteca —
+  para limpiar material antiguo mal archivado (típico tras corregir el artista). Usa `rename`
+  en el mismo volumen (conserva inodos: el seeding sobrevive), nunca sale de la biblioteca ni
+  toca el origen de descargas, no sobrescribe destino, y actualiza ruta, identidad (`local_key`),
+  pistas y carátula. No aplica a cajas multidisco.
+
+### Cambiado
+- **Sellos**: los que ya sigues se resaltan (fondo dorado + estrella) para distinguirlos de un
+  vistazo de los que aún no sigues.
 
 ---
 

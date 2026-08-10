@@ -50,6 +50,7 @@ export const api = {
   dismissed: () => req('/dismissed'),
   restoreAlbum: (id) => req(`/albums/${id}/restore`, { method: 'POST' }),
   deleteAlbum: (id) => req(`/albums/${id}/delete`, { method: 'POST', body: { confirm: true } }),
+  refileAlbum: (id) => req(`/albums/${id}/refile`, { method: 'POST', body: { confirm: true } }),
   candidates: (id) => req(`/albums/${id}/candidates`),
   match: (id, rg_mbid) => req(`/albums/${id}/match`, { method: 'POST', body: { rg_mbid } }),
   mbReleaseGroups: (q, artist) =>

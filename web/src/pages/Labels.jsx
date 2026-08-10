@@ -17,9 +17,21 @@ export default function Labels() {
   const [open, setOpen] = useState(params.get('label'));
   const [q, setQ] = useState('');
   const [err, setErr] = useState(null);
+  const [followedNorms, setFollowedNorms] = useState([]);
   useEffect(() => {
     api.labels().then(setRows).catch((e) => setErr(e.message));
+    api
+      .trackedLabels()
+      .then((ls) => setFollowedNorms(ls.map((l) => labelNorm(l.name))))
+      .catch(() => {});
   }, []);
+
+  // ¿este sello (etiqueta de la colección) está entre los seguidos? Cruce laxo por
+  // nombre (los seguidos usan el nombre canónico de MB, que puede diferir).
+  const isFollowed = (name) => {
+    const n = labelNorm(name);
+    return n && followedNorms.some((t) => t.includes(n) || n.includes(t));
+  };
 
   const back = () => {
     setOpen(null);
@@ -56,20 +68,29 @@ export default function Labels() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            {shown.map((l) => (
-              <button
-                key={l.name}
-                onClick={() => setOpen(l.name)}
-                className="text-sm px-3 py-1.5 rounded-full bg-ink-850 border border-ink-800 hover:border-gold-500/40"
-              >
-                {l.name} <span className="text-neutral-600">{l.albums}</span>
-                {l.variants > 1 && (
-                  <span className="text-neutral-600" title="Variantes de nombre fusionadas (acentos/mayúsculas)">
-                    {' '}· {l.variants} variantes
-                  </span>
-                )}
-              </button>
-            ))}
+            {shown.map((l) => {
+              const followed = isFollowed(l.name);
+              return (
+                <button
+                  key={l.name}
+                  onClick={() => setOpen(l.name)}
+                  title={followed ? 'Sigues este sello (sale en Lanzamientos)' : undefined}
+                  className={`text-sm px-3 py-1.5 rounded-full border inline-flex items-center gap-1.5 ${
+                    followed
+                      ? 'border-gold-500/50 bg-gold-500/15 text-gold-200 hover:border-gold-500/70'
+                      : 'bg-ink-850 border-ink-800 hover:border-gold-500/40'
+                  }`}
+                >
+                  {followed && <Star size={12} className="fill-current text-gold-400" />}
+                  {l.name} <span className={followed ? 'text-gold-300/70' : 'text-neutral-600'}>{l.albums}</span>
+                  {l.variants > 1 && (
+                    <span className="text-neutral-600" title="Variantes de nombre fusionadas (acentos/mayúsculas)">
+                      {' '}· {l.variants} variantes
+                    </span>
+                  )}
+                </button>
+              );
+            })}
             {shown.length === 0 && <span className="text-sm text-neutral-500">Ningún sello coincide con «{q}».</span>}
           </div>
         </>
