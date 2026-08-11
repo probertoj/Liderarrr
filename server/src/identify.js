@@ -254,17 +254,20 @@ export function restoreAlbum(albumId) {
 export async function manualMatch(albumId, rgMbid) {
   const album = db.prepare('SELECT id, title, artist_id FROM albums WHERE id = ?').get(albumId);
   if (!album) throw new Error('Álbum no encontrado');
-  const rg = await mb.searchReleaseGroup(null, album.title).catch(() => null);
-  // el usuario ya eligió el MBID; guardamos lo que sepamos
+  // Trae el RELEASE GROUP EXACTO que eligió el usuario (por su MBID), no una búsqueda
+  // por título: así el tipo (Álbum/Single/EP), los tipos secundarios y el año son los
+  // de esa referencia. Antes se re-buscaba por título y podía re-fijar el tipo malo
+  // (p. ej. seguir marcándolo "Single" al corregirlo a "Álbum").
+  const rg = await mb.releaseGroupById(rgMbid).catch(() => null);
   applyMatch.run({
     id: albumId,
     rg_mbid: rgMbid,
     primary_type: rg?.primary_type || null,
     secondary_types: JSON.stringify(rg?.secondary_types || []),
-    year: null,
+    year: rg?.first_release ? Number(String(rg.first_release).slice(0, 4)) || null : null,
     source: 'manual',
     confidence: 1,
     now: Date.now(),
   });
-  return db.prepare('SELECT id, title, match_state, rg_mbid FROM albums WHERE id = ?').get(albumId);
+  return db.prepare('SELECT id, title, match_state, rg_mbid, primary_type FROM albums WHERE id = ?').get(albumId);
 }

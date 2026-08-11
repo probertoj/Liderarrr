@@ -15,14 +15,32 @@ export default function AlbumDetail() {
   const [artistVal, setArtistVal] = useState('');
   const [editTitle, setEditTitle] = useState(false);
   const [titleVal, setTitleVal] = useState('');
+  const [labels, setLabels] = useState([]);
+  const [labelTried, setLabelTried] = useState(false);
 
   const load = () => api.album(id).then(setAlbum).catch((e) => setErr(e.message));
   useEffect(() => {
     setAlbum(null);
     setEditArtist(false);
     setEditTitle(false);
+    setLabels([]);
+    setLabelTried(false);
     load();
   }, [id]);
+
+  // El sello se muestra junto a «Origen». Si los ficheros no traían la etiqueta y el
+  // álbum está identificado, se resuelve desde MusicBrainz (una vez, cacheado).
+  useEffect(() => {
+    if (!album) return;
+    if (album.labels?.length) {
+      setLabels(album.labels);
+      return;
+    }
+    if ((album.rg_mbid || album.release_mbid) && !labelTried) {
+      setLabelTried(true);
+      api.resolveAlbumLabel(album.id).then((r) => setLabels(r.labels || [])).catch(() => {});
+    }
+  }, [album, labelTried]);
   useEffect(() => {
     api.artistNames().then(setNames).catch(() => {});
   }, []);
@@ -252,6 +270,23 @@ export default function AlbumDetail() {
               <div className="text-neutral-500 text-xs">Origen</div>
               <div>{album.match_source || '—'}</div>
             </div>
+            <div>
+              <div className="text-neutral-500 text-xs">Sello</div>
+              <div className="truncate">
+                {labels.length ? (
+                  labels.map((l, i) => (
+                    <span key={l}>
+                      {i > 0 ? ', ' : ''}
+                      <Link to={`/sellos?label=${encodeURIComponent(l)}`} className="text-gold-400 hover:underline">
+                        {l}
+                      </Link>
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-neutral-600">—</span>
+                )}
+              </div>
+            </div>
           </div>
 
           {album.genres?.length > 0 && (
@@ -260,21 +295,6 @@ export default function AlbumDetail() {
                 <span key={g} className="text-xs px-2 py-0.5 rounded-full bg-ink-850 border border-ink-800">
                   {g}
                 </span>
-              ))}
-            </div>
-          )}
-
-          {album.labels?.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 mt-3">
-              <Tag size={13} className="text-neutral-500" />
-              {album.labels.map((l) => (
-                <Link
-                  key={l}
-                  to={`/sellos?label=${encodeURIComponent(l)}`}
-                  className="text-xs px-2 py-0.5 rounded-full bg-ink-850 border border-ink-800 hover:border-gold-500/40 hover:text-gold-400"
-                >
-                  {l}
-                </Link>
               ))}
             </div>
           )}
@@ -318,6 +338,8 @@ export default function AlbumDetail() {
       {album.match_state !== 'matched' && album.match_state !== 'orphan' && (
         <IdentifySection album={album} onDone={load} />
       )}
+
+      {(album.match_state === 'matched' || album.match_state === 'orphan') && <ReMatch album={album} onDone={load} />}
 
       {album.match_state === 'matched' && <LidarrSection album={album} onDone={load} />}
 
@@ -617,6 +639,36 @@ function IdentifySection({ album, onDone }) {
           album={album}
           onDone={async () => {
             setShowManual(false);
+            await onDone();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Corregir el emparejamiento de un álbum YA identificado: cuando MusicBrainz lo casó
+// con la referencia equivocada (p. ej. un single en vez del álbum). Reabre el buscador
+// manual para elegir otra referencia; manualMatch fija su tipo/año reales.
+function ReMatch({ album, onDone }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card p-4 mb-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+          <Sparkles size={15} /> Emparejamiento con MusicBrainz
+        </h2>
+        <Button onClick={() => setOpen((v) => !v)}>{open ? 'Cerrar' : 'Corregir emparejamiento'}</Button>
+      </div>
+      <p className="text-xs text-neutral-600 mt-1">
+        ¿Lo casó con la referencia equivocada (p. ej. un <b className="font-normal text-neutral-500">single</b> en vez del
+        álbum)? Elige a mano la correcta y se re-emparejará con su tipo y año reales.
+      </p>
+      {open && (
+        <ManualSearch
+          album={album}
+          onDone={async () => {
+            setOpen(false);
             await onDone();
           }}
         />

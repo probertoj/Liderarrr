@@ -151,6 +151,7 @@ export const api = {
   artistNames: () => req('/artists/names'),
   setAlbumArtist: (id, name) => req(`/albums/${id}/artist`, { method: 'PUT', body: { name } }),
   setAlbumTitle: (id, title) => req(`/albums/${id}/title`, { method: 'PUT', body: { title } }),
+  resolveAlbumLabel: (id) => req(`/albums/${id}/label`),
   corrections: () => req('/corrections'),
   refileAllCorrections: () => req('/corrections/refile-all', { method: 'POST' }),
   tagPreview: (id) => req(`/albums/${id}/tag-preview`),

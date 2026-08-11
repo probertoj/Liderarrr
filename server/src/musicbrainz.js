@@ -299,6 +299,44 @@ export async function searchLabels(name, limit = 6) {
   }));
 }
 
+// Sello(s) que editan una RELEASE concreta (MB pone los sellos en las releases, no en
+// los release-groups). Devuelve nombres únicos, sin el placeholder "[no label]".
+export async function releaseLabels(releaseMbid) {
+  if (!releaseMbid) return [];
+  const data = await mbCached(`release-labels:${releaseMbid}`, `/release/${enc(releaseMbid)}?inc=labels`);
+  return [...new Set((data['label-info'] || []).map((li) => li.label?.name).filter(Boolean))].filter(
+    (n) => !/^\[no label\]$/i.test(n)
+  );
+}
+
+// Sello(s) del primer release de un release-group (cuando no tenemos el MBID de release
+// exacto). Aproximación razonable para mostrar el sello en la ficha de un álbum.
+export async function releaseGroupLabels(rgMbid) {
+  if (!rgMbid) return [];
+  const data = await mbCached(`rg-labels:${rgMbid}`, `/release?release-group=${enc(rgMbid)}&inc=labels&limit=1`);
+  const rel = (data.releases || [])[0];
+  return [...new Set((rel?.['label-info'] || []).map((li) => li.label?.name).filter(Boolean))].filter(
+    (n) => !/^\[no label\]$/i.test(n)
+  );
+}
+
+// Un release-group por su MBID (para fijar un emparejamiento manual con el tipo y el
+// año REALES de la referencia elegida, no los de una búsqueda por título).
+export async function releaseGroupById(mbid) {
+  if (!mbid) return null;
+  const rg = await mbCached(`rg:${mbid}`, `/release-group/${enc(mbid)}?inc=artist-credits`);
+  if (!rg || !rg.id) return null;
+  return {
+    rg_mbid: rg.id,
+    title: rg.title,
+    primary_type: rg['primary-type'] || null,
+    secondary_types: rg['secondary-types'] || [],
+    first_release: rg['first-release-date'] || null,
+    artist: (rg['artist-credit'] || []).map((a) => a.name).join(''),
+    artist_mbid: (rg['artist-credit'] || [])[0]?.artist?.id || null,
+  };
+}
+
 // Catálogo de ÁLBUMES DE ESTUDIO de un sello (primary Album, sin secundarios). Los
 // sellos cuelgan de RELEASES en MusicBrainz, no de release-groups: se recorren las
 // releases del sello y se deduplican a RG. Tope `maxReleases` para no traer miles de

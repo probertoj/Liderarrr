@@ -1,7 +1,7 @@
 import { db } from './db.js';
 import { releaseEditions, discogsConfigured } from './discogs.js';
 import { isJunkLabel } from './libkey.js';
-import { searchLabel, labelReleaseGroups } from './musicbrainz.js';
+import { searchLabel, labelReleaseGroups, releaseLabels, releaseGroupLabels } from './musicbrainz.js';
 import { normalizeForDup, libScore } from './queries.js';
 import { normName } from './matchkey.js';
 
@@ -41,6 +41,28 @@ export async function albumEditions(albumId) {
   if (!res) return { configured: true, found: false };
   captureLabel(albumId, res.label);
   return { configured: true, found: true, ...res };
+}
+
+// Resuelve el sello de un álbum IDENTIFICADO desde MusicBrainz (bajo demanda desde la
+// ficha, cuando los ficheros no traían la etiqueta de sello). Si ya se conoce, lo
+// devuelve sin llamar a MB. Lo que encuentra se captura como tag 'label' para que
+// persista y alimente la vista de Sellos. Cacheado en MB.
+export async function resolveAlbumLabel(albumId) {
+  const a = db.prepare('SELECT id, release_mbid, rg_mbid FROM albums WHERE id = ?').get(albumId);
+  if (!a) throw new Error('Álbum no encontrado');
+  const existing = db
+    .prepare("SELECT t.name FROM album_tags at JOIN tags t ON t.id=at.tag_id AND t.type='label' WHERE at.album_id=?")
+    .all(albumId)
+    .map((r) => r.name)
+    .filter((n) => !isJunkLabel(n));
+  if (existing.length) return { labels: existing, cached: true };
+
+  let labels = [];
+  if (a.release_mbid) labels = await releaseLabels(a.release_mbid);
+  if (!labels.length && a.rg_mbid) labels = await releaseGroupLabels(a.rg_mbid);
+  labels = labels.filter((n) => !isJunkLabel(n));
+  for (const l of labels) captureLabel(albumId, l);
+  return { labels };
 }
 
 // Cola de upgrades: álbumes que tienes SIN NINGUNA pista sin pérdida (todo MP3/AAC),

@@ -9,6 +9,19 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Sello en la ficha del álbum, junto a «Origen».** Ahora se muestra siempre; si los ficheros no
+  traían la etiqueta de sello pero el álbum está identificado, se resuelve de MusicBrainz (cacheado
+  y capturado para la vista de Sellos). Enlaza a la página del sello.
+- **Corregir el emparejamiento de un álbum ya identificado.** En la ficha, «Corregir emparejamiento»
+  reabre el buscador de MusicBrainz para elegir otra referencia cuando lo casó con la equivocada
+  (p. ej. un single en vez del álbum), mostrando el tipo de cada candidato.
+
+### Corregido
+- **Emparejamiento manual con el tipo/año equivocados.** Al fijar un release-group a mano se
+  guardaba el tipo de una búsqueda por título (podía seguir marcándolo «Single» al corregirlo a
+  «Álbum»); ahora se lee del release-group elegido por su MBID (tipo, tipos secundarios y año reales).
+
 ---
 
 ## [0.6.3] — 2026-08-10

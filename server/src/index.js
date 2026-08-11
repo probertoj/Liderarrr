@@ -58,7 +58,7 @@ import { listeningOverview, ownershipGap, ownedUnplayed, hasScrobbles } from './
 import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing } from './challenges.js';
 import { importListFromUrl } from './listimport.js';
 import { artistRelations } from './relations.js';
-import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCompletism } from './editions.js';
+import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCompletism, resolveAlbumLabel } from './editions.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
 import { coverFast, resolveCoverSlow, retryMissingCovers } from './covers.js';
 import { diagnostics, pushEvent } from './diag.js';
@@ -405,6 +405,14 @@ app.get('/api/albums/:id/editions', async (req, reply) => {
   }
 });
 app.get('/api/quality/upgrades', async () => upgradeCandidates());
+// resolver el sello de un álbum identificado desde MusicBrainz (si los ficheros no lo traían)
+app.get('/api/albums/:id/label', async (req, reply) => {
+  try {
+    return await resolveAlbumLabel(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 app.get('/api/labels', async () => labelsOverview());
 app.get('/api/labels/:name', async (req) => labelAlbums(req.params.name));
 // completismo del sello contra MusicBrainz (bajo demanda; puede tardar)
