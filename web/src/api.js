@@ -80,6 +80,8 @@ export const api = {
   importRun: (sourceDir, override = {}) => req('/imports/run', { method: 'POST', body: { sourceDir, ...override } }),
   downloads: () => req('/downloads'),
   autoImportRun: () => req('/imports/auto-run', { method: 'POST' }),
+  autograb: () => req('/autograb'),
+  autograbRun: (dryRun) => req('/autograb/run', { method: 'POST', body: { dryRun } }),
 
   // fase 2 — la caza
   tracked: () => req('/tracked'),

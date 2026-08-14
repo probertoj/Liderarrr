@@ -8,6 +8,7 @@ import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobble
 import { refreshAllLabels } from './followlabels.js';
 import { refreshAllCurators } from './radar.js';
 import { runAutoImport, autoImportEnabled, autoImportStatus } from './autoimport.js';
+import { runAutoGrab, autoGrabConfig, autoGrabStatus } from './autograb.js';
 import { db } from './db.js';
 
 // La rutina "poner Liderarrr al día", en orden de dependencias: primero el disco
@@ -107,6 +108,16 @@ function buildSteps() {
       run: async () => {
         const r = await refreshAllCurators();
         return `${r.done}/${r.total} curadores · ${r.added} novedades`;
+      },
+    },
+    {
+      key: 'auto-grab',
+      label: 'Auto-descargar estrenos de artistas seguidos (nativo)',
+      enabled: () => autoGrabConfig().enabled,
+      run: async () => {
+        const r = await runAutoGrab();
+        if (r.error) throw new Error(r.error);
+        return `${autoGrabStatus.grabbed} agarrados de ${autoGrabStatus.considered} candidatos`;
       },
     },
     {

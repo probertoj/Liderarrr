@@ -539,6 +539,56 @@ export default function Settings() {
         </div>
       </section>
 
+      {/* 4b. Auto-descargar nativo (sin Lidarr) */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">
+          4b · Auto-descargar sin Lidarr <span className="text-xs text-neutral-500">(opcional)</span>
+        </h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          La alternativa nativa al auto-Lidarr: cada noche busca en tus indexers (Jackett/Prowlarr) los estrenos de tus
+          artistas seguidos, elige la mejor release (sin pérdida primero, descartando las que no tienen semillas) y la
+          agarra. El auto-import la enlaza a la biblioteca al terminar. Requiere motor de búsqueda y, con Jackett,
+          qBittorrent.
+        </p>
+        <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={s.auto_grab_enabled === '1'}
+            onChange={(e) => setS((p) => ({ ...p, auto_grab_enabled: e.target.checked ? '1' : '0' }))}
+          />
+          Activar auto-descarga nativa en el refresco nocturno
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Horizonte (meses)" hint="Cuánto mirar hacia adelante.">
+            <input type="number" value={s.auto_grab_months || '6'} onChange={set('auto_grab_months')} className={input} />
+          </Field>
+          <Field label="Margen atrás (días)" hint="Recoge estrenos fechados con retraso.">
+            <input type="number" value={s.auto_grab_lookback_days || '30'} onChange={set('auto_grab_lookback_days')} className={input} />
+          </Field>
+          <Field label="Semillas mínimas" hint="Descarta releases con menos seeders (evita torrents muertos).">
+            <input type="number" value={s.auto_grab_min_seeders || '1'} onChange={set('auto_grab_min_seeders')} className={input} />
+          </Field>
+          <Field label="Máximo por tanda" hint="Tope de descargas que agarra en cada pasada.">
+            <input type="number" value={s.auto_grab_limit || '20'} onChange={set('auto_grab_limit')} className={input} />
+          </Field>
+        </div>
+        <div className="mt-2">
+          <Button
+            onClick={async () => {
+              await save();
+              try {
+                const r = await api.autograbRun(true);
+                alert(`Simulación: ${r.considered} candidatos.\n\n${(r.log || []).slice(0, 15).join('\n') || '(ninguno)'}`);
+              } catch (e) {
+                alert(e.message);
+              }
+            }}
+          >
+            Simular ahora (sin agarrar)
+          </Button>
+        </div>
+      </section>
+
       {/* 5. Escritura de etiquetas */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">

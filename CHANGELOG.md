@@ -10,6 +10,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 ## [Sin publicar]
 
 ### Añadido
+- **Auto-descarga nativa, sin Lidarr (camino a 1.0).** Alternativa al auto-Lidarr: en el refresco
+  nocturno busca en tus indexers (Jackett/Prowlarr) los estrenos/huecos de tus artistas seguidos,
+  **elige la mejor release** con una heurística propia (sin pérdida primero: FLAC > 320 > V0 > 256;
+  **descarta las que no tienen semillas**; exige coincidencia con el álbum) y la agarra. El registro
+  de descargas + el auto-import cierran el bucle (hardlink a la biblioteca). Se activa y configura en
+  Ajustes → «4b · Auto-descargar sin Lidarr» (horizonte, margen, semillas mínimas, tope por tanda),
+  con «Simular ahora» para ver qué agarraría sin descargar nada. Salta lo que ya tienes o ya pediste.
+- **Al agarrar, qBittorrent arranca la descarga** (antes se quedaba en «Stopped» si qB estaba
+  configurado para añadir en pausa): se envía `stopped=false`/`paused=false`.
+
+
 - **Auto-import: cerrar el bucle de descargas sin Lidarr (camino a la independencia).** Con
   «Auto-importar al terminar» activado (Ajustes → Importar descargas), Liderarr sondea qBittorrent
   cada pocos minutos y, por cada torrent **completado** que cuelgue de tu carpeta de torrents, lo
