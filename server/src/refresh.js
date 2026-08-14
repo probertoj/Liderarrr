@@ -7,6 +7,7 @@ import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
 import { refreshAllLabels } from './followlabels.js';
 import { refreshAllCurators } from './radar.js';
+import { runAutoImport, autoImportEnabled, autoImportStatus } from './autoimport.js';
 import { db } from './db.js';
 
 // La rutina "poner Liderarrr al día", en orden de dependencias: primero el disco
@@ -31,6 +32,15 @@ const has = (...keys) => keys.every((k) => !!getSetting(k));
 
 function buildSteps() {
   return [
+    {
+      key: 'autoimport',
+      label: 'Auto-importar descargas terminadas (qBittorrent)',
+      enabled: () => autoImportEnabled(),
+      run: async () => {
+        await runAutoImport();
+        return `${autoImportStatus.imported} importadas · ${autoImportStatus.errors.length} con error`;
+      },
+    },
     {
       key: 'scan',
       label: 'Escanear la biblioteca del disco',

@@ -1,8 +1,76 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { DownloadCloud, Link2, RefreshCw } from 'lucide-react';
+import { DownloadCloud, Link2, RefreshCw, Zap } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button } from '../components.jsx';
+
+// Panel de auto-import (cierre del bucle sin Lidarr): estado, botón para importar las
+// descargas terminadas ahora mismo, y las últimas descargas registradas con su estado.
+function AutoImportPanel() {
+  const [dl, setDl] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => api.downloads().then(setDl).catch(() => {});
+  useEffect(() => {
+    load();
+  }, []);
+  const runNow = async () => {
+    setBusy(true);
+    try {
+      await api.autoImportRun();
+      await load();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (!dl) return null;
+  const STATE = { requested: 'pedido', importing: 'importando', imported: 'importado', error: 'error' };
+  return (
+    <div className="card p-4 mb-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+          <Zap size={15} /> Auto-import{' '}
+          <span className={`text-xs ${dl.enabled ? 'text-emerald-400/80' : 'text-neutral-600'}`}>
+            {dl.enabled ? 'activado' : 'desactivado'}
+          </span>
+        </h2>
+        <Button onClick={runNow} disabled={busy}>
+          <span className="inline-flex items-center gap-1.5">
+            <RefreshCw size={14} className={busy ? 'animate-spin' : ''} /> {busy ? 'Importando…' : 'Importar terminadas ahora'}
+          </span>
+        </Button>
+      </div>
+      <p className="text-xs text-neutral-600 mt-1">
+        Cierra el bucle sin Lidarr: al terminar una descarga en qBittorrent, se enlaza a tu biblioteca organizada.
+        {dl.enabled ? ' Se ejecuta solo cada pocos minutos.' : ' Actívalo en Ajustes → Importar descargas.'}
+      </p>
+      {dl.items?.length > 0 && (
+        <div className="mt-3 max-h-56 overflow-y-auto divide-y divide-ink-850/60 text-sm">
+          {dl.items.slice(0, 30).map((d) => (
+            <div key={d.id} className="py-1.5 flex items-center gap-2 min-w-0">
+              <span className="truncate flex-1 min-w-0" title={d.release_title || ''}>
+                {d.artist ? `${d.artist} — ` : ''}
+                {d.album || d.release_title || '(sin título)'}
+              </span>
+              <span
+                className={`text-xs shrink-0 ${
+                  d.status === 'imported'
+                    ? 'text-emerald-400'
+                    : d.status === 'error'
+                      ? 'text-red-400'
+                      : 'text-neutral-500'
+                }`}
+              >
+                {STATE[d.status] || d.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const inputCls = 'block mt-0.5 bg-ink-850 border border-ink-800 rounded px-2 py-1 text-sm text-neutral-200 outline-none focus:border-gold-500/60';
 
@@ -99,6 +167,9 @@ export default function Imports() {
         Enlaza (hardlink) las descargas a tu biblioteca organizada, como hace Lidarr pero sin su veto. No borra ni copia
         el origen: sigues sembrando. Tras importar, el álbum aparece en el próximo escaneo.
       </p>
+
+      <AutoImportPanel />
+
 
       {!data.configured && (
         <div className="card p-6 text-neutral-400">

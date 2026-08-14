@@ -476,6 +476,18 @@ export default function Settings() {
           />
           Copiar si el hardlink no es posible <span className="text-xs text-neutral-500">(ocupa el doble; úsalo si origen y biblioteca no comparten volumen)</span>
         </label>
+        <label className="flex items-center gap-2 text-sm mt-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={s.auto_import === '1'}
+            onChange={(e) => setS((p) => ({ ...p, auto_import: e.target.checked ? '1' : '0' }))}
+          />
+          <b className="font-normal">Auto-importar al terminar</b>{' '}
+          <span className="text-xs text-neutral-500">
+            (cierra el bucle sin Lidarr: cada pocos minutos revisa qBittorrent y enlaza a la biblioteca lo que haya
+            terminado; requiere «Permitir importar» y qBittorrent configurado)
+          </span>
+        </label>
       </section>
 
       {/* 4. Auto-Lidarr */}

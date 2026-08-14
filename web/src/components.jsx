@@ -304,7 +304,13 @@ export function SearchModal({ initialQuery, onClose }) {
     setGrabbing(r.guid);
     setErr(null);
     try {
-      const res = await api.searchGrab({ engine, guid: r.guid, indexerId: r.indexerId, downloadUrl: r.downloadUrl });
+      const res = await api.searchGrab({
+        engine,
+        guid: r.guid,
+        indexerId: r.indexerId,
+        downloadUrl: r.downloadUrl,
+        context: { release_title: r.title || null },
+      });
       setGrabbed((p) => ({ ...p, [r.guid]: true }));
       setMsg(res?.via === 'qbittorrent' ? 'Enviado a qBittorrent.' : 'Enviado a tu cliente de descarga.');
     } catch (e) {

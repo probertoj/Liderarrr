@@ -10,6 +10,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 ## [Sin publicar]
 
 ### Añadido
+- **Auto-import: cerrar el bucle de descargas sin Lidarr (camino a la independencia).** Con
+  «Auto-importar al terminar» activado (Ajustes → Importar descargas), Liderarr sondea qBittorrent
+  cada pocos minutos y, por cada torrent **completado** que cuelgue de tu carpeta de torrents, lo
+  **enlaza (hardlink)** a tu biblioteca organizada `{artist}/{album} ({year})` y relanza el escaneo
+  — como hacía Lidarr, pero nativo. No borra ni copia el origen (sigues sembrando). También en
+  «Actualizar todo» y con un botón «Importar terminadas ahora» en la pestaña Importar.
+- **Registro de descargas.** Cuando agarras una release, se apunta el pedido (artista/álbum, título
+  de la release, hash) para: casar el torrent terminado con su álbum (destino correcto aunque las
+  etiquetas fallen), evitar re-pedir, y ver el estado (pedido → importando → importado) en Importar.
+
+
 - **Sello en la ficha del álbum, junto a «Origen».** Ahora se muestra siempre; si los ficheros no
   traían la etiqueta de sello pero el álbum está identificado, se resuelve de MusicBrainz (cacheado
   y capturado para la vista de Sellos). Enlaza a la página del sello.

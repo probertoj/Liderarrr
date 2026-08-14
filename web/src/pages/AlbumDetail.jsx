@@ -950,7 +950,21 @@ function SearchSection({ album }) {
     setGrabbing(r.guid);
     setErr(null);
     try {
-      const res = await api.searchGrab({ engine, guid: r.guid, indexerId: r.indexerId, downloadUrl: r.downloadUrl });
+      const res = await api.searchGrab({
+        engine,
+        guid: r.guid,
+        indexerId: r.indexerId,
+        downloadUrl: r.downloadUrl,
+        // contexto para el registro de descargas + auto-import (destino correcto)
+        context: {
+          album_id: album.id,
+          rg_mbid: album.rg_mbid || null,
+          artist: album.album_artist || album.artist?.name || null,
+          album: album.title || null,
+          year: album.year || null,
+          release_title: r.title || null,
+        },
+      });
       setGrabbed((p) => ({ ...p, [r.guid]: true }));
       setMsg(res?.via === 'qbittorrent' ? 'Enviado a qBittorrent.' : 'Enviado a tu cliente de descarga.');
     } catch (e) {

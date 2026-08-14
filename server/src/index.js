@@ -16,6 +16,8 @@ import { qbTest, qbAdd } from './qbittorrent.js';
 import { deleteAlbumFromDisk } from './albumdelete.js';
 import { refileAlbum, correctedAlbums, refileAll } from './refile.js';
 import { pendingImports, importFolder } from './importer.js';
+import { recordGrab, magnetHash, downloadsList } from './downloads.js';
+import { runAutoImport, autoImportStatus, autoImportEnabled } from './autoimport.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground } from './musicbrainz.js';
 import { acoustidTest } from './acoustid.js';
 import { discogsTest, searchRelease } from './discogs.js';
@@ -666,12 +668,16 @@ app.get('/api/search', async (req, reply) => {
 });
 app.post('/api/search/grab', async (req, reply) => {
   try {
-    const { engine, guid, indexerId, downloadUrl } = req.body || {};
+    const { engine, guid, indexerId, downloadUrl, context } = req.body || {};
+    const c = context || {};
     if (engine === 'jackett') {
       await qbAdd({ url: downloadUrl });
+      // registra el pedido (② registro de descargas) para que el auto-import lo case
+      recordGrab({ ...c, infohash: magnetHash(downloadUrl), source: 'jackett' });
       return { ok: true, via: 'qbittorrent' };
     }
     await prowlarrGrab({ guid, indexerId });
+    recordGrab({ ...c, source: 'prowlarr' });
     return { ok: true, via: 'prowlarr' };
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
@@ -702,6 +708,16 @@ app.post('/api/lidarr/add-bulk', async (req, reply) => {
   const items = req.body?.items || [];
   if (!items.length) return reply.code(400).send({ error: 'Nada que añadir' });
   return enqueueLidarrAdd(items);
+});
+
+// --- auto-import (cerrar el bucle) + registro de descargas -------------------
+app.get('/api/downloads', async () => ({ enabled: autoImportEnabled(), status: autoImportStatus, items: downloadsList() }));
+app.post('/api/imports/auto-run', async (req, reply) => {
+  try {
+    return await runAutoImport();
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
 });
 
 // --- imágenes locales (carátulas: fichero o incrustada en etiquetas) --------
@@ -754,6 +770,16 @@ function scheduleNightly() {
   setInterval(check, 60 * 1000);
 }
 
+// Auto-import periódico: cada pocos minutos revisa qBittorrent y enlaza lo que haya
+// terminado. Barato si está desactivado (runAutoImport sale enseguida). Es lo que
+// "cierra el bucle" sin Lidarr.
+function scheduleAutoImport() {
+  const MIN = Number(getSetting('auto_import_interval_min')) || 3;
+  setInterval(() => {
+    runAutoImport().catch((e) => console.warn('[autoimport] tick falló:', String(e.message || e)));
+  }, Math.max(1, MIN) * 60 * 1000);
+}
+
 // Errores fatales: los logueamos para que se VEAN. Antes, un error no capturado
 // tumbaba el proceso y en los logs solo aparecía el crash del destructor de
 // better-sqlite3, ocultando la causa real. No salimos: preferimos seguir vivos.
@@ -779,6 +805,7 @@ app
   .then(() => {
     console.log(`[Liderarrr] escuchando en http://0.0.0.0:${PORT}`);
     scheduleNightly();
+    scheduleAutoImport();
     // backfill de multidiscos: reagrupa cajas sobre lo ya escaneado, sin exigir un
     // reescaneo completo. Diferido para no retrasar el primer request. Solo lectura.
     setImmediate(() => {

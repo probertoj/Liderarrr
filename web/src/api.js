@@ -78,6 +78,8 @@ export const api = {
   searchGrab: (item) => req('/search/grab', { method: 'POST', body: item }),
   importsPending: () => req('/imports/pending'),
   importRun: (sourceDir, override = {}) => req('/imports/run', { method: 'POST', body: { sourceDir, ...override } }),
+  downloads: () => req('/downloads'),
+  autoImportRun: () => req('/imports/auto-run', { method: 'POST' }),
 
   // fase 2 — la caza
   tracked: () => req('/tracked'),

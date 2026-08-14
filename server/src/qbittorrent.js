@@ -128,3 +128,29 @@ export async function qbAdd({ url: dl, category } = {}) {
   if (/^fails\.?$/i.test(r)) throw new Error('qBittorrent no acepto el enlace (Fails.).');
   return { ok: true };
 }
+
+// Torrents COMPLETADOS (para el auto-import: cerrar el bucle de descargas). Si hay una
+// categoria configurada, filtra por ella (solo lo que manda Liderarr). content_path es
+// la raiz del contenido (carpeta en multi-fichero, fichero en single).
+export async function qbCompletedTorrents() {
+  const cat = getSetting('qbittorrent_category') || '';
+  let path = '/api/v2/torrents/info?filter=completed';
+  if (cat) path += `&category=${encodeURIComponent(cat)}`;
+  const txt = await qbFetch(path);
+  let list = [];
+  try {
+    list = JSON.parse(txt || '[]');
+  } catch {
+    list = [];
+  }
+  return list.map((t) => ({
+    hash: String(t.hash || '').toLowerCase(),
+    name: t.name || '',
+    contentPath: t.content_path || t.save_path || '',
+    savePath: t.save_path || '',
+    category: t.category || '',
+    progress: t.progress,
+    state: t.state || '',
+    completedOn: t.completion_on || 0,
+  }));
+}

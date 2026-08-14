@@ -339,6 +339,29 @@ CREATE TABLE IF NOT EXISTS imports (
   dest_dir TEXT,
   imported_at INTEGER
 );
+
+-- Registro nativo de descargas/pedidos (0.6.x, independencia de Lidarr). Cuando Liderarr
+-- agarra una release, apunta aquí el pedido con el contexto del álbum; el auto-import casa
+-- el torrent terminado (por hash o nombre) con la petición para llevarlo a su carpeta y
+-- marcar el estado. Sustituye al snapshot de Lidarr para pintar "pedido/descargando".
+CREATE TABLE IF NOT EXISTS downloads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  album_id INTEGER,
+  rg_mbid TEXT,
+  artist TEXT,
+  album TEXT,
+  year INTEGER,
+  release_title TEXT,
+  infohash TEXT,
+  source TEXT,                -- jackett | prowlarr
+  status TEXT DEFAULT 'requested',  -- requested | importing | imported | error
+  dest TEXT,
+  requested_at INTEGER,
+  updated_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
+CREATE INDEX IF NOT EXISTS idx_downloads_infohash ON downloads(infohash);
+CREATE INDEX IF NOT EXISTS idx_downloads_rg ON downloads(rg_mbid);
 `);
 
 // --- migraciones ligeras ----------------------------------------------------
