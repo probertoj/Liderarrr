@@ -124,6 +124,10 @@ export async function qbAdd({ url: dl, category } = {}) {
   const cat = category || getSetting('qbittorrent_category') || '';
   let form = `urls=${encodeURIComponent(dl)}`;
   if (cat) form += `&category=${encodeURIComponent(cat)}`;
+  // ARRANCA la descarga sí o sí: si qBittorrent está configurado para «añadir en pausa»
+  // (o es su defecto), el torrent se queda en Stopped y nunca baja ni se auto-importa.
+  // qBittorrent 5.x renombró el parámetro de `paused` a `stopped`; mandamos ambos a false.
+  form += '&paused=false&stopped=false';
   const r = (await qbFetch('/api/v2/torrents/add', { method: 'POST', body: form })).trim();
   if (/^fails\.?$/i.test(r)) throw new Error('qBittorrent no acepto el enlace (Fails.).');
   return { ok: true };
