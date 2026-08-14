@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel } from '../components.jsx';
+import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, useLidarrEnabled } from '../components.jsx';
 
 export default function ArtistDetail() {
   const { id } = useParams();
@@ -10,6 +10,7 @@ export default function ArtistDetail() {
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const [openKey, setOpenKey] = useState(null); // grupo de duplicados desplegado
+  const lidarrOn = useLidarrEnabled();
 
   const load = () => api.artist(id).then(setArtist).catch((e) => setErr(e.message));
   useEffect(() => {
@@ -163,12 +164,14 @@ export default function ArtistDetail() {
       )}
 
       {/* lo que falta */}
-      {comp.missing?.length > 0 && <MissingList items={comp.missing} artistMbid={artist.mbid} artistName={artist.name} />}
+      {comp.missing?.length > 0 && (
+        <MissingList items={comp.missing} artistMbid={artist.mbid} artistName={artist.name} lidarrOn={lidarrOn} />
+      )}
       {scope === 'all' && comp.missingEps?.length > 0 && (
-        <MissingList items={comp.missingEps} artistMbid={artist.mbid} artistName={artist.name} noun="EPs" singular="EP" />
+        <MissingList items={comp.missingEps} artistMbid={artist.mbid} artistName={artist.name} noun="EPs" singular="EP" lidarrOn={lidarrOn} />
       )}
       {scope === 'all' && comp.missingSingles?.length > 0 && (
-        <MissingList items={comp.missingSingles} artistMbid={artist.mbid} artistName={artist.name} noun="singles" singular="single" />
+        <MissingList items={comp.missingSingles} artistMbid={artist.mbid} artistName={artist.name} noun="singles" singular="single" lidarrOn={lidarrOn} />
       )}
 
       {/* por estrenar */}
@@ -331,19 +334,29 @@ function RelChip({ a }) {
   );
 }
 
-function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudio', singular = 'álbum de estudio' }) {
+function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudio', singular = 'álbum de estudio', lidarrOn }) {
   const [added, setAdded] = useState({});
   const [busy, setBusy] = useState(null);
   const [queue, setQueue] = useState(null);
   const [search, setSearch] = useState(null); // query del modal de búsqueda manual
 
-  // Lidarr es lento: el envío se ENCOLA y responde al instante; se sondea el progreso.
+  // Con Lidarr → se lo mandamos (envío encolado, no bloqueante). Sin Lidarr (opcional)
+  // → descarga nativa: agarra la mejor release por Prowlarr/Jackett y el auto-import
+  // la coloca en la biblioteca.
   const add = async (rg) => {
     setBusy(rg.rg_mbid);
     try {
-      await api.lidarrAdd(rg.rg_mbid, artistMbid);
+      if (lidarrOn) {
+        await api.lidarrAdd(rg.rg_mbid, artistMbid);
+        pollLidarrQueue(setQueue);
+      } else {
+        const res = await api.grabBest(`${artistName || ''} ${rg.title}`.trim(), { rg_mbid: rg.rg_mbid, artist: artistName, album: rg.title });
+        if (!res.grabbed) {
+          alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+          return;
+        }
+      }
       setAdded((p) => ({ ...p, [rg.rg_mbid]: true }));
-      pollLidarrQueue(setQueue);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -356,11 +369,21 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
     if (!toSend.length) return;
     setBusy('all');
     try {
-      await api.lidarrAddBulk(toSend.map((i) => ({ rg_mbid: i.rg_mbid, artist_mbid: artistMbid })));
-      const next = {};
-      for (const i of toSend) next[i.rg_mbid] = true;
-      setAdded((p) => ({ ...p, ...next }));
-      pollLidarrQueue(setQueue);
+      if (lidarrOn) {
+        await api.lidarrAddBulk(toSend.map((i) => ({ rg_mbid: i.rg_mbid, artist_mbid: artistMbid })));
+        pollLidarrQueue(setQueue);
+        setAdded((p) => ({ ...p, ...Object.fromEntries(toSend.map((i) => [i.rg_mbid, true])) }));
+      } else {
+        // nativo: secuencial (los indexers se consultan en vivo). Marca las que agarra.
+        for (const i of toSend) {
+          try {
+            const res = await api.grabBest(`${artistName || ''} ${i.title}`.trim(), { rg_mbid: i.rg_mbid, artist: artistName, album: i.title });
+            if (res.grabbed) setAdded((p) => ({ ...p, [i.rg_mbid]: true }));
+          } catch {
+            /* uno que falla no corta la tanda */
+          }
+        }
+      }
     } catch (e) {
       alert(e.message);
     } finally {
@@ -377,7 +400,7 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
         <Button variant="gold" onClick={addAll} disabled={busy === 'all'}>
           <span className="inline-flex items-center gap-1.5">
             {busy === 'all' && <Loader2 size={14} className="animate-spin" />}
-            {busy === 'all' ? 'Encolando…' : 'Enviar todos a Lidarr'}
+            {busy === 'all' ? (lidarrOn ? 'Encolando…' : 'Descargando…') : lidarrOn ? 'Enviar todos a Lidarr' : 'Descargar todos'}
           </span>
         </Button>
       </div>
@@ -416,7 +439,7 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
               </button>
               {done ? (
                 <span className="text-emerald-400 text-xs inline-flex items-center gap-1 shrink-0">
-                  <Check size={14} /> en Lidarr
+                  <Check size={14} /> {lidarrOn ? 'en Lidarr' : 'pedido'}
                 </span>
               ) : (
                 <button
@@ -425,7 +448,7 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
                   className="text-xs px-2 py-1 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 shrink-0 inline-flex items-center gap-1 disabled:opacity-50"
                 >
                   {busy === m.rg_mbid ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-                  {busy === m.rg_mbid ? 'Enviando…' : 'Lidarr'}
+                  {busy === m.rg_mbid ? (lidarrOn ? 'Enviando…' : 'Descargando…') : lidarrOn ? 'Lidarr' : 'Descargar'}
                 </button>
               )}
             </div>

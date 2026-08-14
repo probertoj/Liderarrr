@@ -9,7 +9,7 @@ import { runScan, scanStatus } from './scanner.js';
 import { regroupDiscs } from './discgroup.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch } from './identify.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
-import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab, enqueueLidarrAdd, lidarrAddStatus, resumeAddQueue } from './lidarr.js';
+import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab, enqueueLidarrAdd, lidarrAddStatus, resumeAddQueue, lidarrConfig } from './lidarr.js';
 import { prowlarrTest, prowlarrSearch, prowlarrGrab } from './prowlarr.js';
 import { jackettTest, jackettSearch } from './jackett.js';
 import { qbTest, qbAdd } from './qbittorrent.js';
@@ -18,7 +18,7 @@ import { refileAlbum, correctedAlbums, refileAll } from './refile.js';
 import { pendingImports, importFolder } from './importer.js';
 import { recordGrab, magnetHash, downloadsList } from './downloads.js';
 import { runAutoImport, autoImportStatus, autoImportEnabled } from './autoimport.js';
-import { runAutoGrab, autoGrabConfig, autoGrabStatus } from './autograb.js';
+import { runAutoGrab, autoGrabConfig, autoGrabStatus, searchAndGrabBest } from './autograb.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground } from './musicbrainz.js';
 import { acoustidTest } from './acoustid.js';
 import { discogsTest, searchRelease } from './discogs.js';
@@ -716,6 +716,21 @@ app.get('/api/downloads', async () => ({ enabled: autoImportEnabled(), status: a
 // auto-descarga nativa (③+④): estado/config y ejecución manual (dryRun para simular)
 app.get('/api/autograb', async () => ({ ...autoGrabConfig(), status: autoGrabStatus }));
 app.post('/api/autograb/run', async (req) => runAutoGrab({ dryRun: !!req.body?.dryRun }));
+// grab nativo de UN ítem (un clic → la mejor release): el reemplazo de «enviar a Lidarr»
+app.post('/api/grab-best', async (req, reply) => {
+  try {
+    const { query, context } = req.body || {};
+    if (!query) return reply.code(400).send({ error: 'Falta la consulta' });
+    return await searchAndGrabBest(query, context || {});
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// ¿Lidarr configurado? La UI oculta sus caminos si no lo está (Lidarr es opcional).
+app.get('/api/lidarr/enabled', async () => {
+  const { url, key } = lidarrConfig();
+  return { enabled: !!(url && key) };
+});
 app.post('/api/imports/auto-run', async (req, reply) => {
   try {
     return await runAutoImport();

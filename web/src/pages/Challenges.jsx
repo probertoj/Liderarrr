@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download } from 'lucide-react';
 import { api } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, Button, SearchModal } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, Button, SearchModal, useLidarrEnabled } from '../components.jsx';
 
 // Retos: listas de álbumes "que hay que tener/oír". Anillos concéntricos de lo
 // que tienes vs lo que has escuchado, y envío en bloque a Lidarr de lo que falta.
@@ -191,6 +191,7 @@ function Detail({ id, onBack }) {
   const [filter, setFilter] = useState('all'); // all | missing | unheard
   const [search, setSearch] = useState(null); // query del modal de búsqueda manual
   const [queued, setQueued] = useState({}); // position -> 'sending' | 'ok' | 'fail'
+  const lidarrOn = useLidarrEnabled();
 
   const load = () => api.challenge(id).then(setC).catch((e) => setErr(e.message));
   useEffect(() => {
@@ -198,25 +199,48 @@ function Detail({ id, onBack }) {
   }, [id]);
 
   const sendMissing = async () => {
-    if (!confirm('¿Resolver en MusicBrainz y enviar a Lidarr todos los que te faltan?')) return;
+    if (lidarrOn) {
+      if (!confirm('¿Resolver en MusicBrainz y enviar a Lidarr todos los que te faltan?')) return;
+      setSending(true);
+      try {
+        const r = await api.challengeToLidarr(id);
+        alert(`Encolados ${r.queued} para resolver y enviar en segundo plano.\nEl progreso está en la cola de Lidarr (Diagnóstico).`);
+      } catch (e) {
+        alert(e.message);
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+    // Nativo (sin Lidarr): agarra la mejor de cada faltante, secuencial (indexers en vivo).
+    const missing = (c?.items || []).filter((i) => !i.owned);
+    if (!missing.length || !confirm(`¿Buscar y descargar los ${missing.length} que te faltan? Puede tardar.`)) return;
     setSending(true);
     try {
-      const r = await api.challengeToLidarr(id);
-      alert(`Encolados ${r.queued} para resolver y enviar en segundo plano.\nEl progreso está en la cola de Lidarr (Diagnóstico).`);
-    } catch (e) {
-      alert(e.message);
+      for (const it of missing) {
+        setQueued((p) => ({ ...p, [it.position]: 'sending' }));
+        try {
+          const r = await api.grabBest(`${it.artist} ${it.album}`, { artist: it.artist, album: it.album });
+          setQueued((p) => ({ ...p, [it.position]: r.grabbed ? 'ok' : 'fail' }));
+        } catch {
+          setQueued((p) => ({ ...p, [it.position]: 'fail' }));
+        }
+      }
     } finally {
       setSending(false);
     }
   };
 
-  // Envío no bloqueante de UN ítem: resuelve en MB y encola a Lidarr.
+  // UN ítem: con Lidarr resuelve en MB y encola; sin Lidarr agarra la mejor release.
   const sendOne = async (it) => {
     setQueued((p) => ({ ...p, [it.position]: 'sending' }));
     try {
-      const r = await api.lidarrAddByName(it.artist, it.album);
-      setQueued((p) => ({ ...p, [it.position]: r.ok ? 'ok' : 'fail' }));
-      if (!r.ok) alert(`No se pudo enviar: ${r.reason || 'sin coincidencia en MusicBrainz'}`);
+      const r = lidarrOn
+        ? await api.lidarrAddByName(it.artist, it.album)
+        : await api.grabBest(`${it.artist} ${it.album}`, { artist: it.artist, album: it.album });
+      const ok = lidarrOn ? r.ok : r.grabbed;
+      setQueued((p) => ({ ...p, [it.position]: ok ? 'ok' : 'fail' }));
+      if (!ok) alert(`No se pudo: ${r.reason || 'sin coincidencia / sin release'}`);
     } catch (e) {
       setQueued((p) => ({ ...p, [it.position]: 'fail' }));
       alert(e.message);
@@ -254,7 +278,7 @@ function Detail({ id, onBack }) {
         <div className="flex gap-2">
           <Button variant="gold" onClick={sendMissing} disabled={sending}>
             <span className="inline-flex items-center gap-1.5">
-              <Send size={14} /> {sending ? 'Enviando…' : 'Faltantes a Lidarr'}
+              <Send size={14} /> {sending ? (lidarrOn ? 'Enviando…' : 'Descargando…') : lidarrOn ? 'Faltantes a Lidarr' : 'Descargar faltantes'}
             </span>
           </Button>
           <Button variant="ghost" onClick={remove}>
@@ -306,7 +330,7 @@ function Detail({ id, onBack }) {
                       disabled={queued[it.position] === 'sending'}
                       className="px-2 py-1 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 disabled:opacity-50"
                     >
-                      <Download size={12} /> {queued[it.position] === 'sending' ? '…' : 'Lidarr'}
+                      <Download size={12} /> {queued[it.position] === 'sending' ? '…' : lidarrOn ? 'Lidarr' : 'Descargar'}
                     </button>
                   )}
                 </>

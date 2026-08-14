@@ -3,6 +3,31 @@ import { Link } from 'react-router-dom';
 import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2 } from 'lucide-react';
 import { api, coverUrl, fmtBytes } from './api.js';
 
+// ¿Lidarr configurado? La UI oculta sus caminos cuando no lo está (Lidarr es opcional:
+// el flujo nativo —buscar/descargar, auto-descarga— es el que manda). Se consulta una
+// sola vez y se cachea a nivel de módulo. Devuelve null mientras carga (no decidido).
+let _lidarrEnabled;
+export function useLidarrEnabled() {
+  const [on, setOn] = useState(_lidarrEnabled === undefined ? null : _lidarrEnabled);
+  useEffect(() => {
+    if (_lidarrEnabled !== undefined) {
+      setOn(_lidarrEnabled);
+      return;
+    }
+    api
+      .lidarrEnabled()
+      .then((r) => {
+        _lidarrEnabled = !!r.enabled;
+        setOn(_lidarrEnabled);
+      })
+      .catch(() => {
+        _lidarrEnabled = false;
+        setOn(false);
+      });
+  }, []);
+  return on;
+}
+
 // Red de seguridad: si una página lanza un error al pintar (o falla la carga de
 // su código tras una actualización, o una petición revienta), muestra un aviso
 // con recargar en vez de dejar TODA la app en blanco. Se remonta al cambiar de

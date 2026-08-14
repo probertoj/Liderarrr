@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { Cover, StateBadge, Spinner, ErrorMsg, Button } from '../components.jsx';
+import { Cover, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled } from '../components.jsx';
 
 export default function AlbumDetail() {
   const { id } = useParams();
@@ -17,6 +17,7 @@ export default function AlbumDetail() {
   const [titleVal, setTitleVal] = useState('');
   const [labels, setLabels] = useState([]);
   const [labelTried, setLabelTried] = useState(false);
+  const lidarrOn = useLidarrEnabled();
 
   const load = () => api.album(id).then(setAlbum).catch((e) => setErr(e.message));
   useEffect(() => {
@@ -341,7 +342,7 @@ export default function AlbumDetail() {
 
       {(album.match_state === 'matched' || album.match_state === 'orphan') && <ReMatch album={album} onDone={load} />}
 
-      {album.match_state === 'matched' && <LidarrSection album={album} onDone={load} />}
+      {lidarrOn && album.match_state === 'matched' && <LidarrSection album={album} onDone={load} />}
 
       <SearchSection album={album} />
 

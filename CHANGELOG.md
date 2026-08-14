@@ -9,6 +9,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Cambiado
+- **Lidarr ahora es opcional (independencia).** Si no tienes Lidarr configurado, la app funciona
+  entera con el flujo nativo: los botones «Lidarr» de la ficha del álbum, huecos del artista,
+  calendario, radar y retos pasan a **«Descargar»** (agarra la mejor release por Prowlarr/Jackett y
+  el auto-import la coloca en la biblioteca). Con Lidarr configurado, todo sigue igual que antes.
+
 ### Añadido
 - **Auto-descarga nativa, sin Lidarr (camino a 1.0).** Alternativa al auto-Lidarr: en el refresco
   nocturno busca en tus indexers (Jackett/Prowlarr) los estrenos/huecos de tus artistas seguidos,

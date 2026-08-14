@@ -82,6 +82,8 @@ export const api = {
   autoImportRun: () => req('/imports/auto-run', { method: 'POST' }),
   autograb: () => req('/autograb'),
   autograbRun: (dryRun) => req('/autograb/run', { method: 'POST', body: { dryRun } }),
+  grabBest: (query, context) => req('/grab-best', { method: 'POST', body: { query, context } }),
+  lidarrEnabled: () => req('/lidarr/enabled'),
 
   // fase 2 — la caza
   tracked: () => req('/tracked'),

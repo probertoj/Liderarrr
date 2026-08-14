@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarClock, Plus, Check, Loader2, ExternalLink, Search, Star, Tag, X, RefreshCw, Radio } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, SearchModal } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, SearchModal, useLidarrEnabled } from '../components.jsx';
 
 // Lanzamientos: cuatro vistas. «Próximos» (release groups por estrenar de tus artistas),
 // «Estrenados recientemente» (ya estrenados dentro de una ventana; por defecto este año),
@@ -13,7 +13,7 @@ import { PageTitle, Spinner, ErrorMsg, SearchModal } from '../components.jsx';
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 const thisYearStart = () => `${new Date().getFullYear()}-01-01`;
 
-function ReleaseRow({ r, added, busy, followed, onAdd, onFollow, onSearch }) {
+function ReleaseRow({ r, added, busy, followed, onAdd, onFollow, onSearch, lidarrOn }) {
   const done = added[r.rg_mbid] || r.in_lidarr;
   const followKey = r.artist_id || r.artist_mbid;
   const isFollowed = (followKey && followed[followKey]) || r.tracked;
@@ -86,17 +86,17 @@ function ReleaseRow({ r, added, busy, followed, onAdd, onFollow, onSearch }) {
           </span>
         ) : done ? (
           <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
-            <Check size={13} /> Lidarr
+            <Check size={13} /> {lidarrOn ? 'Lidarr' : 'pedido'}
           </span>
-        ) : r.artist_mbid ? (
+        ) : lidarrOn && !r.artist_mbid ? null : (
           <button
             onClick={() => onAdd(r)}
             disabled={busy === r.rg_mbid}
             className="text-xs px-1.5 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 disabled:opacity-50"
           >
-            {busy === r.rg_mbid ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Lidarr
+            {busy === r.rg_mbid ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} {lidarrOn ? 'Lidarr' : 'Descargar'}
           </button>
-        ) : null}
+        )}
       </div>
     </div>
   );
@@ -239,22 +239,32 @@ function LabelManager({ labels, onChange }) {
 
 // Fila del radar: un ítem de Bandcamp curado. No trae MBID; el botón Lidarr lo
 // resuelve contra MusicBrainz al vuelo (artista+título) y, si acierta, lo envía.
-function RadarRow({ r, onSearch, onFollowMbid, onQueue }) {
+function RadarRow({ r, onSearch, onFollowMbid, onQueue, lidarrOn }) {
   const [state, setState] = useState('idle'); // idle | resolving | added | notfound
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
 
-  const sendLidarr = async () => {
+  // Con Lidarr → resuelve el MBID y se lo manda. Sin Lidarr → descarga nativa por
+  // artista+título (no necesita MBID); el auto-import la coloca en la biblioteca.
+  const sendGrab = async () => {
     setState('resolving');
     try {
-      const res = await api.radarResolve(r.id);
-      if (!res.rg_mbid) {
-        setState('notfound');
-        return;
+      if (lidarrOn) {
+        const res = await api.radarResolve(r.id);
+        if (!res.rg_mbid) {
+          setState('notfound');
+          return;
+        }
+        await api.lidarrAdd(res.rg_mbid, res.artist_mbid);
+        onQueue();
+      } else {
+        const res = await api.grabBest(`${r.artist} ${r.title}`, { artist: r.artist, album: r.title });
+        if (!res.grabbed) {
+          setState('notfound');
+          return;
+        }
       }
-      await api.lidarrAdd(res.rg_mbid, res.artist_mbid);
       setState('added');
-      onQueue();
     } catch (e) {
       alert(e.message);
       setState('idle');
@@ -347,19 +357,19 @@ function RadarRow({ r, onSearch, onFollowMbid, onQueue }) {
           </span>
         ) : state === 'added' ? (
           <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
-            <Check size={13} /> Lidarr
+            <Check size={13} /> {lidarrOn ? 'Lidarr' : 'pedido'}
           </span>
         ) : state === 'notfound' ? (
-          <span className="text-neutral-500 text-xs" title="MusicBrainz no lo reconoce con confianza">
-            sin match MB
+          <span className="text-neutral-500 text-xs" title={lidarrOn ? 'MusicBrainz no lo reconoce con confianza' : 'Sin release válida en tus indexers'}>
+            {lidarrOn ? 'sin match MB' : 'sin release'}
           </span>
         ) : (
           <button
-            onClick={sendLidarr}
+            onClick={sendGrab}
             disabled={state === 'resolving'}
             className="text-xs px-1.5 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 disabled:opacity-50"
           >
-            {state === 'resolving' ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Lidarr
+            {state === 'resolving' ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} {lidarrOn ? 'Lidarr' : 'Descargar'}
           </button>
         )}
         <button onClick={dismiss} className="text-neutral-600 hover:text-red-400" title="Descartar del radar">
@@ -498,12 +508,24 @@ export default function Calendar() {
     if (view === 'radar') loadCurators();
   }, [view, all, since, unowned]);
 
+  const lidarrOn = useLidarrEnabled();
+
+  // Con Lidarr → se lo mandamos (como siempre). Sin Lidarr (opcional) → descarga
+  // nativa: agarra la mejor release por Prowlarr/Jackett y el auto-import la coloca.
   const add = async (r) => {
     setBusy(r.rg_mbid);
     try {
-      await api.lidarrAdd(r.rg_mbid, r.artist_mbid);
+      if (lidarrOn) {
+        await api.lidarrAdd(r.rg_mbid, r.artist_mbid);
+        pollLidarrQueue(setQueue);
+      } else {
+        const res = await api.grabBest(`${r.artist} ${r.title}`, { rg_mbid: r.rg_mbid, artist: r.artist, album: r.title });
+        if (!res.grabbed) {
+          alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+          return;
+        }
+      }
       setAdded((p) => ({ ...p, [r.rg_mbid]: true }));
-      pollLidarrQueue(setQueue);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -678,6 +700,7 @@ export default function Calendar() {
                   <RadarRow
                     key={r.id}
                     r={r}
+                    lidarrOn={lidarrOn}
                     onSearch={setSearch}
                     onFollowMbid={api.followMbid}
                     onQueue={() => pollLidarrQueue(setQueue)}
@@ -695,6 +718,7 @@ export default function Calendar() {
                       <RadarRow
                         key={r.id}
                         r={r}
+                        lidarrOn={lidarrOn}
                         onSearch={setSearch}
                         onFollowMbid={api.followMbid}
                         onQueue={() => pollLidarrQueue(setQueue)}
@@ -710,6 +734,7 @@ export default function Calendar() {
                         onAdd={add}
                         onFollow={follow}
                         onSearch={setSearch}
+                        lidarrOn={lidarrOn}
                       />
                     ))}
               </div>
