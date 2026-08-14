@@ -572,6 +572,18 @@ export default function Settings() {
             <input type="number" value={s.auto_grab_limit || '20'} onChange={set('auto_grab_limit')} className={input} />
           </Field>
         </div>
+        <label className="flex items-center gap-2 text-sm mt-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={s.auto_grab_freeleech_only === '1'}
+            onChange={(e) => setS((p) => ({ ...p, auto_grab_freeleech_only: e.target.checked ? '1' : '0' }))}
+          />
+          <b className="font-normal">Solo freeleech</b>{' '}
+          <span className="text-xs text-neutral-500">
+            (solo agarra releases marcadas freeleech —no cuentan para el ratio—; protege tu cuenta en trackers
+            privados. Si el indexer no informa el freeleech, se descarta por seguridad)
+          </span>
+        </label>
         <div className="mt-2">
           <Button
             onClick={async () => {

@@ -19,6 +19,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   con «Simular ahora» para ver qué agarraría sin descargar nada. Salta lo que ya tienes o ya pediste.
 - **Al agarrar, qBittorrent arranca la descarga** (antes se quedaba en «Stopped» si qB estaba
   configurado para añadir en pausa): se envía `stopped=false`/`paused=false`.
+- **Freeleech.** Las búsquedas marcan las releases **freeleech** (no cuentan para el ratio, atributo
+  `downloadvolumefactor` de Torznab/Prowlarr) con una insignia. La auto-descarga tiene una opción
+  **«Solo freeleech»** (Ajustes → 4b): solo agarra releases freeleech confirmadas —protege tu cuenta
+  en trackers privados—; si el indexer no informa el freeleech, se descarta por seguridad. (Gastar
+  *tokens* de freeleech es propio de cada tracker y no se puede automatizar por Torznab/Prowlarr.)
 
 
 - **Auto-import: cerrar el bucle de descargas sin Lidarr (camino a la independencia).** Con

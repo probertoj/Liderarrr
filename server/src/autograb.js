@@ -28,12 +28,15 @@ function formatRank(title) {
 //  - descarta las MUERTAS (0 seeders) — justo el caso que dejaba descargas paradas;
 //  - exige coincidencia mínima con el álbum (evita agarrar algo ajeno);
 //  - puntúa por formato + seeders (+ bonus si el artista también aparece).
-export function pickBestRelease(results, { artist, album, minSeeders = 1 } = {}) {
+export function pickBestRelease(results, { artist, album, minSeeders = 1, freeleechOnly = false } = {}) {
   const na = normName(artist);
   const nal = normName(album);
   const scored = [];
   for (const r of results || []) {
     if (typeof r.seeders === 'number' && r.seeders < minSeeders) continue; // muerta
+    // freeleech-only: solo releases CONFIRMADAS freeleech (protege el ratio). Si el
+    // indexer no informa el factor (freeleech null), se descarta por seguridad.
+    if (freeleechOnly && r.freeleech !== true) continue;
     const nt = normName(r.title);
     if (nal && !nt.includes(nal)) continue; // no parece ser ese álbum
     const score = formatRank(r.title) + Math.min(20, Math.log2((r.seeders || 0) + 1) * 4) + (na && nt.includes(na) ? 10 : 0);
@@ -49,9 +52,14 @@ export function pickBestRelease(results, { artist, album, minSeeders = 1 } = {})
 export async function searchAndGrabBest(query, context = {}) {
   const engine = getSetting('search_engine') || 'prowlarr';
   const minSeeders = Number(getSetting('auto_grab_min_seeders')) || 1;
+  const freeleechOnly = getSetting('auto_grab_freeleech_only') === '1';
   const results = engine === 'jackett' ? await jackettSearch(query) : await prowlarrSearch(query);
-  const best = pickBestRelease(results, { artist: context.artist, album: context.album, minSeeders });
-  if (!best) return { grabbed: false, reason: 'sin release válida (0 seeders o sin coincidencia)' };
+  const best = pickBestRelease(results, { artist: context.artist, album: context.album, minSeeders, freeleechOnly });
+  if (!best)
+    return {
+      grabbed: false,
+      reason: freeleechOnly ? 'sin release freeleech válida (o 0 seeders / sin coincidencia)' : 'sin release válida (0 seeders o sin coincidencia)',
+    };
   if (engine === 'jackett') await qbAdd({ url: best.downloadUrl });
   else await prowlarrGrab({ guid: best.guid, indexerId: best.indexerId });
   recordGrab({ ...context, release_title: best.title, infohash: magnetHash(best.downloadUrl), source: engine });
@@ -75,6 +83,7 @@ export function autoGrabConfig() {
     lookbackDays: Number(getSetting('auto_grab_lookback_days')) || 30,
     minSeeders: Number(getSetting('auto_grab_min_seeders')) || 1,
     limit: Number(getSetting('auto_grab_limit')) || 20,
+    freeleechOnly: getSetting('auto_grab_freeleech_only') === '1',
     lastRun: Number(getSetting('auto_grab_last_run') || 0) || null,
   };
 }

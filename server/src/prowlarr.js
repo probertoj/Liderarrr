@@ -77,6 +77,10 @@ function mapRelease(r) {
     protocol: r.protocol || '', // torrent | usenet
     publishDate: r.publishDate || null,
     infoUrl: r.infoUrl || null,
+    // freeleech: downloadVolumeFactor=0 significa que la descarga NO cuenta para el ratio.
+    // null si el indexer no lo informa (se trata como "no freeleech" al filtrar).
+    downloadFactor: typeof r.downloadVolumeFactor === 'number' ? r.downloadVolumeFactor : null,
+    freeleech: typeof r.downloadVolumeFactor === 'number' ? r.downloadVolumeFactor === 0 : null,
     // Prowlarr no parsea la calidad de audio: el formato va en el TÍTULO del tracker
     // (p. ej. "[FLAC / 24bit Lossless]"). Se muestra el título tal cual.
   };

@@ -82,6 +82,10 @@ function parseTorznab(xml) {
     const size = Number(tagOf(b, 'size') || attrOf(b, 'size') || 0) || 0;
     const seedersRaw = attrOf(b, 'seeders') ?? attrOf(b, 'seeds');
     const peersRaw = attrOf(b, 'peers') ?? attrOf(b, 'leechers');
+    // freeleech: downloadvolumefactor=0 → la descarga no cuenta para el ratio. null si el
+    // indexer no informa el atributo (se trata como "no freeleech" al filtrar).
+    const dvfRaw = attrOf(b, 'downloadvolumefactor');
+    const downloadFactor = dvfRaw != null ? Number(dvfRaw) : null;
     items.push({
       engine: 'jackett',
       guid: tagOf(b, 'guid') || downloadUrl,
@@ -93,6 +97,8 @@ function parseTorznab(xml) {
       protocol: 'torrent',
       publishDate: tagOf(b, 'pubDate'),
       infoUrl: tagOf(b, 'comments') || null,
+      downloadFactor,
+      freeleech: downloadFactor != null ? downloadFactor === 0 : null,
       downloadUrl,
     });
   }

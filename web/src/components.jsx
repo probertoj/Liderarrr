@@ -370,6 +370,7 @@ export function SearchModal({ initialQuery, onClose }) {
                       <span className={r.seeders > 0 ? 'text-emerald-400/70' : 'text-red-400/70'}>{r.seeders} seeders</span>
                     )}
                     {r.protocol && <span>{r.protocol}</span>}
+                    {r.freeleech && <span className="text-emerald-400" title="No cuenta para el ratio">freeleech</span>}
                   </div>
                 </div>
                 {grabbed[r.guid] ? (

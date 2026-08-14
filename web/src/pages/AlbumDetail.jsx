@@ -1023,6 +1023,7 @@ function SearchSection({ album }) {
                   )}
                   {r.grabs != null && <span>{r.grabs} grabs</span>}
                   {r.protocol && <span>{r.protocol}</span>}
+                  {r.freeleech && <span className="text-emerald-400" title="No cuenta para el ratio">freeleech</span>}
                 </div>
               </div>
               {grabbed[r.guid] ? (
