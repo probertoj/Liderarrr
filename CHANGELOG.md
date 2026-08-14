@@ -22,8 +22,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 - **Freeleech.** Las búsquedas marcan las releases **freeleech** (no cuentan para el ratio, atributo
   `downloadvolumefactor` de Torznab/Prowlarr) con una insignia. La auto-descarga tiene una opción
   **«Solo freeleech»** (Ajustes → 4b): solo agarra releases freeleech confirmadas —protege tu cuenta
-  en trackers privados—; si el indexer no informa el freeleech, se descarta por seguridad. (Gastar
-  *tokens* de freeleech es propio de cada tracker y no se puede automatizar por Torznab/Prowlarr.)
+  en trackers privados—; si el indexer no informa el freeleech, se descarta por seguridad.
+  Nota: los **tokens de freeleech** los gestiona **Prowlarr por indexer** (Never/Preferred/Required);
+  como Liderarr agarra vía Prowlarr (no bypassa), ese ajuste se respeta tal cual. Con **Jackett** no
+  hay tokens, así que ahí el filtro «Solo freeleech» es la protección de ratio.
 
 
 - **Auto-import: cerrar el bucle de descargas sin Lidarr (camino a la independencia).** Con
