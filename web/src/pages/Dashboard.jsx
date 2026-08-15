@@ -3,9 +3,24 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip,
 } from 'recharts';
-import { CalendarClock, Search, X, User, Disc3, Star, Download, Loader2 } from 'lucide-react';
+import { CalendarClock, Search, X, User, Disc3, Star, Download, Loader2, ExternalLink } from 'lucide-react';
 import { api, coverUrl, fmtBytes } from '../api.js';
 import { PageHeader, StatCard, Section, Spinner, ErrorMsg, SearchModal } from '../components.jsx';
+
+// Enlace a MusicBrainz para desambiguar los resultados externos (hay muchos «Beef» o «La
+// Bohème» distintos; el MBID te dice cuál es cuál). stopPropagation por si va dentro de fila.
+const MbLink = ({ url }) => (
+  <a
+    href={url}
+    target="_blank"
+    rel="noreferrer"
+    onClick={(e) => e.stopPropagation()}
+    className="text-[11px] text-neutral-600 hover:text-gold-400 inline-flex items-center gap-0.5 shrink-0"
+    title="Ver en MusicBrainz"
+  >
+    MB <ExternalLink size={10} />
+  </a>
+);
 
 // Buscador rápido del Dashboard: el punto de entrada. Busca al instante en tu colección
 // (artista/disco → su ficha) y, debajo, fuera de ella en MusicBrainz (seguir artista /
@@ -110,11 +125,14 @@ function QuickSearch() {
               Fuera de tu colección {extLoading && <Loader2 size={11} className="animate-spin" />}
             </div>
             {extArtistsOwned.map((a) => (
-              <Link key={`mao${a.mbid}`} to={`/artista/${a.artist_id}`} onClick={close} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-ink-800 text-sm">
+              <div key={`mao${a.mbid}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-ink-800 text-sm">
                 <User size={14} className="text-neutral-500 shrink-0" />
-                <span className="flex-1 truncate">{a.name}</span>
+                <Link to={`/artista/${a.artist_id}`} onClick={close} className="flex-1 truncate hover:text-gold-400">
+                  {a.name}
+                </Link>
+                {a.mbid && <MbLink url={`https://musicbrainz.org/artist/${a.mbid}`} />}
                 <span className="text-xs text-emerald-400/70 shrink-0">lo sigues/tienes</span>
-              </Link>
+              </div>
             ))}
             {extArtistsNew.map((a) => (
               <div key={`ma${a.mbid}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-ink-800 text-sm">
@@ -123,6 +141,7 @@ function QuickSearch() {
                   {a.name}
                   {a.disambiguation ? <span className="text-neutral-600"> · {a.disambiguation}</span> : ''}
                 </span>
+                {a.mbid && <MbLink url={`https://musicbrainz.org/artist/${a.mbid}`} />}
                 <button
                   onClick={() => follow(a)}
                   disabled={busy === a.mbid}
@@ -138,6 +157,7 @@ function QuickSearch() {
                 <span className="flex-1 truncate">
                   {al.title} <span className="text-neutral-600">· {al.artist}{al.year ? ` · ${al.year}` : ''}</span>
                 </span>
+                {al.rg_mbid && <MbLink url={`https://musicbrainz.org/release-group/${al.rg_mbid}`} />}
                 {al.owned ? (
                   <span className="text-xs text-emerald-400/70 shrink-0">lo tienes</span>
                 ) : (
