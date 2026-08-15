@@ -39,6 +39,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   con su instrumento, además de producción, ingeniería y composición, agrupados por persona y con en
   cuántas pistas aparece cada uno. Cada músico enlaza a su ficha si lo tienes en la biblioteca, o a
   MusicBrainz. Se carga bajo demanda.
+- **«Sobre el disco» en la ficha del álbum** (estilo Roon): reseña/descripción del disco (o, si no la hay,
+  del artista) desde Last.fm, con «Leer más», y valoración de la comunidad de Discogs (estrellas + nº de
+  votos). Se autocarga; ambas fuentes son opcionales (aparecen si tienes configuradas Last.fm/Discogs).
 
 ### Corregido
 - **Completismo del artista en vivo**: «faltan», «por estrenar» y el % se calculan cruzando en vivo

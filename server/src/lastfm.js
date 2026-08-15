@@ -51,10 +51,25 @@ export async function albumInfo(artist, album) {
       listeners: Number(a.listeners) || 0,
       playcount: Number(a.playcount) || 0,
       url: a.url || null,
+      wiki: cleanWiki(a.wiki?.content || a.wiki?.summary),
     };
   } catch {
     return null;
   }
+}
+
+// Limpia el texto de la wiki de Last.fm: quita el enlace «Read more on Last.fm» y las
+// etiquetas HTML, deja texto plano. Last.fm publica estos textos con licencia CC-BY-SA.
+function cleanWiki(html) {
+  if (!html) return null;
+  const t = String(html)
+    .replace(/<a\b[^>]*>.*?<\/a>/gis, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\.\s*\./g, '.') // el enlace «Read more» solía dejar un doble punto
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n/g, '\n')
+    .trim();
+  return t || null;
 }
 
 // Popularidad de un artista: oyentes y reproducciones globales. Señal de "cómo
@@ -75,6 +90,7 @@ export async function artistInfo(name) {
       listeners: Number(a.stats?.listeners) || 0,
       playcount: Number(a.stats?.playcount) || 0,
       url: a.url || null,
+      bio: cleanWiki(a.bio?.content || a.bio?.summary),
     };
   } catch {
     return null;

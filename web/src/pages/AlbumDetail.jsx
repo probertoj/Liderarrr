@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { Cover, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled } from '../components.jsx';
 
@@ -344,6 +344,8 @@ export default function AlbumDetail() {
           <p className="text-xs text-neutral-600 mt-2 break-all">{album.path}</p>
         </div>
       </div>
+
+      <AboutSection albumId={album.id} />
 
       {album.match_state !== 'matched' && album.match_state !== 'orphan' && (
         <IdentifySection album={album} onDone={load} />
@@ -764,6 +766,90 @@ function TagWriter({ albumId }) {
               )}
             </>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// «Sobre el disco» (estilo Roon): reseña/descripción (Last.fm) + valoración de la
+// comunidad (Discogs). Se autocarga al abrir la ficha; si no hay nada, no se muestra.
+function Stars({ value }) {
+  const full = Math.round(value || 0);
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star key={n} size={13} className={n <= full ? 'text-gold-400 fill-current' : 'text-neutral-700'} />
+      ))}
+    </span>
+  );
+}
+
+function AboutSection({ albumId }) {
+  const [data, setData] = useState(null);
+  const [expand, setExpand] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setData(null);
+    setExpand(false);
+    api
+      .albumAbout(albumId)
+      .then((d) => alive && setData(d))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [albumId]);
+
+  if (!data) return null;
+  const { review, rating } = data;
+  const hasRating = rating && rating.average != null && rating.count > 0;
+  if (!review && !hasRating) return null;
+
+  const text = review?.text || '';
+  const long = text.length > 420;
+  const shown = expand || !long ? text : `${text.slice(0, 420).trimEnd()}…`;
+
+  return (
+    <div className="card p-4 mb-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+          <BookOpen size={15} /> Sobre el disco
+        </h2>
+        {hasRating && (
+          <a
+            href={rating.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-neutral-400 hover:text-gold-300"
+            title={`Valoración de la comunidad de Discogs (${rating.count} votos)`}
+          >
+            <Stars value={rating.average} />
+            <span className="text-neutral-500">
+              {rating.average.toFixed(2)}/5 · {rating.count} · Discogs
+            </span>
+          </a>
+        )}
+      </div>
+      {review && (
+        <div className="mt-2">
+          <p className="text-sm text-neutral-300 whitespace-pre-line leading-relaxed">{shown}</p>
+          <div className="mt-1.5 flex items-center gap-3">
+            {long && (
+              <button onClick={() => setExpand((v) => !v)} className="text-xs text-gold-400 hover:underline">
+                {expand ? 'Leer menos' : 'Leer más'}
+              </button>
+            )}
+            <a
+              href={review.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-neutral-600 hover:text-neutral-400 inline-flex items-center gap-0.5"
+            >
+              {review.about === 'artist' ? 'Sobre el artista · Last.fm' : 'vía Last.fm'} <ExternalLink size={10} />
+            </a>
+          </div>
         </div>
       )}
     </div>

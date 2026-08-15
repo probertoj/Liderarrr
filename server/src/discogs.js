@@ -142,6 +142,22 @@ export async function releaseEditions(artist, title) {
   };
 }
 
+// Valoración de la comunidad de Discogs para un álbum (media sobre 5 + nº de votos).
+// Reusa la caché del release (misma clave que las ediciones).
+export async function releaseRating(artist, title) {
+  if (!discogsConfigured() || !title) return null;
+  const hit = await searchRelease(artist, title);
+  if (!hit) return null;
+  const url = `https://www.discogs.com/release/${hit.discogs_id}`;
+  try {
+    const rel = await dcCached(`release:${hit.discogs_id}`, `/releases/${hit.discogs_id}`);
+    const r = rel.community?.rating;
+    return { average: r?.average || null, count: r?.count || 0, url };
+  } catch {
+    return { average: null, count: 0, url };
+  }
+}
+
 export async function discogsTest() {
   const data = await schedule(() => dcFetch('/database/search?q=nevermind&type=release&per_page=1'));
   return { ok: true, results: data.pagination?.items ?? 0 };
