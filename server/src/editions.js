@@ -1,7 +1,7 @@
 import { db } from './db.js';
 import { releaseEditions, discogsConfigured } from './discogs.js';
 import { isJunkLabel } from './libkey.js';
-import { searchLabel, labelReleaseGroups, releaseLabels, releaseGroupLabels } from './musicbrainz.js';
+import { searchLabel, labelReleaseGroups, releaseLabels, releaseGroupLabels, releaseGroupReleases } from './musicbrainz.js';
 import { normalizeForDup, libScore } from './queries.js';
 import { normName } from './matchkey.js';
 
@@ -32,15 +32,28 @@ function captureLabel(albumId, label) {
   if (id) linkLabel.run(albumId, id);
 }
 
-// Ediciones de un álbum concreto (bajo demanda desde su ficha).
+// Versiones de un álbum (bajo demanda desde su ficha): unifica las RELEASES oficiales
+// de MusicBrainz (lista canónica de ediciones del release-group) con las ediciones de
+// Discogs (prensajes/remasters y radar de upgrades). Cada fuente es opcional: MB necesita
+// el álbum identificado (rg_mbid), Discogs necesita token.
 export async function albumEditions(albumId) {
-  if (!discogsConfigured()) return { configured: false };
-  const a = db.prepare('SELECT id, album_artist, title FROM albums WHERE id = ?').get(albumId);
+  const a = db.prepare('SELECT id, album_artist, title, rg_mbid FROM albums WHERE id = ?').get(albumId);
   if (!a) throw new Error('Álbum no encontrado');
-  const res = await releaseEditions(a.album_artist, a.title);
-  if (!res) return { configured: true, found: false };
-  captureLabel(albumId, res.label);
-  return { configured: true, found: true, ...res };
+
+  let mbVersions = [];
+  if (a.rg_mbid) mbVersions = await releaseGroupReleases(a.rg_mbid).catch(() => []);
+
+  let discogs = { configured: discogsConfigured() };
+  if (discogs.configured) {
+    const res = await releaseEditions(a.album_artist, a.title);
+    if (res) {
+      captureLabel(albumId, res.label);
+      discogs = { ...discogs, found: true, ...res };
+    } else {
+      discogs = { ...discogs, found: false };
+    }
+  }
+  return { mbVersions, discogs };
 }
 
 // Resuelve el sello de un álbum IDENTIFICADO desde MusicBrainz (bajo demanda desde la

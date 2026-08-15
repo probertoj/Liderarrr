@@ -1038,8 +1038,9 @@ function AlbumCreditsSection({ albumId }) {
   );
 }
 
-// Ediciones de Discogs (el equivalente de JustWatch): ¿existe una versión mejor
-// de este disco ahí fuera? Se carga bajo demanda para no gastar peticiones.
+// Versiones del disco (estilo Roon): todas las ediciones oficiales de MusicBrainz
+// (prensajes por país/año/formato/sello) unificadas con las de Discogs (que además
+// marcan posibles upgrades). Cada fuente es opcional. Se carga bajo demanda.
 function Editions({ albumId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1057,68 +1058,110 @@ function Editions({ albumId }) {
     }
   };
 
+  const dc = data?.discogs || {};
+  const nothing = data && !data.mbVersions?.length && !dc.found && dc.configured !== false;
+
   return (
     <div className="card p-4 mb-6">
       <div className="flex items-center justify-between">
         <h2 className="text-sm text-neutral-400 flex items-center gap-2">
-          <Disc3 size={15} /> Ediciones (Discogs)
+          <Disc3 size={15} /> Versiones
         </h2>
         {!data && (
           <Button onClick={load} disabled={loading}>
-            {loading ? 'Buscando…' : 'Buscar ediciones'}
+            {loading ? 'Buscando…' : 'Ver versiones'}
           </Button>
         )}
       </div>
       <p className="text-xs text-neutral-600 mt-1">
-        Tu radar de <span className="text-neutral-500">upgrades</span>: MusicBrainz dice qué álbumes existen; Discogs dice
-        qué versiones hay de este (vinilo, remaster, edición japonesa, box set…). Si tienes un rip peor que una edición
-        que Discogs conoce, aparece en «Posibles upgrades». No toca tus ficheros: solo te informa.
+        Todas las ediciones de este disco: las oficiales de <span className="text-neutral-500">MusicBrainz</span> (prensaje
+        por país, año, formato y sello) y las de <span className="text-neutral-500">Discogs</span>, con radar de posibles
+        upgrades. No toca tus ficheros: solo te informa.
       </p>
 
       {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
-      {data && data.configured === false && (
-        <p className="text-sm text-neutral-600 mt-3">Configura un token de Discogs en Ajustes para ver ediciones.</p>
-      )}
-      {data && data.found === false && <p className="text-sm text-neutral-600 mt-3">Discogs no encuentra este álbum.</p>}
 
-      {data && data.found && (
-        <div className="mt-3">
-          {data.upgradeHints?.length > 0 && (
-            <div className="mb-3 text-sm">
-              <span className="text-gold-400">Posibles upgrades:</span>{' '}
-              {data.upgradeHints.map((u, i) => (
-                <span key={i} className="text-neutral-400">
-                  {u.format}
-                  {u.year ? ` (${u.year})` : ''}
-                  {i < data.upgradeHints.length - 1 ? ' · ' : ''}
-                </span>
-              ))}
+      {data && (
+        <div className="mt-3 space-y-4">
+          {data.mbVersions?.length > 0 && (
+            <div>
+              <h3 className="text-xs uppercase tracking-wider text-neutral-600 mb-2">MusicBrainz · {data.mbVersions.length}</h3>
+              <div className="max-h-72 overflow-y-auto divide-y divide-ink-850/60">
+                {data.mbVersions.map((v) => (
+                  <a
+                    key={v.mbid}
+                    href={`https://musicbrainz.org/release/${v.mbid}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="py-1.5 px-1 -mx-1 rounded flex items-center justify-between text-sm hover:bg-ink-850/40"
+                  >
+                    <span className="min-w-0 truncate text-neutral-300">
+                      {v.formats.join(', ') || '—'}
+                      {v.label ? <span className="text-neutral-600"> · {v.label}</span> : ''}
+                      {v.disambiguation ? <span className="text-neutral-600"> · {v.disambiguation}</span> : ''}
+                    </span>
+                    <span className="text-neutral-500 shrink-0 ml-2">
+                      {v.country ? `${v.country} ` : ''}
+                      {v.year || ''}
+                    </span>
+                  </a>
+                ))}
+              </div>
             </div>
           )}
-          <div className="max-h-72 overflow-y-auto divide-y divide-ink-850/60">
-            {data.editions.map((e, i) => (
-              <div key={i} className="py-1.5 flex items-center justify-between text-sm">
-                <span className="text-neutral-300">
-                  {e.format}
-                  {e.label ? <span className="text-neutral-600"> · {e.label}</span> : ''}
-                </span>
-                <span className="text-neutral-500 shrink-0 ml-2">
-                  {e.country ? `${e.country} ` : ''}
-                  {e.year || ''}
-                </span>
-              </div>
-            ))}
-          </div>
-          {data.discogsUrl && (
-            <a
-              href={data.discogsUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-gold-400 hover:underline mt-2"
-            >
-              Ver en Discogs <ExternalLink size={12} />
-            </a>
+
+          {dc.configured === false && (
+            <p className="text-xs text-neutral-600">
+              Añade un token de <span className="text-neutral-500">Discogs</span> en Ajustes para ver también sus ediciones
+              y el radar de upgrades.
+            </p>
           )}
+
+          {dc.found && (
+            <div>
+              <h3 className="text-xs uppercase tracking-wider text-neutral-600 mb-2 flex items-center gap-2">
+                Discogs
+                {dc.discogsUrl && (
+                  <a
+                    href={dc.discogsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="normal-case tracking-normal text-gold-400 hover:underline inline-flex items-center gap-0.5"
+                  >
+                    master <ExternalLink size={10} />
+                  </a>
+                )}
+              </h3>
+              {dc.upgradeHints?.length > 0 && (
+                <div className="mb-2 text-sm">
+                  <span className="text-gold-400">Posibles upgrades:</span>{' '}
+                  {dc.upgradeHints.map((u, i) => (
+                    <span key={i} className="text-neutral-400">
+                      {u.format}
+                      {u.year ? ` (${u.year})` : ''}
+                      {i < dc.upgradeHints.length - 1 ? ' · ' : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="max-h-60 overflow-y-auto divide-y divide-ink-850/60">
+                {dc.editions.map((e, i) => (
+                  <div key={i} className="py-1.5 flex items-center justify-between text-sm">
+                    <span className="text-neutral-300 min-w-0 truncate">
+                      {e.format}
+                      {e.label ? <span className="text-neutral-600"> · {e.label}</span> : ''}
+                    </span>
+                    <span className="text-neutral-500 shrink-0 ml-2">
+                      {e.country ? `${e.country} ` : ''}
+                      {e.year || ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {nothing && <p className="text-sm text-neutral-600">No se encontraron versiones.</p>}
         </div>
       )}
     </div>

@@ -422,6 +422,28 @@ export async function releaseGroupCredits(rgMbid, releaseMbid) {
 
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
+// Todas las RELEASES (ediciones oficiales) de un release-group: fecha, país, formato,
+// sello, nº de pistas y estado. La lista canónica de «versiones» de un disco en MB.
+export async function releaseGroupReleases(rgMbid) {
+  if (!rgMbid) return [];
+  const data = await mbCached(`rg-releases:${rgMbid}`, `/release?release-group=${enc(rgMbid)}&inc=media+labels&limit=100`);
+  return (data.releases || [])
+    .map((r) => ({
+      mbid: r.id,
+      title: r.title,
+      date: r.date || null,
+      year: r.date ? Number(String(r.date).slice(0, 4)) || null : null,
+      country: r.country || r['release-events']?.[0]?.area?.['iso-3166-1-codes']?.[0] || null,
+      status: r.status || null,
+      disambiguation: r.disambiguation || '',
+      formats: [...new Set((r.media || []).map((m) => m.format).filter(Boolean))],
+      tracks: (r.media || []).reduce((n, m) => n + (m['track-count'] || 0), 0),
+      label: (r['label-info'] || []).map((li) => li.label?.name).filter(Boolean)[0] || null,
+      catno: (r['label-info'] || [])[0]?.['catalog-number'] || null,
+    }))
+    .sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')));
+}
+
 // Catálogo de ÁLBUMES DE ESTUDIO de un sello (primary Album, sin secundarios). Los
 // sellos cuelgan de RELEASES en MusicBrainz, no de release-groups: se recorren las
 // releases del sello y se deduplican a RG. Tope `maxReleases` para no traer miles de

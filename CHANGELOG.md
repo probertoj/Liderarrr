@@ -45,6 +45,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 - **Recomendaciones en la ficha del álbum** (estilo Valence de Roon): «Más de este artista» (otros discos
   suyos que tienes, con carátula, enlazados) y «Te podría gustar» (artistas afines vía Last.fm, resaltando
   los que ya tienes). Se carga bajo demanda.
+- **«Versiones» en la ficha del álbum** (antes «Ediciones (Discogs)»): ahora unifica todas las ediciones
+  oficiales de MusicBrainz (prensaje por país, año, formato y sello, cada una enlazada) con las de Discogs
+  y su radar de posibles upgrades. Cada fuente es opcional.
 
 ### Corregido
 - **Completismo del artista en vivo**: «faltan», «por estrenar» y el % se calculan cruzando en vivo
