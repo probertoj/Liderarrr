@@ -8,7 +8,7 @@ export default function Library() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [group, setGroup] = useState(null); // grupo de duplicados abierto (al pinchar ×N)
-  const [f, setF] = useState({ q: '', genre: '', decade: '', format: '', lossless: '', state: '', sort: 'added', dupesOnly: '' });
+  const [f, setF] = useState({ q: '', genre: '', decade: '', year: '', format: '', lossless: '', state: '', sort: 'added', dupesOnly: '' });
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
   const [combining, setCombining] = useState(false);
@@ -101,6 +101,19 @@ export default function Library() {
             </option>
           ))}
         </select>
+        <input
+          list="year-list"
+          value={f.year}
+          onChange={set('year')}
+          placeholder="Año"
+          className={`${sel} w-24`}
+          title="Filtrar por un año concreto (tiene prioridad sobre la década)"
+        />
+        <datalist id="year-list">
+          {filters?.years?.map((y) => (
+            <option key={y} value={y} />
+          ))}
+        </datalist>
         <select value={f.format} onChange={set('format')} className={sel}>
           <option value="">Formato</option>
           {filters?.formats.map((fm) => (

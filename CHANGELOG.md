@@ -9,6 +9,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Dashboard: «Próximos lanzamientos»** en vez de «Últimas en Lidarr»: los estrenos por venir de tus
+  artistas y sellos seguidos, con enlace al calendario.
+- **Discoteca: filtrar por año** (además de por década). El año concreto tiene prioridad sobre la década.
+- **Artistas: más formas de ordenar**: recientes, seguidos primero, nombre A-Z / Z-A y aleatorio (antes solo
+  por nº de álbumes, pistas o nombre).
+
+### Corregido
+- **Calidad y disco: los duplicados ahora se pueden pinchar** para abrir el panel de copias y limpiarlas
+  (descartar o borrar), en vez de solo listarlos sin poder actuar.
+- **Carga de carátulas inconsistente**: las portadas ya no «desaparecen» al volver a la Discoteca con el
+  botón atrás del navegador, ni faltan al entrar en un disco. Se quitó el `loading="lazy"` (que a veces no
+  disparaba la carga) y el 404 de una carátula aún sin resolver deja de cachearse (antes se servía el 404
+  viejo 30 s aunque ya estuviera lista). Igual para las fotos de artista.
+
 ---
 
 ## [0.8.0] — 2026-08-15

@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HardDrive } from 'lucide-react';
 import { api, fmtBytes } from '../api.js';
-import { PageTitle, Stat, Spinner, ErrorMsg } from '../components.jsx';
+import { PageTitle, Stat, Spinner, ErrorMsg, DuplicateGroupPanel } from '../components.jsx';
 
 export default function Quality() {
   const [ov, setOv] = useState(null);
   const [dups, setDups] = useState(null);
   const [err, setErr] = useState(null);
+  const [group, setGroup] = useState(null); // grupo de duplicados abierto (para limpiarlo)
   useEffect(() => {
     Promise.all([api.quality(), api.duplicates()])
       .then(([o, d]) => {
@@ -16,6 +17,17 @@ export default function Quality() {
       })
       .catch((e) => setErr(e.message));
   }, []);
+
+  // abre el panel de limpieza del grupo (mismas acciones que en la Discoteca al pinchar ×N)
+  const openDup = async (d) => {
+    const firstId = Number(String(d.ids || '').split(',')[0]);
+    if (!firstId) return;
+    try {
+      setGroup(await api.dupGroup(firstId));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
 
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!ov) return <Spinner />;
@@ -79,17 +91,28 @@ export default function Quality() {
           {!dups || dups.length === 0 ? (
             <p className="text-neutral-600 text-sm">Sin duplicados detectados.</p>
           ) : (
-            <div className="space-y-1.5 max-h-64 overflow-y-auto">
-              {dups.map((d, i) => (
-                <div key={i} className="text-sm">
-                  <span>{d.album_artist} — {d.title}</span>
-                  <span className="text-xs text-amber-400/80 ml-2">×{d.copies}</span>
-                </div>
-              ))}
-            </div>
+            <>
+              <p className="text-xs text-neutral-600 mb-2">Pincha uno para ver las copias y limpiarlas.</p>
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {dups.map((d, i) => (
+                  <button
+                    key={i}
+                    onClick={() => openDup(d)}
+                    className="w-full text-left text-sm px-2 py-1 -mx-2 rounded hover:bg-ink-850/60 flex items-center justify-between"
+                  >
+                    <span className="truncate">
+                      {d.album_artist} — {d.title}
+                    </span>
+                    <span className="text-xs text-sky-400 ml-2 shrink-0">×{d.copies}</span>
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>
+
+      {group && <DuplicateGroupPanel group={group} onClose={() => setGroup(null)} />}
     </div>
   );
 }

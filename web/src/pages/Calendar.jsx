@@ -23,7 +23,6 @@ function ReleaseRow({ r, added, busy, followed, onAdd, onFollow, onSearch, lidar
       <img
         src={`https://coverartarchive.org/release-group/${r.rg_mbid}/front-250`}
         alt=""
-        loading="lazy"
         onError={(e) => {
           e.currentTarget.style.visibility = 'hidden';
         }}
@@ -295,7 +294,6 @@ function RadarRow({ r, onSearch, onFollowMbid, onQueue, lidarrOn }) {
       <img
         src={r.image}
         alt=""
-        loading="lazy"
         onError={(e) => {
           e.currentTarget.style.visibility = 'hidden';
         }}

@@ -37,7 +37,11 @@ export default function Artists() {
         >
           <option value="albums">Más álbumes</option>
           <option value="tracks">Más pistas</option>
-          <option value="name">Nombre</option>
+          <option value="added">Recientes</option>
+          <option value="tracked">Seguidos primero</option>
+          <option value="name">Nombre (A-Z)</option>
+          <option value="name_desc">Nombre (Z-A)</option>
+          <option value="random">Aleatorio</option>
         </select>
       </div>
 

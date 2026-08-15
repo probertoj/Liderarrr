@@ -830,9 +830,10 @@ app.get('/api/cover/:id', async (req, reply) => {
   // Solo lanza la resolución lenta en la PRIMERA petición (sin ?r): en una parrilla
   // grande (Artistas) los reintentos ?r=N repetían el trabajo pesado por cada imagen.
   if (r.status === 'pending' && req.query?.r == null) resolveCoverSlow(id).catch(() => {});
-  // Caché negativa corta: evita martillear el servidor con las que faltan, pero deja
-  // que aparezcan pronto las que se acaben de resolver.
-  reply.header('Cache-Control', 'public, max-age=30');
+  // NO cachear el 404: si se cacheara, al volver a la Discoteca (botón atrás) se seguiría
+  // sirviendo el 404 viejo aunque la carátula ya esté resuelta. coverFast es barato, así
+  // que re-consultar en cada navegación es aceptable y hace que las carátulas aparezcan.
+  reply.header('Cache-Control', 'no-store');
   return reply.code(404).send();
 });
 
@@ -849,7 +850,7 @@ app.get('/api/artist/:id/photo', async (req, reply) => {
     return reply.send(fs.createReadStream(r.path));
   }
   if (r.status === 'pending' && req.query?.r == null) resolveArtistPhotoSlow(id).catch(() => {});
-  reply.header('Cache-Control', 'public, max-age=30');
+  reply.header('Cache-Control', 'no-store');
   return reply.code(404).send();
 });
 app.get('/api/artist/:id/photo/candidates', async (req, reply) => {

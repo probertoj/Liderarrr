@@ -133,7 +133,6 @@ export function Cover({ id, size = 'full', className = '', noRetry = false, bust
           }
           onLoad={() => setLoaded(true)}
           onError={onError}
-          loading="lazy"
           className={`absolute inset-0 h-full w-full object-cover transition-opacity ${loaded ? 'opacity-100' : 'opacity-0'}`}
           alt=""
         />
@@ -182,7 +181,7 @@ export function ArtistPhoto({ id, name, size = 40, className = '', bust, retry =
       style={{ width: size, height: size, fontSize: Math.round(size * 0.32) }}
     >
       {showImg ? (
-        <img src={src} onError={onError} className="h-full w-full object-cover" alt="" loading="lazy" />
+        <img src={src} onError={onError} className="h-full w-full object-cover" alt="" />
       ) : (
         <span>{artistInitials(name)}</span>
       )}

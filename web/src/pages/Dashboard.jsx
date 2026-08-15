@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   BarChart, Bar, LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip,
 } from 'recharts';
+import { CalendarClock } from 'lucide-react';
 import { api, coverUrl, fmtBytes } from '../api.js';
 import { PageHeader, StatCard, Section, Spinner, ErrorMsg } from '../components.jsx';
 import { useChartTheme } from '../charts.js';
@@ -17,7 +18,7 @@ function CoverTile({ id, title, artist, sub }) {
     <Link to={id ? `/album/${id}` : '#'} className="group block">
       <div className="aspect-square rounded-lg overflow-hidden bg-ink-850 border border-ink-800 group-hover:border-gold-400 transition-colors flex items-center justify-center">
         {id && !err ? (
-          <img src={coverUrl(id)} alt="" loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover" />
+          <img src={coverUrl(id)} alt="" onError={() => setErr(true)} className="w-full h-full object-cover" />
         ) : (
           <span className="text-[11px] text-neutral-600 text-center p-2 leading-tight">{title}</span>
         )}
@@ -38,12 +39,14 @@ export default function Dashboard() {
   const [ov, setOv] = useState(null);
   const [charts, setCharts] = useState(null);
   const [recent, setRecent] = useState(null);
+  const [upcoming, setUpcoming] = useState(null);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
     api.overview().then(setOv).catch((e) => setErr(e.message));
     api.charts().then(setCharts).catch(() => {});
     api.recent().then(setRecent).catch(() => {});
+    api.upcoming().then(setUpcoming).catch(() => {});
   }, []);
 
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
@@ -112,25 +115,30 @@ export default function Dashboard() {
         </Section>
 
         <Section
-          title="Últimas en Lidarr"
-          action={<Link to="/ajustes" className="text-xs text-gold-400 hover:underline">Ajustes →</Link>}
+          title="Próximos lanzamientos"
+          action={<Link to="/proximos" className="text-xs text-gold-400 hover:underline">Ver calendario →</Link>}
         >
-          {recent?.lidarrRecent?.length ? (
+          {upcoming?.length ? (
             <div className="card divide-y divide-ink-800 max-h-[360px] overflow-y-auto">
-              {recent.lidarrRecent.map((m, i) => (
-                <div key={i} className="flex items-center gap-2 px-3 py-2 text-sm">
-                  <span className={m.has_file ? 'text-emerald-400' : 'text-neutral-500'}>{m.has_file ? '✓' : '⏳'}</span>
+              {upcoming.slice(0, 12).map((u) => (
+                <Link
+                  key={u.rg_mbid}
+                  to="/proximos"
+                  className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-ink-850/50"
+                >
+                  <CalendarClock size={14} className="text-gold-400/70 shrink-0" />
                   <span className="text-neutral-300 truncate flex-1">
-                    {m.artist ? <span className="text-neutral-500">{m.artist} — </span> : ''}
-                    {m.title}
+                    {u.artist ? <span className="text-neutral-500">{u.artist} — </span> : ''}
+                    {u.title}
                   </span>
-                  <span className="text-[11px] text-neutral-600 shrink-0">{m.added ? fmtDate(Date.parse(m.added)) : ''}</span>
-                </div>
+                  <span className="text-[11px] text-neutral-600 shrink-0">{u.first_release}</span>
+                </Link>
               ))}
             </div>
           ) : (
             <div className="text-neutral-600 text-sm py-8 text-center">
-              Conecta Lidarr en <Link to="/ajustes" className="text-gold-400">Ajustes</Link> para ver aquí lo que le has pedido.
+              Sigue artistas y sellos para ver aquí sus próximos discos. También en{' '}
+              <Link to="/proximos" className="text-gold-400">Lanzamientos</Link>.
             </div>
           )}
         </Section>
