@@ -65,6 +65,7 @@ import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCom
 import { albumPersonnel } from './albumcredits.js';
 import { albumAbout } from './about.js';
 import { albumRecommendations } from './recommend.js';
+import { findLocal, findExternal } from './find.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
 import { coverFast, resolveCoverSlow, retryMissingCovers, coverCandidates, applyCover } from './covers.js';
 import { artistPhotoFast, resolveArtistPhotoSlow, artistPhotoCandidates, applyArtistPhoto } from './artistpix.js';
@@ -361,6 +362,15 @@ app.post('/api/tracked/by-mbid', async (req, reply) => {
 app.get('/api/artists/search-mb', async (req, reply) => {
   try {
     return await searchArtists(req.query?.q, 8);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// búsqueda rápida del Dashboard: local (instantáneo) + externo (MusicBrainz)
+app.get('/api/find/local', async (req) => findLocal(req.query?.q));
+app.get('/api/find/external', async (req, reply) => {
+  try {
+    return await findExternal(req.query?.q);
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

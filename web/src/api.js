@@ -95,6 +95,8 @@ export const api = {
   unfollow: (id, facet = 'artist') => req(`/tracked/${id}?facet=${facet}`, { method: 'DELETE' }),
   followMbid: (mbid, facet) => req('/tracked/by-mbid', { method: 'POST', body: { mbid, facet } }),
   searchArtistMb: (q) => req(`/artists/search-mb?q=${encodeURIComponent(q)}`),
+  findLocal: (q) => req(`/find/local?q=${encodeURIComponent(q)}`),
+  findExternal: (q) => req(`/find/external?q=${encodeURIComponent(q)}`),
   setArtistMbid: (id, mbid) => req(`/artists/${id}/mbid`, { method: 'PUT', body: { mbid } }),
   refreshArtistDisco: (id) => req(`/artists/${id}/refresh-discography`, { method: 'POST' }),
   discographyRefresh: (onlyTracked) => req('/discography/refresh', { method: 'POST', body: { onlyTracked } }),

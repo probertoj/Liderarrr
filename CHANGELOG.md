@@ -9,6 +9,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Buscador rápido en el Dashboard**: el punto de entrada. Escribe un artista o un disco y salen al instante
+  los de **tu colección** (a su ficha) y, debajo, los que **aún no tienes** vía MusicBrainz — un artista con
+  «Seguir» (entra en completismo y te lleva a su ficha) y un disco con «Descargar». La app va de lo que
+  tienes y, sobre todo, de lo que te falta.
+
 ---
 
 ## [0.8.1] — 2026-08-15
