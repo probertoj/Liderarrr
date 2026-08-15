@@ -154,8 +154,20 @@ export async function searchReleaseGroup(artist, title) {
     first_release: rg['first-release-date'] || null,
     artist: (rg['artist-credit'] || []).map((a) => a.name).join(''),
     artist_mbid: (rg['artist-credit'] || [])[0]?.artist?.id || null,
+    credits: mapCredits(rg),
     score: Number(rg.score) || 0,
   };
+}
+
+// Artist-credit completo (para álbumes acreditados a varios: splits, colaboraciones).
+// Cada entrada: nombre canónico + MBID + el nombre tal como aparece + el nexo posterior.
+function mapCredits(rg) {
+  return (rg['artist-credit'] || []).map((c) => ({
+    name: c.artist?.name || c.name || '',
+    mbid: c.artist?.id || null,
+    credit_name: c.name || c.artist?.name || '',
+    joinphrase: c.joinphrase || '',
+  }));
 }
 
 // Búsqueda LIBRE de release groups para la resolución manual ("Elegir a mano"):
@@ -334,6 +346,7 @@ export async function releaseGroupById(mbid) {
     first_release: rg['first-release-date'] || null,
     artist: (rg['artist-credit'] || []).map((a) => a.name).join(''),
     artist_mbid: (rg['artist-credit'] || [])[0]?.artist?.id || null,
+    credits: mapCredits(rg),
   };
 }
 

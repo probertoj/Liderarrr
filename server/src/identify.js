@@ -4,6 +4,7 @@ import * as acoustid from './acoustid.js';
 import * as discogs from './discogs.js';
 import * as lastfm from './lastfm.js';
 import { clearNone } from './covers.js';
+import { syncAlbumCreditsFromMb } from './credits.js';
 
 // La cadena de identificación, en orden de fiabilidad decreciente (es el flujo
 // del segundo diagrama). Cada álbum sin resolver pasa por:
@@ -105,6 +106,8 @@ async function identifyAlbum(album) {
     if (rg && rg.score >= 80) {
       commitMatch(album, rg, 'musicbrainz', rg.score / 100);
       await anchorArtist(album.id, rg.artist_mbid);
+      // splits/colaboraciones: si el credit trae 2+ artistas, se poblan automáticamente
+      syncAlbumCreditsFromMb(album.id, rg.credits);
       return 'musicbrainz';
     }
   } catch {
@@ -269,5 +272,7 @@ export async function manualMatch(albumId, rgMbid) {
     confidence: 1,
     now: Date.now(),
   });
+  // splits/colaboraciones: puebla el artist-credit desde MB si trae 2+ artistas
+  if (rg?.credits) syncAlbumCreditsFromMb(albumId, rg.credits);
   return db.prepare('SELECT id, title, match_state, rg_mbid, primary_type FROM albums WHERE id = ?').get(albumId);
 }

@@ -280,9 +280,11 @@ CREATE TABLE IF NOT EXISTS sync_log (
 -- que MB conoce de un artista con MBID, marcado con si LO TIENES, si está por
 -- estrenar y su tipo. Denormalizado a propósito: huecos, calendario y % de
 -- completismo salen de aquí con SQL simple, sin repegar a MB en cada página.
+-- Clave COMPUESTA (rg_mbid, artist_id): un release-group puede colgar de varios
+-- artistas (splits, colaboraciones) y contar en el completismo de cada uno.
 CREATE TABLE IF NOT EXISTS release_groups (
-  rg_mbid TEXT PRIMARY KEY,
-  artist_id INTEGER,            -- fila local del artista
+  rg_mbid TEXT NOT NULL,
+  artist_id INTEGER NOT NULL,  -- fila local del artista
   artist_mbid TEXT,
   title TEXT,
   first_release TEXT,          -- YYYY-MM-DD (o parcial)
@@ -291,11 +293,27 @@ CREATE TABLE IF NOT EXISTS release_groups (
   is_owned INTEGER DEFAULT 0,
   owned_album_id INTEGER,      -- álbum local que lo cubre (si lo tienes)
   is_upcoming INTEGER DEFAULT 0,
-  fetched_at INTEGER
+  fetched_at INTEGER,
+  PRIMARY KEY (rg_mbid, artist_id)
 );
 CREATE INDEX IF NOT EXISTS idx_rg_artist ON release_groups(artist_id);
 CREATE INDEX IF NOT EXISTS idx_rg_owned ON release_groups(is_owned);
 CREATE INDEX IF NOT EXISTS idx_rg_upcoming ON release_groups(is_upcoming);
+
+-- Artist-credit COMPLETO de un álbum local (splits/singles compartidos, colaboraciones):
+-- al modo MusicBrainz, un álbum puede estar acreditado a varios artistas con su nexo
+-- ("A / B", "A & B"). Solo se llena cuando hay 2+ artistas; con uno basta albums.artist_id.
+-- albums.artist_id sigue siendo el artista PRINCIPAL (posición 0) por compatibilidad.
+CREATE TABLE IF NOT EXISTS album_artists (
+  album_id INTEGER NOT NULL,
+  artist_id INTEGER NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,   -- 0 = principal
+  join_phrase TEXT,                      -- nexo tras este artista (" / ", " & ", ", ")
+  credit_name TEXT,                      -- nombre tal como aparece en el credit
+  PRIMARY KEY (album_id, artist_id)
+);
+CREATE INDEX IF NOT EXISTS idx_aa_album ON album_artists(album_id);
+CREATE INDEX IF NOT EXISTS idx_aa_artist ON album_artists(artist_id);
 
 -- Completismo por artista (solo álbumes de estudio estrenados), para poder
 -- listar y ordenar sin recalcular. Se rellena junto a release_groups.
@@ -390,6 +408,46 @@ ensureColumn('albums', 'artist_manual', 'artist_manual INTEGER DEFAULT 0');
 // título corregido a mano desde la UI (0.6.3): igual que artist_manual, protege el
 // título de que un reescaneo lo pise con la etiqueta del fichero.
 ensureColumn('albums', 'title_manual', 'title_manual INTEGER DEFAULT 0');
+
+// (0.8) release_groups pasa de clave rg_mbid único a clave COMPUESTA (rg_mbid, artist_id):
+// un mismo release-group puede estar acreditado a varios artistas (splits, colaboraciones)
+// y debe contar en el completismo de CADA uno. Antes el UNIQUE(rg_mbid) lo colapsaba a un
+// solo artista. Rebuild de tabla (SQLite no permite cambiar la PK in situ); conserva datos.
+(function migrateReleaseGroupsPk() {
+  const info = db.prepare('PRAGMA table_info(release_groups)').all();
+  if (!info.length) return; // aún no existe (primer arranque): ya se crea con la PK nueva
+  const pkCols = info.filter((c) => c.pk > 0).map((c) => c.name);
+  const alreadyComposite = pkCols.includes('rg_mbid') && pkCols.includes('artist_id');
+  if (alreadyComposite) return;
+  db.exec(`
+    CREATE TABLE release_groups_new (
+      rg_mbid TEXT NOT NULL,
+      artist_id INTEGER NOT NULL,
+      artist_mbid TEXT,
+      title TEXT,
+      first_release TEXT,
+      primary_type TEXT,
+      secondary_types TEXT,
+      is_owned INTEGER DEFAULT 0,
+      owned_album_id INTEGER,
+      is_upcoming INTEGER DEFAULT 0,
+      fetched_at INTEGER,
+      PRIMARY KEY (rg_mbid, artist_id)
+    );
+    INSERT OR IGNORE INTO release_groups_new
+      (rg_mbid, artist_id, artist_mbid, title, first_release, primary_type,
+       secondary_types, is_owned, owned_album_id, is_upcoming, fetched_at)
+      SELECT rg_mbid, artist_id, artist_mbid, title, first_release, primary_type,
+             secondary_types, is_owned, owned_album_id, is_upcoming, fetched_at
+      FROM release_groups WHERE artist_id IS NOT NULL;
+    DROP TABLE release_groups;
+    ALTER TABLE release_groups_new RENAME TO release_groups;
+    CREATE INDEX IF NOT EXISTS idx_rg_artist ON release_groups(artist_id);
+    CREATE INDEX IF NOT EXISTS idx_rg_owned ON release_groups(is_owned);
+    CREATE INDEX IF NOT EXISTS idx_rg_upcoming ON release_groups(is_upcoming);
+  `);
+  console.log('[db] release_groups -> clave compuesta (rg_mbid, artist_id)');
+})();
 
 // Evita reimportar el mismo scrobble: sin esto, cada importación reinsertaba
 // desde cero. Los scrobbles "sonando ahora" (sin ts) se descartan al importar.

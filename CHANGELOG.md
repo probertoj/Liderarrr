@@ -28,6 +28,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   MBID (duplicados, mayúsculas… p. ej. «Florence + the Machine»), un buscador por nombre —o pegando el
   MBID— lo enlaza y recalcula su discografía y completismo al instante. Queda fijado (un reescaneo no
   lo pisa).
+- **Varios artistas por álbum** (singles compartidos del emo, colaboraciones), al modo MusicBrainz
+  («A / B»): en la ficha del álbum se editan uno o varios artistas; cada uno se enlaza a su ficha. Un
+  split **cuenta en el completismo de cada artista**, aparece en la colección de ambos y, si lo tienes,
+  no sale como «single que te falta» para ninguno. Se autopobla desde el *artist-credit* de MusicBrainz
+  al identificar y también se puede poner a mano. (Por dentro: tabla `album_artists` y `release_groups`
+  pasa a clave compuesta `(rg_mbid, artist_id)` para que un release-group pueda contar en varios
+  artistas; la migración conserva los datos y se aplica sola.)
 
 ### Corregido
 - **Completismo del artista en vivo**: «faltan», «por estrenar» y el % se calculan cruzando en vivo

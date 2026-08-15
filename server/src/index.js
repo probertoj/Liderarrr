@@ -269,6 +269,14 @@ app.put('/api/albums/:id/artist', async (req, reply) => {
     return reply.code(400).send({ error: String(err.message || err) });
   }
 });
+// artist-credit COMPLETO (varios artistas: splits/colaboraciones). body.artists = [{name, mbid?}]
+app.put('/api/albums/:id/artists', async (req, reply) => {
+  try {
+    return q.setAlbumArtists(Number(req.params.id), req.body?.artists);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 app.put('/api/albums/:id/title', async (req, reply) => {
   try {
     return q.setAlbumTitle(Number(req.params.id), req.body?.title);

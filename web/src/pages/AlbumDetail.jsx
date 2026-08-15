@@ -11,8 +11,7 @@ export default function AlbumDetail() {
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const [names, setNames] = useState([]);
-  const [editArtist, setEditArtist] = useState(false);
-  const [artistVal, setArtistVal] = useState('');
+  const [creditModal, setCreditModal] = useState(false);
   const [editTitle, setEditTitle] = useState(false);
   const [titleVal, setTitleVal] = useState('');
   const [labels, setLabels] = useState([]);
@@ -24,7 +23,7 @@ export default function AlbumDetail() {
   const load = () => api.album(id).then(setAlbum).catch((e) => setErr(e.message));
   useEffect(() => {
     setAlbum(null);
-    setEditArtist(false);
+    setCreditModal(false);
     setEditTitle(false);
     setLabels([]);
     setLabelTried(false);
@@ -47,26 +46,6 @@ export default function AlbumDetail() {
   useEffect(() => {
     api.artistNames().then(setNames).catch(() => {});
   }, []);
-
-  // Corrige el artista del álbum (metadato interno, no toca ficheros). Protegido de
-  // reescaneos (artist_manual). Útil sobre todo en lo que llegó sin etiquetar.
-  const saveArtist = async () => {
-    const name = artistVal.trim();
-    if (!name || name === album.album_artist) {
-      setEditArtist(false);
-      return;
-    }
-    setBusy(true);
-    try {
-      await api.setAlbumArtist(id, name);
-      setEditArtist(false);
-      await load();
-    } catch (e) {
-      alert(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const setState = async (state) => {
     setBusy(true);
@@ -246,44 +225,31 @@ export default function AlbumDetail() {
               <option key={n} value={n} />
             ))}
           </datalist>
-          {editArtist ? (
-            <span className="inline-flex items-center gap-1.5">
-              <input
-                list="artist-names"
-                value={artistVal}
-                autoFocus
-                disabled={busy}
-                onChange={(e) => setArtistVal(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveArtist();
-                  if (e.key === 'Escape') setEditArtist(false);
-                }}
-                className="bg-ink-850 border border-ink-800 rounded px-2 py-0.5 text-sm outline-none focus:border-gold-500/60"
-              />
-              <button onClick={saveArtist} disabled={busy} className="text-gold-300 hover:text-gold-200 disabled:opacity-50" title="Guardar">
-                {busy ? <Loader2 size={15} className="animate-spin" /> : <Check size={16} />}
-              </button>
-              <button onClick={() => setEditArtist(false)} className="text-neutral-500 hover:text-neutral-300" title="Cancelar">
-                <X size={15} />
-              </button>
+          <span className="inline-flex items-center gap-1.5 flex-wrap">
+            <span className="text-sm">
+              {album.artists?.length ? (
+                album.artists.map((c, i) => (
+                  <span key={c.artist_id ?? i}>
+                    <Link to={`/artista/${c.artist_id}`} className="text-gold-400 hover:underline">
+                      {c.credit_name || c.name}
+                    </Link>
+                    <span className="text-neutral-500">{c.join_phrase || (i < album.artists.length - 1 ? ' / ' : '')}</span>
+                  </span>
+                ))
+              ) : (
+                <Link to={`/artista/${album.artist_id}`} className="text-gold-400 hover:underline">
+                  {album.artist?.name || album.album_artist}
+                </Link>
+              )}
             </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5">
-              <Link to={`/artista/${album.artist_id}`} className="text-gold-400 hover:underline">
-                {album.artist?.name || album.album_artist}
-              </Link>
-              <button
-                onClick={() => {
-                  setArtistVal(album.album_artist || '');
-                  setEditArtist(true);
-                }}
-                title="Corregir el artista"
-                className="text-neutral-500 hover:text-gold-400"
-              >
-                <Pencil size={13} />
-              </button>
-            </span>
-          )}
+            <button
+              onClick={() => setCreditModal(true)}
+              title="Editar artista(s) — pon varios para singles compartidos y colaboraciones"
+              className="text-neutral-500 hover:text-gold-400"
+            >
+              <Pencil size={13} />
+            </button>
+          </span>
           {album.year && <span className="text-neutral-500"> · {album.year}</span>}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-sm">
@@ -422,6 +388,117 @@ export default function AlbumDetail() {
           }}
         />
       )}
+
+      {creditModal && (
+        <CreditEditor
+          album={album}
+          names={names}
+          onClose={() => setCreditModal(false)}
+          onSaved={async () => {
+            setCreditModal(false);
+            await load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Editor del artist-credit de un álbum: uno o VARIOS artistas (singles compartidos del
+// emo, colaboraciones). El primero es el principal. Se resuelven por nombre en el backend
+// (reusa el artista local si existe, o lo crea). Para completismo fino de un co-artista sin
+// MBID, luego se puede «Enlazar con MusicBrainz» desde su ficha.
+function CreditEditor({ album, names, onClose, onSaved }) {
+  const initial = album.artists?.length
+    ? album.artists.map((c) => c.credit_name || c.name)
+    : [album.artist?.name || album.album_artist || ''];
+  const [rows, setRows] = useState(initial.length ? initial : ['']);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const setRow = (i, v) => setRows((r) => r.map((x, j) => (j === i ? v : x)));
+  const addRow = () => setRows((r) => [...r, '']);
+  const removeRow = (i) => setRows((r) => (r.length > 1 ? r.filter((_, j) => j !== i) : r));
+
+  const save = async () => {
+    const list = rows.map((n) => n.trim()).filter(Boolean);
+    if (!list.length) {
+      setErr('Hace falta al menos un artista.');
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.setAlbumArtists(album.id, list.map((name) => ({ name })));
+      await onSaved();
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="card w-full max-w-md mt-16 p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm text-neutral-300 flex items-center gap-2">
+            <Pencil size={14} /> Artista(s) del álbum
+          </h2>
+          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-300" title="Cerrar">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="text-xs text-neutral-600 mb-3">
+          Pon <b className="font-normal text-neutral-400">varios</b> para singles compartidos o colaboraciones (al modo
+          MusicBrainz: «A / B»). El primero es el principal. No toca los ficheros.
+        </p>
+
+        <div className="space-y-2">
+          {rows.map((val, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-xs text-neutral-600 w-4 text-right">{i + 1}</span>
+              <input
+                list="artist-names"
+                value={val}
+                autoFocus={i === rows.length - 1}
+                disabled={busy}
+                onChange={(e) => setRow(i, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') save();
+                  if (e.key === 'Escape') onClose();
+                }}
+                placeholder={i === 0 ? 'Artista principal…' : 'Otro artista…'}
+                className="flex-1 bg-ink-850 border border-ink-800 rounded px-2 py-1.5 text-sm outline-none focus:border-gold-500/60"
+              />
+              <button
+                onClick={() => removeRow(i)}
+                disabled={busy || rows.length <= 1}
+                title="Quitar"
+                className="text-neutral-600 hover:text-red-400 disabled:opacity-30"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button onClick={addRow} disabled={busy} className="mt-2 text-xs text-gold-400 hover:underline inline-flex items-center gap-1">
+          + Añadir artista
+        </button>
+
+        {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+
+        <div className="flex justify-end gap-2 mt-4">
+          <Button onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button variant="gold" onClick={save} disabled={busy}>
+            <span className="inline-flex items-center gap-1.5">
+              {busy && <Loader2 size={14} className="animate-spin" />} Guardar
+            </span>
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

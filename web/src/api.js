@@ -157,6 +157,7 @@ export const api = {
   setArtistScope: (id, scope) => req(`/artists/${id}/scope`, { method: 'POST', body: { scope } }),
   artistNames: () => req('/artists/names'),
   setAlbumArtist: (id, name) => req(`/albums/${id}/artist`, { method: 'PUT', body: { name } }),
+  setAlbumArtists: (id, artists) => req(`/albums/${id}/artists`, { method: 'PUT', body: { artists } }),
   setAlbumTitle: (id, title) => req(`/albums/${id}/title`, { method: 'PUT', body: { title } }),
   resolveAlbumLabel: (id) => req(`/albums/${id}/label`),
   coverCandidates: (id, q) => req(`/cover/${id}/candidates${q ? `?q=${encodeURIComponent(q)}` : ''}`),

@@ -23,8 +23,8 @@ INSERT INTO release_groups (rg_mbid, artist_id, artist_mbid, title, first_releas
   secondary_types, is_owned, owned_album_id, is_upcoming, fetched_at)
 VALUES (@rg_mbid, @artist_id, @artist_mbid, @title, @first_release, @primary_type,
   @secondary_types, @is_owned, @owned_album_id, @is_upcoming, @fetched_at)
-ON CONFLICT(rg_mbid) DO UPDATE SET
-  artist_id=excluded.artist_id, artist_mbid=excluded.artist_mbid, title=excluded.title,
+ON CONFLICT(rg_mbid, artist_id) DO UPDATE SET
+  artist_mbid=excluded.artist_mbid, title=excluded.title,
   first_release=excluded.first_release, primary_type=excluded.primary_type,
   secondary_types=excluded.secondary_types, is_owned=excluded.is_owned,
   owned_album_id=excluded.owned_album_id, is_upcoming=excluded.is_upcoming, fetched_at=excluded.fetched_at
@@ -44,10 +44,18 @@ export async function enrichArtistDiscography(artistId) {
 
   const rgs = await mb.artistReleaseGroups(artist.mbid);
 
-  // álbumes que tienes de este artista, para casar por rg_mbid o por título
+  // álbumes que tienes de este artista, para casar por rg_mbid o por título. Incluye los
+  // acreditados a él como co-artista (splits/colaboraciones vía album_artists), no solo
+  // donde es el principal.
   const ownedByRg = new Map();
   const ownedByTitle = new Map();
-  for (const a of db.prepare('SELECT id, title, rg_mbid FROM albums WHERE artist_id = ?').all(artistId)) {
+  const ownedAlbums = db
+    .prepare(
+      `SELECT id, title, rg_mbid FROM albums
+       WHERE artist_id = @id OR id IN (SELECT album_id FROM album_artists WHERE artist_id = @id)`
+    )
+    .all({ id: artistId });
+  for (const a of ownedAlbums) {
     if (a.rg_mbid) ownedByRg.set(a.rg_mbid, a.id);
     ownedByTitle.set(norm(a.title), a.id);
   }
@@ -175,8 +183,12 @@ export function artistCompleteness(artistId) {
   // quedaba obsoleto: un disco recién importado seguía en "faltan" hasta re-enriquecer
   // (exigía reescanear). Ahora se cruza en vivo con tu biblioteca.
   const ownedRows = db
-    .prepare("SELECT rg_mbid, album_artist, title FROM albums WHERE artist_id = ? AND match_state != 'dismissed'")
-    .all(artistId);
+    .prepare(
+      `SELECT rg_mbid, album_artist, title FROM albums
+       WHERE match_state != 'dismissed'
+         AND (artist_id = @id OR id IN (SELECT album_id FROM album_artists WHERE artist_id = @id))`
+    )
+    .all({ id: artistId });
   const ownedRg = new Set(ownedRows.filter((o) => o.rg_mbid).map((o) => o.rg_mbid));
   const ownedKey = new Set(ownedRows.map((o) => matchKey(o.album_artist || artistName, o.title)));
   const isOwned = (r) => (r.rg_mbid && ownedRg.has(r.rg_mbid)) || ownedKey.has(matchKey(artistName, r.title));
