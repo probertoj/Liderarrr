@@ -26,6 +26,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 - **Multidisco «Combinar con…»: buscador** para encontrar cualquier disco de tu colección con el que
   combinar (antes solo listaba los del mismo artista/carpeta, difícil de usar si eran muchos). La
   selección se conserva al cambiar entre la lista por defecto y los resultados de búsqueda.
+- **Multidiscos ripeados limpios: mejor detección automática**. Las cajas cuyas carpetas se llaman
+  explícitamente «CD1 / CD2 / CD3» (o «Disc N») ahora se agrupan aunque cada disco traiga su propia cuenta
+  de pistas limpia (antes solo se agrupaban las de «total contaminado»). Ej.: *Seamonsters* (edición
+  expandida en CD1/CD2/CD3) se reconoce como una caja de 3 discos **53/53** —no como 53/19 ni como cuatro
+  «duplicados» sueltos—, dejando el MP3 de otra edición como disco aparte. El conteo de la caja suma las
+  pistas de discos limpios y usa el total de caja cuando las etiquetas vienen contaminadas. (Se aplica en
+  el próximo escaneo o «Actualizar todo».)
 
 ### Corregido
 - **Calidad y disco: los duplicados ahora se pueden pinchar** para abrir el panel de copias y limpiarlas

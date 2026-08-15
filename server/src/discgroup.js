@@ -22,12 +22,20 @@ const norm = (s) =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 
-// Un nombre de carpeta parece un DISCO de una caja? "CD 1", "Disc 2", "Disco 3",
-// "CD1", o un prefijo numerico corto de disco ("01 ...", "1 - ..."). NO casa
-// "1979 - Before Hollywood" (ano de 4 digitos) ni nombres de album normales.
+// Nombre de carpeta EXPLÍCITAMENTE de disco: "CD 1", "Disc 2", "Disco 3", "CD1". Señal
+// fuerte y segura: basta para agrupar discos hermanos aunque sus cuentas sean limpias
+// (p. ej. Seamonsters: CD1 18/18, CD2 19/19, CD3 16/16). NO casa nombres de álbum normales.
+function isExplicitDiscFolder(name) {
+  return /(?:^|[^a-z])(?:cd|disco|dis[ck])\s*\.?\s*\d+/i.test(String(name || '').trim());
+}
+
+// Un nombre de carpeta parece un DISCO de una caja? Lo explícito (CD N) o un prefijo
+// numerico corto ("01 ...", "1 - ..."). NO casa "1979 - Before Hollywood" (año de 4
+// dígitos) ni nombres de album normales. El prefijo numérico es señal DÉBIL (podría ser
+// álbumes numerados), así que solo cuenta con el total contaminado.
 function isDiscFolder(name) {
   const b = String(name || '').trim();
-  if (/(?:^|[^a-z])(?:cd|disco|dis[ck])\s*\.?\s*\d+/i.test(b)) return true;
+  if (isExplicitDiscFolder(b)) return true;
   if (/^\d{1,2}[\s.\-_]/.test(b)) return true;
   return false;
 }
@@ -46,8 +54,11 @@ export function regroupDiscs() {
     )
     .all();
 
-  // agrupa candidatos por (carpeta padre + artista + total de caja). Los álbumes con la
-  // agrupación decidida a mano (disc_group_manual) NO participan: la heurística los ignora.
+  // agrupa candidatos. Los marcados a mano (disc_group_manual) NO participan. Dos señales:
+  //  - EXPLÍCITA (carpeta "CD N"/"Disc N"): agrupa hermanas por (padre + artista), sin
+  //    exigir total contaminado — así caza cajas ripeadas limpias (cada CD con su cuenta).
+  //  - CONTAMINADA (total > ficheros, típico de cajas cuyas etiquetas traen el total de la
+  //    caja): agrupa por (padre + artista + total), para no unir dos cajas distintas.
   const buckets = new Map();
   for (const a of rows) {
     if (a.disc_group_manual) continue;
@@ -56,9 +67,10 @@ export function regroupDiscs() {
     const parent = path.posix.dirname(p);
     const total = a.track_count || 0;
     const files = a.track_file_count || 0;
-    const looksDisc = total > files && (isDiscFolder(base) || (a.disc_count || 1) > 1);
-    if (!looksDisc) continue;
-    const key = [parent, norm(a.album_artist), total].join(' ');
+    const explicit = isExplicitDiscFolder(base);
+    const contaminated = total > files && (isDiscFolder(base) || (a.disc_count || 1) > 1);
+    if (!explicit && !contaminated) continue;
+    const key = explicit ? [parent, norm(a.album_artist), 'disc'].join(' | ') : [parent, norm(a.album_artist), total].join(' | ');
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push(a);
   }
