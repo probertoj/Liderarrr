@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users } from 'lucide-react';
+import { Users, Star } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Cover } from '../components.jsx';
 
@@ -49,13 +49,19 @@ export default function Artists() {
             <Link
               key={a.id}
               to={`/artista/${a.id}`}
-              className="card p-2.5 hover:border-gold-500/40 flex items-center gap-3"
+              className={`card p-2.5 flex items-center gap-3 ${
+                a.tracked ? 'border-gold-500/50 bg-gold-500/10 hover:border-gold-500/70' : 'hover:border-gold-500/40'
+              }`}
+              title={a.tracked ? 'Sigues a este artista' : undefined}
             >
               <div className="w-11 h-11 rounded-md overflow-hidden shrink-0">
-                <Cover id={a.cover_album_id} size="sm" />
+                <Cover id={a.cover_album_id} size="sm" noRetry />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate">{a.name}</div>
+                <div className="truncate flex items-center gap-1.5">
+                  {a.tracked ? <Star size={12} className="fill-current text-gold-400 shrink-0" /> : null}
+                  {a.name}
+                </div>
                 <div className="text-xs text-neutral-600 truncate">
                   {a.mbid ? 'en MusicBrainz' : 'artista local'}
                   {a.country ? ` · ${a.country}` : ''}

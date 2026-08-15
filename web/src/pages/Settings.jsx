@@ -148,19 +148,31 @@ function TestButton({ service, label, beforeTest }) {
 
 export default function Settings() {
   const [s, setS] = useState(null);
+  const [initial, setInitial] = useState(null); // snapshot para detectar cambios sin guardar
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [profiles, setProfiles] = useState(null);
 
   useEffect(() => {
-    api.settings().then(setS);
+    api.settings().then((v) => {
+      setS(v);
+      setInitial(v);
+    });
   }, []);
 
   const set = (k) => (e) => setS((prev) => ({ ...prev, [k]: e.target.value }));
+  const dirty = s && initial && JSON.stringify(s) !== JSON.stringify(initial);
 
   const save = async () => {
-    await api.saveSettings(s);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setSaving(true);
+    try {
+      await api.saveSettings(s);
+      setInitial(s); // ya guardado: deja de estar "sucio"
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const loadProfiles = async () => {
@@ -386,6 +398,12 @@ export default function Settings() {
         </Field>
         <Field label="API key" hint="Jackett → arriba a la derecha, «API Key».">
           <input value={s.jackett_key || ''} onChange={set('jackett_key')} className={input} placeholder="••••••••" />
+        </Field>
+        <Field
+          label="Categorías"
+          hint="Torznab, separadas por coma. 3000 = música. Déjalo VACÍO si algún tracker (p. ej. Orpheus) no aparece: buscará en todas las categorías."
+        >
+          <input value={s.jackett_categories ?? '3000'} onChange={set('jackett_categories')} className={input} placeholder="3000" />
         </Field>
         <HowTo title="¿Cómo consigo la API key de Jackett?">
           <Steps>
@@ -653,6 +671,22 @@ export default function Settings() {
           <Download size={14} /> Descargar base de datos
         </a>
       </section>
+
+      {/* Barra de guardado flotante: aparece al cambiar cualquier ajuste, cerca de donde
+          estás (antes el único botón Guardar quedaba arriba y era fácil olvidarlo). */}
+      {dirty && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
+          <div className="flex items-center gap-3 rounded-xl border border-gold-500/50 bg-ink-900/95 backdrop-blur px-4 py-2.5 shadow-lg">
+            <span className="text-sm text-gold-200">Cambios sin guardar</span>
+            <Button variant="gold" onClick={save} disabled={saving}>
+              <span className="inline-flex items-center gap-1.5">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                {saving ? 'Guardando…' : 'Guardar'}
+              </span>
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

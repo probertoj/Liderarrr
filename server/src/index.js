@@ -752,7 +752,12 @@ app.get('/api/cover/:id', async (req, reply) => {
     reply.header('Cache-Control', 'public, max-age=86400');
     return reply.send(fs.createReadStream(r.path));
   }
-  if (r.status === 'pending') resolveCoverSlow(id).catch(() => {});
+  // Solo lanza la resolución lenta en la PRIMERA petición (sin ?r): en una parrilla
+  // grande (Artistas) los reintentos ?r=N repetían el trabajo pesado por cada imagen.
+  if (r.status === 'pending' && req.query?.r == null) resolveCoverSlow(id).catch(() => {});
+  // Caché negativa corta: evita martillear el servidor con las que faltan, pero deja
+  // que aparezcan pronto las que se acaben de resolver.
+  reply.header('Cache-Control', 'public, max-age=30');
   return reply.code(404).send();
 });
 

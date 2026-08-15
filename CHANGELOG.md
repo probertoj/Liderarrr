@@ -9,6 +9,26 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Artistas seguidos resaltados** en la lista de artistas (fondo dorado + estrella), como los sellos.
+- **Discografía del artista colapsable por tipo**: Álbumes, EPs y Singles se pliegan; por defecto solo
+  Álbumes queda abierto.
+- **Ajustes: barra de guardado flotante** que aparece al cambiar cualquier ajuste (antes el único
+  botón Guardar quedaba arriba, lejos y fácil de olvidar).
+- **Jackett: categoría configurable** (Ajustes → Jackett). Por defecto 3000 (música); **déjala vacía**
+  si un tracker (p. ej. Orpheus) no aparece: buscará en todas las categorías (algunos indexers no
+  declaran la categoría 3000 en Jackett y el filtro los excluía del agregado «all»).
+
+### Corregido
+- **Completismo del artista en vivo**: «faltan», «por estrenar» y el % se calculan cruzando en vivo
+  con tu biblioteca, no con una estadística guardada que envejecía. Efectos: al importar un disco
+  desaparece de «faltan» sin reescanear, y un estreno ya salido deja de contar como «por estrenar».
+
+### Rendimiento
+- **Carga de carátulas en la lista de artistas**: sin la tormenta de reintentos por cada miniatura
+  (una sola petición cacheable por carátula) y con caché negativa corta en el servidor para las que
+  faltan. La parrilla de artistas carga más ágil.
+
 ---
 
 ## [0.7.0] — 2026-08-14

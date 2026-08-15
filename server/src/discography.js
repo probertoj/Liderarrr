@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import * as mb from './musicbrainz.js';
+import { matchKey } from './matchkey.js';
 
 // "La caza": cruza la discografía que MusicBrainz conoce de un artista con lo que
 // TIENES en el disco, y calcula el completismo. Un artista sin MBID no se puede
@@ -163,24 +164,44 @@ export async function enrichAllDiscographies({ onlyTracked = false, maxAgeDays =
 // Completismo de un artista para su ficha: barra + lista de lo que falta y lo que
 // está por estrenar, con filtro de tipos.
 export function artistCompleteness(artistId) {
-  const stats = db.prepare('SELECT * FROM artist_stats WHERE artist_id = ?').get(artistId);
+  const artistName = db.prepare('SELECT name FROM artists WHERE id = ?').get(artistId)?.name || '';
   const rgs = db
     .prepare('SELECT * FROM release_groups WHERE artist_id = ? ORDER BY first_release, title')
     .all(artistId)
     .map((r) => ({ ...r, secondary_types: r.secondary_types ? JSON.parse(r.secondary_types) : [] }));
 
-  // "Por estrenar" se decide por FECHA en vivo, no por el flag is_upcoming guardado:
-  // ese flag se fijaba al enriquecer la discografía y quedaba obsoleto cuando pasaba
-  // la fecha, así que discos ya salidos seguían apareciendo como "Por estrenar".
+  // Propiedad EN VIVO: ¿tienes ya este release-group? Por rg_mbid, o por artista+título
+  // (matchKey). Antes se leía el flag is_owned guardado al enriquecer la discografía, que
+  // quedaba obsoleto: un disco recién importado seguía en "faltan" hasta re-enriquecer
+  // (exigía reescanear). Ahora se cruza en vivo con tu biblioteca.
+  const ownedRows = db
+    .prepare("SELECT rg_mbid, album_artist, title FROM albums WHERE artist_id = ? AND match_state != 'dismissed'")
+    .all(artistId);
+  const ownedRg = new Set(ownedRows.filter((o) => o.rg_mbid).map((o) => o.rg_mbid));
+  const ownedKey = new Set(ownedRows.map((o) => matchKey(o.album_artist || artistName, o.title)));
+  const isOwned = (r) => (r.rg_mbid && ownedRg.has(r.rg_mbid)) || ownedKey.has(matchKey(artistName, r.title));
+
+  // "Por estrenar" se decide por FECHA en vivo, no por el flag is_upcoming guardado.
   const today = new Date().toISOString().slice(0, 10);
   const isUpcoming = (r) => r.first_release && r.first_release > today;
   const noSecondary = (r) => !r.secondary_types || r.secondary_types.length === 0;
-  const missingOf = (type) => rgs.filter((r) => r.primary_type === type && noSecondary(r) && !r.is_owned && !isUpcoming(r));
+  const missingOf = (type) => rgs.filter((r) => r.primary_type === type && noSecondary(r) && !isOwned(r) && !isUpcoming(r));
 
-  const missing = rgs.filter((r) => isStudioAlbum(r.primary_type, r.secondary_types) && !r.is_owned && !isUpcoming(r));
+  const missing = rgs.filter((r) => isStudioAlbum(r.primary_type, r.secondary_types) && !isOwned(r) && !isUpcoming(r));
   const missingEps = missingOf('EP');
   const missingSingles = missingOf('Single');
   const upcoming = rgs.filter(isUpcoming);
-  const pct = stats && stats.studio_total ? Math.round((stats.studio_owned / stats.studio_total) * 100) : null;
+
+  // Estadísticas EN VIVO para la barra y los contadores (no el snapshot de artist_stats,
+  // que envejece): así el % y los "faltan / por estrenar" reflejan lo que tienes ahora.
+  const studioRgs = rgs.filter((r) => isStudioAlbum(r.primary_type, r.secondary_types));
+  const studioOwned = studioRgs.filter(isOwned).length;
+  const stats = {
+    studio_total: studioRgs.length,
+    studio_owned: studioOwned,
+    missing: missing.length,
+    upcoming: upcoming.length,
+  };
+  const pct = studioRgs.length ? Math.round((studioOwned / studioRgs.length) * 100) : null;
   return { stats, pct, missing, missingEps, missingSingles, upcoming, all: rgs };
 }

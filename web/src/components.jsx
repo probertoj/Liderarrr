@@ -91,7 +91,7 @@ export function StateBadge({ state }) {
 // —icono atenuado y pulsante— en vez de un hueco en blanco. Si tras los reintentos no
 // hay carátula, el icono queda estático (estado "sin carátula").
 const COVER_RETRIES = 3;
-export function Cover({ id, size = 'full', className = '' }) {
+export function Cover({ id, size = 'full', className = '', noRetry = false }) {
   const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -104,8 +104,11 @@ export function Cover({ id, size = 'full', className = '' }) {
     return () => clearTimeout(timer.current);
   }, [id]);
 
+  // noRetry (parrillas grandes, p. ej. Artistas): sin reintentos con ?r=N — cada carátula
+  // es una sola petición cacheable; si falta, se muestra el placeholder y punto. Evita la
+  // tormenta de reintentos que ralentizaba la lista.
   const onError = () => {
-    if (attempt >= COVER_RETRIES) {
+    if (noRetry || attempt >= COVER_RETRIES) {
       setFailed(true);
       return;
     }

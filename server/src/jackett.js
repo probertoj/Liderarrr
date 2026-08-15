@@ -116,7 +116,14 @@ export async function jackettTest() {
 export async function jackettSearch(query, { limit = 100 } = {}) {
   const q = String(query || '').trim();
   if (!q) return [];
-  const xml = await torznabFetch({ t: 'search', cat: '3000', q });
+  // Categoría configurable. Por defecto 3000 (Audio). Algunos indexers (p. ej. Orpheus)
+  // no declaran esa categoría exacta en sus caps de Jackett y el filtro cat=3000 los
+  // EXCLUYE del agregado «all»; dejando el ajuste VACÍO se busca sin filtro (todas las
+  // categorías) y esos trackers vuelven a aparecer.
+  const cats = (getSetting('jackett_categories') ?? '3000').trim();
+  const params = { t: 'search', q };
+  if (cats) params.cat = cats;
+  const xml = await torznabFetch(params);
   const list = parseTorznab(xml);
   list.sort((a, b) => (b.seeders ?? -1) - (a.seeders ?? -1));
   return list.slice(0, limit);

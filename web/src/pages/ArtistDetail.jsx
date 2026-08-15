@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, useLidarrEnabled } from '../components.jsx';
 
@@ -10,7 +10,15 @@ export default function ArtistDetail() {
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const [openKey, setOpenKey] = useState(null); // grupo de duplicados desplegado
+  const [openTypes, setOpenTypes] = useState(() => new Set(['Álbumes'])); // por defecto solo Álbumes
   const lidarrOn = useLidarrEnabled();
+  const toggleType = (t) =>
+    setOpenTypes((s) => {
+      const n = new Set(s);
+      if (n.has(t)) n.delete(t);
+      else n.add(t);
+      return n;
+    });
 
   const load = () => api.artist(id).then(setArtist).catch((e) => setErr(e.message));
   useEffect(() => {
@@ -201,23 +209,32 @@ export default function ArtistDetail() {
         )}
       </p>
       {typeSections.length > 1 ? (
-        <div className="space-y-6 mb-8">
-          {typeSections.map((t) => (
-            <div key={t}>
-              <h2 className="text-sm text-gold-400/80 mb-2">
-                {t} <span className="text-neutral-600">· {byType[t].length}</span>
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {byType[t].map((a) => (
-                  <AlbumCard
-                    key={a.id}
-                    album={{ ...a, album_artist: artist.name }}
-                    onClick={a.dup ? () => setOpenKey(a.dup.key) : undefined}
-                  />
-                ))}
+        <div className="space-y-4 mb-8">
+          {typeSections.map((t) => {
+            const open = openTypes.has(t);
+            return (
+              <div key={t}>
+                <button
+                  onClick={() => toggleType(t)}
+                  className="w-full flex items-center gap-1.5 text-sm text-gold-400/80 mb-2 hover:text-gold-300"
+                >
+                  {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                  {t} <span className="text-neutral-600">· {byType[t].length}</span>
+                </button>
+                {open && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {byType[t].map((a) => (
+                      <AlbumCard
+                        key={a.id}
+                        album={{ ...a, album_artist: artist.name }}
+                        onClick={a.dup ? () => setOpenKey(a.dup.key) : undefined}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
