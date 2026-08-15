@@ -173,11 +173,19 @@ export default function AlbumDetail() {
                     Discogs <ExternalLink size={11} />
                   </a>
                   <a
-                    href={`https://record.club/search?q=${encodeURIComponent(q)}`}
+                    href={
+                      album.rg_mbid
+                        ? `https://record.club/import/${album.rg_mbid}`
+                        : `https://record.club/search?q=${encodeURIComponent(q)}`
+                    }
                     target="_blank"
                     rel="noreferrer"
                     className="text-xs text-gold-400 hover:underline inline-flex items-center gap-1"
-                    title="Buscar este disco en Record Club"
+                    title={
+                      album.rg_mbid
+                        ? 'Abrir este disco en Record Club (por su MBID; requiere sesión iniciada allí)'
+                        : 'Buscar este disco en Record Club'
+                    }
                   >
                     Record Club <ExternalLink size={11} />
                   </a>
