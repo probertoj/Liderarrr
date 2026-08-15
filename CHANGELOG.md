@@ -9,6 +9,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+---
+
+## [0.8.0] — 2026-08-15
+
+Objetivo: **la página de disco al nivel de Roon**, con datos libres. La ficha ahora reúne reseña y
+valoración, créditos por persona con foto, roles e instrumentos, recomendaciones y todas las versiones.
+Además: varios artistas por álbum (splits) con completismo para cada uno, fotos de artista, y combinar
+multidiscos a mano. Y la independencia de Lidarr de la 0.7 se consolida (incluye lo que quedó sin taguear
+de 0.7.1).
+
 ### Añadido
 - **Artistas seguidos resaltados** en la lista de artistas (fondo dorado + estrella), como los sellos.
 - **Discografía del artista colapsable por tipo**: Álbumes, EPs y Singles se pliegan; por defecto solo
