@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { Cover, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled } from '../components.jsx';
 
@@ -354,6 +354,8 @@ export default function AlbumDetail() {
       {lidarrOn && album.match_state === 'matched' && <LidarrSection album={album} onDone={load} />}
 
       <SearchSection album={album} />
+
+      {album.match_state === 'matched' && <AlbumCreditsSection albumId={album.id} />}
 
       <Editions albumId={album.id} />
 
@@ -762,6 +764,89 @@ function TagWriter({ albumId }) {
               )}
             </>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Créditos ricos del álbum (estilo Roon): personal con sus roles/instrumentos, desde
+// MusicBrainz. Cada persona enlaza a su ficha si la tienes en la biblioteca, o a MB.
+// Se carga bajo demanda (varias peticiones a MB).
+function initials(name) {
+  return String(name || '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
+
+function AlbumCreditsSection({ albumId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      setData(await api.albumCredits(albumId));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="card p-4 mb-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+          <Users size={15} /> Créditos
+        </h2>
+        {!data && (
+          <Button onClick={load} disabled={loading}>
+            {loading ? 'Cargando…' : 'Ver créditos'}
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-neutral-600 mt-1">
+        Quién tocó qué, desde MusicBrainz: intérpretes con su instrumento, producción e ingeniería. Cada persona enlaza a
+        su ficha si la tienes.
+      </p>
+
+      {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+      {data && !data.found && <p className="text-sm text-neutral-600 mt-3">{data.reason || 'MusicBrainz no tiene créditos para este álbum.'}</p>}
+
+      {data && data.found && (
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {data.people.map((p) => {
+            const inner = (
+              <div className="flex items-center gap-2.5 p-2 rounded-lg border border-ink-800 bg-ink-850/60 hover:border-gold-500/40 h-full">
+                <div className="w-10 h-10 shrink-0 rounded-full bg-ink-800 border border-ink-700 flex items-center justify-center text-xs text-neutral-400">
+                  {initials(p.name)}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm truncate text-neutral-200">{p.name}</div>
+                  <div className="text-xs text-neutral-500 truncate" title={p.role_text}>
+                    {p.role_text || '—'}
+                  </div>
+                  <div className="text-[11px] text-neutral-600">{p.all_tracks ? 'Todas las pistas' : `${p.track_count} pista${p.track_count === 1 ? '' : 's'}`}</div>
+                </div>
+              </div>
+            );
+            return p.artist_id ? (
+              <Link key={p.mbid} to={`/artista/${p.artist_id}`}>
+                {inner}
+              </Link>
+            ) : (
+              <a key={p.mbid} href={`https://musicbrainz.org/artist/${p.mbid}`} target="_blank" rel="noreferrer">
+                {inner}
+              </a>
+            );
+          })}
         </div>
       )}
     </div>

@@ -62,6 +62,7 @@ import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challen
 import { importListFromUrl } from './listimport.js';
 import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCompletism, resolveAlbumLabel } from './editions.js';
+import { albumPersonnel } from './albumcredits.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
 import { coverFast, resolveCoverSlow, retryMissingCovers, coverCandidates, applyCover } from './covers.js';
 import { diagnostics, pushEvent } from './diag.js';
@@ -428,6 +429,14 @@ app.get('/api/artists/:id/relations', async (req, reply) => {
 app.get('/api/albums/:id/editions', async (req, reply) => {
   try {
     return await albumEditions(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// créditos ricos del álbum (personal con roles/instrumentos, desde MusicBrainz)
+app.get('/api/albums/:id/credits', async (req, reply) => {
+  try {
+    return await albumPersonnel(Number(req.params.id));
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

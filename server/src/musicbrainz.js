@@ -350,6 +350,78 @@ export async function releaseGroupById(mbid) {
   };
 }
 
+// Créditos/personal de un álbum (estilo Roon): relaciones de artista a nivel de RELEASE
+// (productor, ingeniero, mezcla…) + a nivel de GRABACIÓN (intérpretes con su instrumento
+// por pista) + obras (compositor/letrista). Los créditos cuelgan de una RELEASE concreta,
+// no del release-group; se toma una release representativa del RG. Devuelve el personal
+// agrupado por persona con sus roles y en qué pistas aparece. Cacheado en MB.
+export async function releaseGroupCredits(rgMbid, releaseMbid) {
+  let relId = releaseMbid || null;
+  if (!relId) {
+    const list = await mbCached(`rg-rel-any:${rgMbid}`, `/release?release-group=${enc(rgMbid)}&limit=1`);
+    relId = (list.releases || [])[0]?.id || null;
+  }
+  if (!relId) return { found: false };
+  const rel = await mbCached(
+    `rel-credits:${relId}`,
+    `/release/${enc(relId)}?inc=artist-rels+recordings+recording-level-rels+work-rels+work-level-rels`
+  );
+  if (!rel || !rel.id) return { found: false };
+
+  // acumulador por persona (MBID); guarda nombre, roles (Set) y pistas donde aparece
+  const people = new Map();
+  const add = (artist, role, trackKey) => {
+    if (!artist?.id) return;
+    let p = people.get(artist.id);
+    if (!p) {
+      p = { mbid: artist.id, name: artist.name || '', roles: new Set(), tracks: new Set(), releaseWide: false };
+      people.set(artist.id, p);
+    }
+    if (role) p.roles.add(role);
+    if (trackKey == null) p.releaseWide = true;
+    else p.tracks.add(trackKey);
+  };
+  // etiqueta legible de una relación: los instrumentos/atributos si los hay, si no el tipo
+  const label = (r) => {
+    const attrs = (r.attributes || []).filter(Boolean);
+    if (attrs.length) return attrs.map(cap).join(', ');
+    return cap(r.type || '');
+  };
+
+  // 1) créditos a nivel de release (aplican a todo el álbum)
+  for (const r of rel.relations || []) if (r.artist) add(r.artist, label(r), null);
+
+  // 2) créditos a nivel de grabación (por pista) + obras (compositor/letrista)
+  let trackNo = 0;
+  for (const medium of rel.media || []) {
+    for (const t of medium.tracks || []) {
+      trackNo++;
+      const key = `${trackNo}: ${t.title || t.recording?.title || ''}`;
+      const rec = t.recording;
+      for (const r of rec?.relations || []) {
+        if (r.artist) add(r.artist, label(r), key);
+        // obras enlazadas a la grabación → compositor/letrista
+        for (const wr of r.work?.relations || []) if (wr.artist) add(wr.artist, cap(wr.type || ''), key);
+      }
+    }
+  }
+
+  const total = trackNo || 1;
+  const list = [...people.values()].map((p) => ({
+    mbid: p.mbid,
+    name: p.name,
+    roles: [...p.roles],
+    track_count: p.releaseWide ? total : p.tracks.size,
+    all_tracks: p.releaseWide || p.tracks.size >= total,
+    tracks: [...p.tracks],
+  }));
+  // ordena: quien aparece en más pistas primero
+  list.sort((a, b) => b.track_count - a.track_count || a.name.localeCompare(b.name));
+  return { found: true, release_mbid: relId, total_tracks: total, people: list };
+}
+
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
 // Catálogo de ÁLBUMES DE ESTUDIO de un sello (primary Album, sin secundarios). Los
 // sellos cuelgan de RELEASES en MusicBrainz, no de release-groups: se recorren las
 // releases del sello y se deduplican a RG. Tope `maxReleases` para no traer miles de

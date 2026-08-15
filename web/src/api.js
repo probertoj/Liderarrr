@@ -148,6 +148,7 @@ export const api = {
 
   // fase 4 — refinado
   editions: (id) => req(`/albums/${id}/editions`),
+  albumCredits: (id) => req(`/albums/${id}/credits`),
   relations: (id) => req(`/artists/${id}/relations`),
   upgrades: () => req('/quality/upgrades'),
   labels: () => req('/labels'),

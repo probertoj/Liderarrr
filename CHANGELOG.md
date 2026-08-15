@@ -35,6 +35,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   al identificar y también se puede poner a mano. (Por dentro: tabla `album_artists` y `release_groups`
   pasa a clave compuesta `(rg_mbid, artist_id)` para que un release-group pueda contar en varios
   artistas; la migración conserva los datos y se aplica sola.)
+- **Créditos ricos en la ficha del álbum** (estilo Roon): quién tocó qué, desde MusicBrainz — intérpretes
+  con su instrumento, además de producción, ingeniería y composición, agrupados por persona y con en
+  cuántas pistas aparece cada uno. Cada músico enlaza a su ficha si lo tienes en la biblioteca, o a
+  MusicBrainz. Se carga bajo demanda.
 
 ### Corregido
 - **Completismo del artista en vivo**: «faltan», «por estrenar» y el % se calculan cruzando en vivo
