@@ -130,19 +130,6 @@ app.get('/api/version', async () => ({ name: 'Liderarrr', version: pkg.version }
 app.get('/api/update-check', async () => updateCheck());
 app.get('/api/diag', async () => diagnostics());
 
-app.get('/api/setup-state', async () => {
-  const s = getAllSettings();
-  return {
-    music: !!s.music_dirs,
-    lidarr: !!(s.lidarr_url && s.lidarr_key),
-    prowlarr: !!(s.prowlarr_url && s.prowlarr_key),
-    acoustid: !!s.acoustid_key,
-    lastfm: !!s.lastfm_key,
-    discogs: !!s.discogs_token,
-    scanned: db.prepare('SELECT COUNT(*) AS n FROM albums').get().n > 0,
-  };
-});
-
 // --- ajustes ----------------------------------------------------------------
 const SECRET_KEYS = new Set(['lidarr_key', 'prowlarr_key', 'jackett_key', 'qbittorrent_pass', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token']);
 app.get('/api/settings', async () => {

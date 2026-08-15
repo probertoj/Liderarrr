@@ -24,7 +24,6 @@ export const api = {
   version: () => req('/version'),
   updateCheck: () => req('/update-check'),
   diag: () => req('/diag'),
-  setupState: () => req('/setup-state'),
   settings: () => req('/settings'),
   saveSettings: (body) => req('/settings', { method: 'PUT', body }),
   test: (svc) => req(`/settings/test/${svc}`, { method: 'POST' }),
