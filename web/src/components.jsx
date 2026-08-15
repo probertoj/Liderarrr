@@ -228,9 +228,9 @@ export function ArtistPhoto({ id, name, size = 40, className = '', bust, retry =
 
 // Tarjeta de álbum para las parrillas.
 // - `selectable`: modo selección (combinar multidiscos en lote); toda la tarjeta alterna.
-// - Si el disco tiene varias versiones/copias, se pasa `onClick`: entonces la CARÁTULA abre
-//   las versiones (para elegir/limpiar) y el TÍTULO lleva a la ficha del disco.
-// - El nombre del ARTISTA enlaza a su ficha (si hay artist_id).
+// - La CARÁTULA y el TÍTULO llevan a la ficha del disco. El nombre del ARTISTA a su ficha.
+// - Si el disco tiene varias copias, se pasa `onClick`: la insignia ×N es un botón que abre
+//   el panel de copias (borrado rápido); el resto de la tarjeta sigue yendo a la ficha.
 export function AlbumCard({ album, onClick, selectable = false, selected = false, onSelectToggle }) {
   const incomplete = album.track_file_count < album.track_count;
   const coverInner = (
@@ -253,14 +253,22 @@ export function AlbumCard({ album, onClick, selectable = false, selected = false
           )}
           {(album.dup || album.match_state === 'orphan') && (
             <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
-              {album.dup && (
-                <span
-                  className="text-[10px] px-1.5 py-0.5 rounded bg-sky-600/90 text-sky-50"
-                  title={`${album.dup.copies} copias de este disco — pincha la carátula para gestionarlas`}
-                >
-                  ×{album.dup.copies}
-                </span>
-              )}
+              {album.dup &&
+                (onClick ? (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onClick();
+                    }}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-sky-600/90 hover:bg-sky-500 text-sky-50 cursor-pointer"
+                    title={`${album.dup.copies} copias — pincha para ver y limpiar las copias`}
+                  >
+                    ×{album.dup.copies}
+                  </button>
+                ) : (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-600/90 text-sky-50">×{album.dup.copies}</span>
+                ))}
               {album.match_state === 'orphan' && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-600/90 text-violet-50">rareza</span>
               )}
@@ -296,15 +304,9 @@ export function AlbumCard({ album, onClick, selectable = false, selected = false
 
   return (
     <div className="group block">
-      {onClick ? (
-        <button type="button" onClick={onClick} className="block w-full text-left" title="Ver las versiones de este disco">
-          {coverInner}
-        </button>
-      ) : (
-        <Link to={`/album/${album.id}`} className="block">
-          {coverInner}
-        </Link>
-      )}
+      <Link to={`/album/${album.id}`} className="block">
+        {coverInner}
+      </Link>
       <div className="mt-1.5 px-0.5">
         <Link to={`/album/${album.id}`} className="text-sm truncate block hover:text-gold-400" title={album.title}>
           {album.title}
@@ -559,22 +561,20 @@ export function SearchModal({ initialQuery, onClose }) {
 // la página de artista o en la Discoteca). Recomienda la copia ★ mejor y deja
 // descartar/deshacer las demás. Descartar solo oculta y quita de los recuentos:
 // nunca borra el fichero (música en solo lectura).
-export function DuplicateGroupPanel({ group, onClose }) {
+// Lista de copias de un disco con acciones (descartar / descartar y borrar). Reutilizable:
+// en el panel modal (al pinchar la insignia ×N en las parrillas) y como sección dentro de
+// la propia ficha del álbum. `onChange` avisa al contenedor tras una acción (para recargar).
+export function DuplicateCopies({ copies, onChange }) {
   const [busy, setBusy] = useState(null);
   const [dismissed, setDismissed] = useState({}); // id -> true (descartados esta sesión)
   const [deleted, setDeleted] = useState({}); // id -> true (borrados del disco, sin vuelta atrás)
-
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   const dismiss = async (id) => {
     setBusy(id);
     try {
       await api.albumState(id, 'dismissed');
       setDismissed((p) => ({ ...p, [id]: true }));
+      onChange?.();
     } catch (e) {
       alert(e.message);
     } finally {
@@ -590,6 +590,7 @@ export function DuplicateGroupPanel({ group, onClose }) {
         delete n[id];
         return n;
       });
+      onChange?.();
     } catch (e) {
       alert(e.message);
     } finally {
@@ -608,12 +609,92 @@ export function DuplicateGroupPanel({ group, onClose }) {
     try {
       await api.deleteAlbum(c.id);
       setDeleted((p) => ({ ...p, [c.id]: true }));
+      onChange?.();
     } catch (e) {
       alert(e.message);
     } finally {
       setBusy(null);
     }
   };
+
+  return (
+    <div className="space-y-1.5">
+      {copies.map((c) => (
+        <div
+          key={c.id}
+          className={`flex items-start gap-3 text-sm rounded px-2 py-1.5 ${
+            c.best ? 'bg-emerald-950/20 border border-emerald-900/40' : 'bg-ink-850/40'
+          } ${dismissed[c.id] ? 'opacity-45' : ''}`}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              {c.best && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/90 text-emerald-50 shrink-0">★ mejor</span>
+              )}
+              <Link to={`/album/${c.id}`} className="truncate hover:text-gold-400">
+                {c.title}
+                {c.year ? <span className="text-neutral-600"> · {c.year}</span> : ''}
+              </Link>
+            </div>
+            <div className="text-xs text-neutral-600 flex flex-wrap gap-x-2 mt-0.5">
+              {c.format && (
+                <span className={c.lossless ? 'text-emerald-400/80' : ''}>
+                  {c.format}
+                  {c.lossless ? ' · lossless' : ''}
+                </span>
+              )}
+              <span className={c.track_file_count < c.track_count ? 'text-amber-400/80' : ''}>
+                {c.track_file_count}/{c.track_count} pistas
+              </span>
+              <span>{fmtBytes(c.size_bytes)}</span>
+              {!c.matched && <span className="text-neutral-500">sin identificar</span>}
+            </div>
+            <div className="text-[11px] text-neutral-700 truncate mt-0.5" title={c.path}>
+              {c.path}
+            </div>
+          </div>
+          {deleted[c.id] ? (
+            <span className="text-xs text-red-400/80 inline-flex items-center gap-1 shrink-0 self-center">
+              <Trash2 size={13} /> borrado del disco
+            </span>
+          ) : dismissed[c.id] ? (
+            <span className="text-xs text-neutral-500 inline-flex items-center gap-2 shrink-0 self-center">
+              descartado
+              <button onClick={() => undo(c.id)} disabled={busy === c.id} className="underline hover:text-gold-400 disabled:opacity-50">
+                deshacer
+              </button>
+            </span>
+          ) : (
+            !c.best && (
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <Button variant="default" disabled={busy === c.id} onClick={() => dismiss(c.id)}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <X size={13} /> {busy === c.id ? '…' : 'Descartar'}
+                  </span>
+                </Button>
+                <button
+                  onClick={() => del(c)}
+                  disabled={busy === c.id}
+                  title="Elimina los ficheros del disco (irreversible)"
+                  className="text-[11px] px-2 py-1 rounded border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50 inline-flex items-center gap-1"
+                >
+                  <Trash2 size={12} /> Descartar y borrar
+                </button>
+              </div>
+            )
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function DuplicateGroupPanel({ group, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
@@ -634,80 +715,7 @@ export function DuplicateGroupPanel({ group, onClose }) {
           <b className="font-normal text-red-400/90">elimina los ficheros del disco</b>: es irreversible, no va a la Papelera
           y, si esa copia está seedeando, puede romper el torrent.
         </p>
-        <div className="space-y-1.5">
-          {group.copies.map((c) => (
-            <div
-              key={c.id}
-              className={`flex items-start gap-3 text-sm rounded px-2 py-1.5 ${
-                c.best ? 'bg-emerald-950/20 border border-emerald-900/40' : 'bg-ink-850/40'
-              } ${dismissed[c.id] ? 'opacity-45' : ''}`}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  {c.best && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/90 text-emerald-50 shrink-0">
-                      ★ mejor
-                    </span>
-                  )}
-                  <Link to={`/album/${c.id}`} className="truncate hover:text-gold-400">
-                    {c.title}
-                    {c.year ? <span className="text-neutral-600"> · {c.year}</span> : ''}
-                  </Link>
-                </div>
-                <div className="text-xs text-neutral-600 flex flex-wrap gap-x-2 mt-0.5">
-                  {c.format && (
-                    <span className={c.lossless ? 'text-emerald-400/80' : ''}>
-                      {c.format}
-                      {c.lossless ? ' · lossless' : ''}
-                    </span>
-                  )}
-                  <span className={c.track_file_count < c.track_count ? 'text-amber-400/80' : ''}>
-                    {c.track_file_count}/{c.track_count} pistas
-                  </span>
-                  <span>{fmtBytes(c.size_bytes)}</span>
-                  {!c.matched && <span className="text-neutral-500">sin identificar</span>}
-                </div>
-                <div className="text-[11px] text-neutral-700 truncate mt-0.5" title={c.path}>
-                  {c.path}
-                </div>
-              </div>
-              {deleted[c.id] ? (
-                <span className="text-xs text-red-400/80 inline-flex items-center gap-1 shrink-0 self-center">
-                  <Trash2 size={13} /> borrado del disco
-                </span>
-              ) : dismissed[c.id] ? (
-                <span className="text-xs text-neutral-500 inline-flex items-center gap-2 shrink-0 self-center">
-                  descartado
-                  <button
-                    onClick={() => undo(c.id)}
-                    disabled={busy === c.id}
-                    className="underline hover:text-gold-400 disabled:opacity-50"
-                  >
-                    deshacer
-                  </button>
-                </span>
-              ) : (
-                !c.best && (
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <Button variant="default" disabled={busy === c.id} onClick={() => dismiss(c.id)}>
-                      <span className="inline-flex items-center gap-1.5">
-                        <X size={13} /> {busy === c.id ? '…' : 'Descartar'}
-                      </span>
-                    </Button>
-                    <button
-                      onClick={() => del(c)}
-                      disabled={busy === c.id}
-                      title="Elimina los ficheros del disco (irreversible)"
-                      className="text-[11px] px-2 py-1 rounded border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50 inline-flex items-center gap-1"
-                    >
-                      <Trash2 size={12} /> Descartar y borrar
-                    </button>
-                  </div>
-                )
-              )}
-            </div>
-          ))}
-        </div>
+        <DuplicateCopies copies={group.copies} />
       </div>
     </div>
   );

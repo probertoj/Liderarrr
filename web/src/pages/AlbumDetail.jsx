@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled } from '../components.jsx';
+import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies } from '../components.jsx';
 
 export default function AlbumDetail() {
   const { id } = useParams();
@@ -394,6 +394,8 @@ export default function AlbumDetail() {
       </div>
 
       <AboutSection albumId={album.id} />
+
+      <DupCopiesSection albumId={album.id} onChange={load} />
 
       {/* secciones secundarias: solo si se revelan desde el menú «⋯» */}
       {shownSec.has('disc') && <DiscBox album={album} onDone={load} />}
@@ -820,6 +822,40 @@ function TagWriter({ albumId }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Copias de este disco (dentro de la ficha): si tienes varias copias de este álbum, las
+// lista con la ★ mejor y acciones para descartar/borrar el resto. Misma gestión que el
+// panel de la insignia ×N de la Discoteca, pero aquí en la propia página del disco.
+function DupCopiesSection({ albumId, onChange }) {
+  const [group, setGroup] = useState(null);
+  const load = () => api.dupGroup(albumId).then(setGroup).catch(() => setGroup(null));
+  useEffect(() => {
+    setGroup(null);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [albumId]);
+
+  if (!group || !group.copies || group.copies.length < 2) return null;
+  return (
+    <div className="card p-4 mb-6">
+      <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+        <Copy size={15} className="text-sky-400" /> Copias de este disco · {group.copies.length}
+      </h2>
+      <p className="text-xs text-neutral-600 mt-1 mb-3">
+        Tienes varias copias. Conserva la <span className="text-emerald-400/90">★ mejor</span> y descarta o borra el resto.
+        «Descartar» solo la oculta (reversible desde la Papelera); «Descartar y borrar» elimina los ficheros
+        (irreversible).
+      </p>
+      <DuplicateCopies
+        copies={group.copies}
+        onChange={() => {
+          load();
+          onChange?.();
+        }}
+      />
     </div>
   );
 }
