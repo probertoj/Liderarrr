@@ -23,6 +23,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 - **Escuchas: acotar la brecha por fecha** (último mes / 3 meses / año) y nueva sección **«Discos que
   escuchas y no tienes»** (a nivel de álbum, con «Buscar»), para pasar a propios lo que oyes ahora en
   streaming y aún no tienes.
+- **Multidisco «Combinar con…»: buscador** para encontrar cualquier disco de tu colección con el que
+  combinar (antes solo listaba los del mismo artista/carpeta, difícil de usar si eran muchos). La
+  selección se conserva al cambiar entre la lista por defecto y los resultados de búsqueda.
 
 ### Corregido
 - **Calidad y disco: los duplicados ahora se pueden pinchar** para abrir el panel de copias y limpiarlas
@@ -31,10 +34,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   se marca al instante como propio en el calendario y deja de ofrecerse para descargar, cruzando en vivo
   con tu biblioteca (por MBID y por artista+título) en lugar del flag guardado, que envejecía. Evita
   descargar dos veces el mismo disco.
-- **Carga de carátulas inconsistente**: las portadas ya no «desaparecen» al volver a la Discoteca con el
-  botón atrás del navegador, ni faltan al entrar en un disco. Se quitó el `loading="lazy"` (que a veces no
-  disparaba la carga) y el 404 de una carátula aún sin resolver deja de cachearse (antes se servía el 404
-  viejo 30 s aunque ya estuviera lista). Igual para las fotos de artista.
+- **Carga de carátulas inconsistente y lenta**: las portadas ya no «desaparecen» al volver a la Discoteca
+  con el botón atrás, ni faltan al entrar en un disco, y sin penalizar la navegación. El componente de
+  carátula usa un *lazy* fiable (IntersectionObserver + comprobación de visibilidad al montar): solo pide
+  las visibles (no las ~470 fuera de pantalla, que era lo que ralentizaba), y las re-pide al volver atrás.
+  Por dentro: el servidor cachea el escaneo de carpeta (antes hacía un `readdirSync` por cada petición, que
+  bloqueaba el hilo) y el 404 de una carátula aún sin resolver no se cachea (antes se servía el 404 viejo).
 
 ---
 

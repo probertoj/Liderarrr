@@ -95,7 +95,9 @@ export function Cover({ id, size = 'full', className = '', noRetry = false, bust
   const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [inView, setInView] = useState(false);
   const timer = useRef(null);
+  const boxRef = useRef(null);
 
   useEffect(() => {
     setAttempt(0);
@@ -104,25 +106,60 @@ export function Cover({ id, size = 'full', className = '', noRetry = false, bust
     return () => clearTimeout(timer.current);
   }, [id, bust]);
 
-  // noRetry (parrillas grandes, p. ej. Artistas): sin reintentos con ?r=N — cada carátula
-  // es una sola petición cacheable; si falta, se muestra el placeholder y punto. Evita la
-  // tormenta de reintentos que ralentizaba la lista.
+  // LAZY FIABLE con IntersectionObserver: la imagen solo se pide cuando el hueco entra (o
+  // ya está) en el viewport. Se re-observa en CADA montaje, así que al volver a la
+  // Discoteca (botón atrás incluido) las carátulas visibles vuelven a cargar — a diferencia
+  // de loading="lazy", que a veces no se disparaba. Y no se piden las ~470 fuera de pantalla,
+  // que es lo que saturaba y ralentizaba la navegación.
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setInView(true);
+      return;
+    }
+    // ¿ya visible (o casi) al montar? getBoundingClientRect es fiable en el acto —incluso
+    // cuando el observer tarda en disparar—, así lo que se ve al volver atrás carga ya.
+    const near = () => {
+      const r = el.getBoundingClientRect();
+      const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+      const vw = window.innerWidth || document.documentElement.clientWidth || 0;
+      return r.top < vh + 300 && r.bottom > -300 && r.left < vw + 300 && r.right > -300;
+    };
+    if (near()) {
+      setInView(true);
+      return;
+    }
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setInView(true);
+          obs.disconnect();
+        }
+      },
+      { rootMargin: '300px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [id]);
+
+  // Reintentos para las carátulas que aún se están resolviendo online (404 = "pendiente").
+  // noRetry (parrillas muy grandes, p. ej. Artistas): sin reintentos, placeholder y punto.
   const onError = () => {
     if (noRetry || attempt >= COVER_RETRIES) {
       setFailed(true);
       return;
     }
-    timer.current = setTimeout(() => setAttempt((a) => a + 1), 2500 * (attempt + 1));
+    timer.current = setTimeout(() => setAttempt((a) => a + 1), 1200 * (attempt + 1));
   };
 
   return (
-    <div className={`relative bg-ink-850 aspect-square overflow-hidden ${className}`}>
+    <div ref={boxRef} className={`relative bg-ink-850 aspect-square overflow-hidden ${className}`}>
       {!loaded && (
         <div className="absolute inset-0 flex items-center justify-center text-neutral-700">
           <ImageOff size={size === 'full' ? 32 : 18} className={failed ? '' : 'opacity-30 animate-pulse'} />
         </div>
       )}
-      {id && !failed && (
+      {id && inView && !failed && (
         <img
           src={
             attempt
@@ -181,7 +218,7 @@ export function ArtistPhoto({ id, name, size = 40, className = '', bust, retry =
       style={{ width: size, height: size, fontSize: Math.round(size * 0.32) }}
     >
       {showImg ? (
-        <img src={src} onError={onError} className="h-full w-full object-cover" alt="" />
+        <img src={src} onError={onError} className="h-full w-full object-cover" alt="" loading="lazy" />
       ) : (
         <span>{artistInitials(name)}</span>
       )}

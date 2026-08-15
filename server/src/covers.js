@@ -72,9 +72,18 @@ function biggestImage(dir) {
   return best;
 }
 
+// Caché en memoria del ESCANEO de carpeta (biggestImage): sin ella, coverFast hacía un
+// readdirSync + statSync por cada petición de carátula. En la Discoteca (cientos de
+// carátulas, y encima re-pedidas al navegar) eso bloqueaba el hilo principal síncrono y
+// ralentizaba TODO. Aquí se recuerda el resultado por álbum (ruta o null = no hay imagen
+// en la carpeta), así las siguientes peticiones son O(1). Se invalida al cachear/aplicar
+// una carátula nueva (cacheAndServe) y al reintentar las que faltan.
+const folderImgCache = new Map();
+
 function cacheAndServe(id, buf, mime) {
   fs.writeFileSync(cachedImg(id), buf);
   fs.writeFileSync(mimeFile(id), mime);
+  folderImgCache.delete(id);
   try {
     fs.unlinkSync(noneFile(id));
   } catch {
@@ -145,7 +154,13 @@ export function coverFast(albumId) {
   if (fs.existsSync(cachedImg(albumId)) && fs.existsSync(mimeFile(albumId)))
     return { status: 'ok', path: cachedImg(albumId), contentType: fs.readFileSync(mimeFile(albumId), 'utf8') };
   if (a.path) {
-    const img = biggestImage(a.path);
+    // O(1): reusa el escaneo de carpeta cacheado (una sola stat para validar la ruta),
+    // en vez de readdirSync + statSync por fichero en CADA petición.
+    let img = folderImgCache.get(albumId);
+    if (img === undefined || (img && !fs.existsSync(img))) {
+      img = biggestImage(a.path);
+      folderImgCache.set(albumId, img);
+    }
     if (img) return { status: 'ok', path: img, contentType: mimeByExt(img) };
   }
   if (fs.existsSync(noneFile(albumId))) return { status: 'none' };
@@ -327,6 +342,7 @@ export async function applyCover(albumId, { url, dataUrl } = {}) {
 // Reintentar todas las que faltan: borra las marcas "sin carátula" para que se
 // vuelvan a resolver (útil tras identificar la biblioteca).
 export function retryMissingCovers() {
+  folderImgCache.clear();
   let n = 0;
   for (const f of fs.readdirSync(ART_DIR)) {
     if (f.endsWith('.none')) {

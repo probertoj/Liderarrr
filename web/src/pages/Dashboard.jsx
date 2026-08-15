@@ -18,7 +18,7 @@ function CoverTile({ id, title, artist, sub }) {
     <Link to={id ? `/album/${id}` : '#'} className="group block">
       <div className="aspect-square rounded-lg overflow-hidden bg-ink-850 border border-ink-800 group-hover:border-gold-400 transition-colors flex items-center justify-center">
         {id && !err ? (
-          <img src={coverUrl(id)} alt="" onError={() => setErr(true)} className="w-full h-full object-cover" />
+          <img src={coverUrl(id)} alt="" loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover" />
         ) : (
           <span className="text-[11px] text-neutral-600 text-center p-2 leading-tight">{title}</span>
         )}

@@ -905,9 +905,11 @@ function DiscBox({ album, onDone }) {
 
 // Modal para elegir con qué discos combinar (candidatos = mismo artista o misma carpeta).
 function CombineModal({ album, onClose, onDone }) {
-  const [cands, setCands] = useState(null);
-  const [sel, setSel] = useState(() => new Set());
-  const [loading, setLoading] = useState(true);
+  const [cands, setCands] = useState(null); // candidatos por defecto (mismo artista/carpeta)
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState(null); // resultados de buscar en toda la biblioteca
+  const [searching, setSearching] = useState(false);
+  const [sel, setSel] = useState(() => new Map()); // id -> {title} de lo seleccionado (para no perderlo al cambiar de lista)
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 
@@ -915,15 +917,32 @@ function CombineModal({ album, onClose, onDone }) {
     api
       .combineCandidates(album.id)
       .then(setCands)
-      .catch((e) => setErr(e.message))
-      .finally(() => setLoading(false));
+      .catch((e) => setErr(e.message));
   }, [album.id]);
 
-  const toggle = (id) =>
-    setSel((s) => {
-      const n = new Set(s);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
+  // buscar en TODA la biblioteca (por si el disco a combinar no es del mismo artista/carpeta)
+  useEffect(() => {
+    const term = q.trim();
+    if (!term) {
+      setResults(null);
+      return;
+    }
+    setSearching(true);
+    const t = setTimeout(() => {
+      api
+        .library({ q: term, flat: '1', limit: 40 })
+        .then((r) => setResults((r.albums || []).filter((a) => a.id !== album.id)))
+        .catch(() => setResults([]))
+        .finally(() => setSearching(false));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, album.id]);
+
+  const toggle = (a) =>
+    setSel((m) => {
+      const n = new Map(m);
+      if (n.has(a.id)) n.delete(a.id);
+      else n.set(a.id, { title: a.title });
       return n;
     });
 
@@ -932,13 +951,28 @@ function CombineModal({ album, onClose, onDone }) {
     setBusy(true);
     setErr(null);
     try {
-      await api.combineAlbums([album.id, ...sel]);
+      await api.combineAlbums([album.id, ...sel.keys()]);
       await onDone();
     } catch (e) {
       setErr(e.message);
       setBusy(false);
     }
   };
+
+  const list = q.trim() ? results : cands;
+  const Row = (c) => (
+    <label key={c.id} className="py-2 flex items-center gap-3 text-sm cursor-pointer">
+      <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c)} className="accent-gold-500" />
+      <span className="min-w-0 flex-1">
+        <span className="truncate block text-neutral-200">{c.title}</span>
+        <span className="text-xs text-neutral-600">
+          {q.trim() && c.album_artist ? `${c.album_artist} · ` : ''}
+          {c.track_file_count}/{c.track_count} pistas
+          {c.in_box ? ' · ya en otra caja' : ''}
+        </span>
+      </span>
+    </label>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
@@ -951,29 +985,48 @@ function CombineModal({ album, onClose, onDone }) {
             <X size={18} />
           </button>
         </div>
-        <p className="text-xs text-neutral-600 mb-3">Otros discos del mismo artista o carpeta. Marca los que forman la misma caja.</p>
+        <p className="text-xs text-neutral-600 mb-3">
+          Marca los discos que forman la misma caja. Abajo salen los del mismo artista o carpeta; usa el buscador para
+          encontrar cualquier otro disco de tu colección.
+        </p>
+
+        <div className="flex items-center gap-2 mb-2 bg-ink-850 border border-ink-800 rounded px-2">
+          <Search size={14} className="text-neutral-600 shrink-0" />
+          <input
+            value={q}
+            autoFocus
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar un disco en tu colección…"
+            className="flex-1 bg-transparent py-1.5 text-sm outline-none"
+          />
+          {q && (
+            <button onClick={() => setQ('')} className="text-neutral-600 hover:text-neutral-300" title="Limpiar">
+              <X size={14} />
+            </button>
+          )}
+        </div>
 
         {err && <p className="text-sm text-red-400 mb-2">{err}</p>}
-        {loading && <Spinner label="Buscando discos…" />}
-        {cands && cands.length === 0 && !loading && (
-          <p className="text-sm text-neutral-600">No hay otros discos del mismo artista o carpeta para combinar.</p>
+        {sel.size > 0 && (
+          <p className="text-xs text-gold-300/90 mb-1">
+            {sel.size} seleccionado{sel.size === 1 ? '' : 's'}: {[...sel.values()].map((v) => v.title).join(', ')}
+          </p>
         )}
 
-        {cands && cands.length > 0 && (
-          <div className="max-h-80 overflow-y-auto divide-y divide-ink-850/60">
-            {cands.map((c) => (
-              <label key={c.id} className="py-2 flex items-center gap-3 text-sm cursor-pointer">
-                <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} className="accent-gold-500" />
-                <span className="min-w-0 flex-1">
-                  <span className="truncate block text-neutral-200">{c.title}</span>
-                  <span className="text-xs text-neutral-600">
-                    {c.track_file_count}/{c.track_count} pistas
-                    {c.in_box ? ' · ya en otra caja' : ''}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
+        {q.trim() ? (
+          searching ? (
+            <Spinner label="Buscando…" />
+          ) : results && results.length === 0 ? (
+            <p className="text-sm text-neutral-600">Nada coincide con «{q}».</p>
+          ) : null
+        ) : !cands ? (
+          <Spinner label="Buscando discos…" />
+        ) : cands.length === 0 ? (
+          <p className="text-sm text-neutral-600">No hay otros discos del mismo artista o carpeta. Usa el buscador de arriba.</p>
+        ) : null}
+
+        {list && list.length > 0 && (
+          <div className="max-h-80 overflow-y-auto divide-y divide-ink-850/60">{list.map(Row)}</div>
         )}
 
         <div className="flex justify-end gap-2 mt-4">
