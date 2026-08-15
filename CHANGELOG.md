@@ -9,6 +9,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+---
+
+## [0.8.1] — 2026-08-15
+
+Ronda de UX y arreglos tras la 0.8.0: carga de carátulas fiable y ágil, mejor manejo de multidiscos y de
+discos con varias copias, filtros y ordenaciones nuevos, el calendario en sintonía con tu disco, y la
+brecha de escuchas acotable por fecha.
+
 ### Añadido
 - **Dashboard: «Próximos lanzamientos»** en vez de «Últimas en Lidarr»: los estrenos por venir de tus
   artistas y sellos seguidos, con enlace al calendario.
