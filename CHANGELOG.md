@@ -15,10 +15,22 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 - **Discoteca: filtrar por año** (además de por década). El año concreto tiene prioridad sobre la década.
 - **Artistas: más formas de ordenar**: recientes, seguidos primero, nombre A-Z / Z-A y aleatorio (antes solo
   por nº de álbumes, pistas o nombre).
+- **Discoteca: la tarjeta de un disco con varias versiones distingue el clic**: la carátula abre las
+  versiones (para elegir/limpiar copias) y el título lleva a la ficha del disco. El nombre del artista
+  enlaza a su ficha.
+- **Ficha de álbum: menú «⋯»** para las opciones secundarias que se usan a veces (Multidisco, Versiones,
+  Etiquetas MusicBrainz, Corregir emparejamiento). Ya no están siempre presentes: se revelan al elegirlas.
+- **Escuchas: acotar la brecha por fecha** (último mes / 3 meses / año) y nueva sección **«Discos que
+  escuchas y no tienes»** (a nivel de álbum, con «Buscar»), para pasar a propios lo que oyes ahora en
+  streaming y aún no tienes.
 
 ### Corregido
 - **Calidad y disco: los duplicados ahora se pueden pinchar** para abrir el panel de copias y limpiarlas
   (descartar o borrar), en vez de solo listarlos sin poder actuar.
+- **Lanzamientos/Huecos: «en disco» en vez de «pedido»**: un disco que ya tienes (importado o escaneado)
+  se marca al instante como propio en el calendario y deja de ofrecerse para descargar, cruzando en vivo
+  con tu biblioteca (por MBID y por artista+título) en lugar del flag guardado, que envejecía. Evita
+  descargar dos veces el mismo disco.
 - **Carga de carátulas inconsistente**: las portadas ya no «desaparecen» al volver a la Discoteca con el
   botón atrás del navegador, ni faltan al entrar en un disco. Se quitó el `loading="lazy"` (que a veces no
   disparaba la carga) y el 404 de una carátula aún sin resolver deja de cachearse (antes se servía el 404

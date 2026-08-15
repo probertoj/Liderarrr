@@ -1,25 +1,44 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Headphones, TrendingUp, Star, EarOff } from 'lucide-react';
+import { Headphones, TrendingUp, Star, EarOff, Search, Disc3 } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { api } from '../api.js';
-import { PageTitle, Stat, Spinner, ErrorMsg, Button } from '../components.jsx';
+import { PageTitle, Stat, Spinner, ErrorMsg, Button, SearchModal } from '../components.jsx';
+
+// Ventanas de fecha para la brecha. `since` = ms (o null = todo el tiempo).
+const RANGES = [
+  { key: 'all', label: 'Todo el tiempo', since: () => null },
+  { key: 'month', label: 'Último mes', since: () => Date.now() - 30 * 86400000 },
+  { key: 'q', label: 'Últimos 3 meses', since: () => Date.now() - 90 * 86400000 },
+  { key: 'year', label: 'Último año', since: () => Date.now() - 365 * 86400000 },
+];
 
 export default function Listening() {
   const [ov, setOv] = useState(null);
   const [gap, setGap] = useState(null);
+  const [albumGap, setAlbumGap] = useState(null);
   const [unplayed, setUnplayed] = useState(null);
   const [err, setErr] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [range, setRange] = useState('all');
+  const [search, setSearch] = useState(null);
 
   const load = () => {
     api.listening().then(setOv).catch((e) => setErr(e.message));
-    api.gap().then(setGap).catch(() => {});
     api.unplayed().then(setUnplayed).catch(() => {});
   };
   useEffect(() => {
     load();
   }, []);
+
+  // la brecha (por artista y por álbum) se recarga al cambiar la ventana de fecha
+  useEffect(() => {
+    const since = RANGES.find((r) => r.key === range)?.since() || null;
+    setGap(null);
+    setAlbumGap(null);
+    api.gap(since).then(setGap).catch(() => {});
+    api.albumGap(since).then(setAlbumGap).catch(() => {});
+  }, [range]);
 
   const doImport = async (full) => {
     setImporting(true);
@@ -88,14 +107,30 @@ export default function Listening() {
 
       {/* LA BRECHA — protagonista */}
       <div className="card p-5 mb-6 border-gold-500/30">
-        <h2 className="font-display text-lg mb-1 flex items-center gap-2">
-          <TrendingUp size={18} className="text-gold-400" /> Brecha escucha↔propiedad
-        </h2>
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+          <h2 className="font-display text-lg flex items-center gap-2">
+            <TrendingUp size={18} className="text-gold-400" /> Brecha escucha↔propiedad
+          </h2>
+          <select
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+            className="bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
+            title="Acota la brecha a lo que has escuchado en esta ventana de tiempo"
+          >
+            {RANGES.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <p className="text-xs text-neutral-500 mb-3">
-          Artistas que escuchas mucho y de los que tienes poco o nada. Tu mejor lista de candidatos: es tu
-          gusto real, no un algoritmo.
+          Artistas que escuchas mucho{range !== 'all' ? ' en esta ventana' : ''} y de los que tienes poco o nada. Tu mejor
+          lista de candidatos: es tu gusto real, no un algoritmo.
         </p>
-        {!gap || gap.length === 0 ? (
+        {!gap ? (
+          <Spinner />
+        ) : gap.length === 0 ? (
           <p className="text-neutral-600 text-sm">Nada destacable: tienes lo que escuchas. 👏</p>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -105,6 +140,44 @@ export default function Listening() {
           </div>
         )}
       </div>
+
+      {/* Discos concretos que has escuchado (en la ventana) y no tienes: para pasarlos a propios */}
+      {albumGap && albumGap.length > 0 && (
+        <div className="card p-5 mb-6">
+          <h2 className="font-display text-lg mb-1 flex items-center gap-2">
+            <Disc3 size={18} className="text-gold-400" /> Discos que escuchas y no tienes
+          </h2>
+          <p className="text-xs text-neutral-500 mb-3">
+            Álbumes que sonaron{range !== 'all' ? ' en esta ventana' : ''} y no están en tu disco. Ideal para pasar a
+            propios lo que oyes ahora en streaming.
+          </p>
+          <div className="space-y-1 max-h-96 overflow-y-auto">
+            {albumGap.map((a, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm px-1 py-1 rounded hover:bg-ink-850/50">
+                <div className="min-w-0 flex-1">
+                  <span className="truncate">
+                    {a.artist_id ? (
+                      <Link to={`/artista/${a.artist_id}`} className="text-neutral-300 hover:text-gold-400">
+                        {a.artist}
+                      </Link>
+                    ) : (
+                      <span className="text-neutral-300">{a.artist}</span>
+                    )}
+                    <span className="text-neutral-500"> — {a.album}</span>
+                  </span>
+                </div>
+                <span className="text-xs text-neutral-600 shrink-0">{a.plays} escuchas</span>
+                <button
+                  onClick={() => setSearch(`${a.artist} ${a.album}`)}
+                  className="text-xs px-1.5 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 shrink-0"
+                >
+                  <Search size={12} /> Buscar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-4 mb-6">
         <div className="card p-4">
@@ -158,6 +231,8 @@ export default function Listening() {
           </div>
         </div>
       )}
+
+      {search != null && <SearchModal initialQuery={search} onClose={() => setSearch(null)} />}
     </div>
   );
 }

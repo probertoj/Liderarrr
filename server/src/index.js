@@ -57,7 +57,7 @@ import {
 } from './radar.js';
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
-import { listeningOverview, ownershipGap, ownedUnplayed, hasScrobbles } from './listening.js';
+import { listeningOverview, ownershipGap, ownedUnplayed, unownedScrobbledAlbums, hasScrobbles } from './listening.js';
 import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing } from './challenges.js';
 import { importListFromUrl } from './listimport.js';
 import { artistRelations } from './relations.js';
@@ -534,7 +534,12 @@ app.post('/api/scrobbles/import', async (req) => {
 });
 app.get('/api/scrobbles/status', async () => ({ ...scrobbleStatus, configured: scrobblesConfigured() }));
 app.get('/api/listening/overview', async () => (hasScrobbles() ? listeningOverview() : { empty: true }));
-app.get('/api/listening/gap', async (req) => ownershipGap({ minPlays: Number(req.query?.minPlays) || 15 }));
+app.get('/api/listening/gap', async (req) =>
+  ownershipGap({ minPlays: Number(req.query?.minPlays) || 15, since: req.query?.since ? Number(req.query.since) : null })
+);
+app.get('/api/listening/album-gap', async (req) =>
+  unownedScrobbledAlbums({ since: req.query?.since ? Number(req.query.since) : null, minPlays: Number(req.query?.minPlays) || 2 })
+);
 app.get('/api/listening/unplayed', async () => ownedUnplayed());
 
 // --- retos ------------------------------------------------------------------

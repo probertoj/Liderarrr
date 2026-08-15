@@ -1,8 +1,20 @@
 import { db } from './db.js';
+import { matchKey } from './matchkey.js';
 
 // Huecos y próximos lanzamientos, ambos leídos de release_groups (que llena
 // discography.js). Excluye lo que ya está en el snapshot de Lidarr ("ya
 // encargado") y lo que el usuario descartó.
+
+// Propiedad EN VIVO: ¿tienes ya este release-group? Por rg_mbid o por artista+título
+// (matchKey). Se cruza contra la biblioteca en el momento, NO contra el flag guardado
+// rg.is_owned (que envejece: un disco recién importado seguía saliendo como "no lo
+// tienes" en el calendario hasta re-enriquecer la discografía, y así se pedía dos veces).
+function ownedMatcher() {
+  const rows = db.prepare("SELECT rg_mbid, album_artist, title FROM albums WHERE match_state != 'dismissed'").all();
+  const ownedRg = new Set(rows.filter((o) => o.rg_mbid).map((o) => o.rg_mbid));
+  const ownedKey = new Set(rows.map((o) => matchKey(o.album_artist, o.title)));
+  return (rgMbid, artist, title) => (rgMbid && ownedRg.has(rgMbid)) || ownedKey.has(matchKey(artist, title));
+}
 
 // Álbumes de estudio estrenados que MB conoce de tus artistas y que NO tienes.
 // onlyTracked = solo de los que sigues; si no, de todos los artistas con MBID.
@@ -18,16 +30,19 @@ export function gaps({ onlyTracked = true } = {}) {
        FROM release_groups rg
        JOIN artists ar ON ar.id = rg.artist_id
        ${trackedJoin}
-       WHERE rg.is_owned = 0 AND rg.is_upcoming = 0
+       WHERE rg.is_upcoming = 0
          AND rg.primary_type = 'Album'
          AND (rg.secondary_types IS NULL OR rg.secondary_types = '[]')
          AND rg.rg_mbid NOT IN (SELECT rg_mbid FROM dismissed_albums)
        ORDER BY ar.name COLLATE NOCASE, rg.first_release`
     )
     .all();
+  // filtra en vivo los que YA tienes (no el flag guardado is_owned, que envejece)
+  const isOwned = ownedMatcher();
   // agrupar por artista para la UI
   const byArtist = new Map();
   for (const r of rows) {
+    if (isOwned(r.rg_mbid, r.artist, r.title)) continue;
     if (!byArtist.has(r.artist_id)) byArtist.set(r.artist_id, { artist_id: r.artist_id, artist: r.artist, artist_mbid: r.artist_mbid, missing: [] });
     byArtist.get(r.artist_id).missing.push({
       rg_mbid: r.rg_mbid,
@@ -36,14 +51,16 @@ export function gaps({ onlyTracked = true } = {}) {
       in_lidarr: !!r.in_lidarr,
     });
   }
-  return { total: rows.length, artists: [...byArtist.values()] };
+  const artists = [...byArtist.values()];
+  const total = artists.reduce((s, a) => s + a.missing.length, 0);
+  return { total, artists };
 }
 
 // Calendario de próximos: release groups por estrenar de tus artistas seguidos,
 // ordenados por fecha. MusicBrainz sí tiene fechas futuras.
 export function upcoming({ onlyTracked = true } = {}) {
   const trackedJoin = onlyTracked ? 'JOIN tracked_artists t ON t.artist_id = rg.artist_id' : '';
-  return db
+  const rows = db
     .prepare(
       `SELECT rg.rg_mbid, rg.title, rg.first_release, rg.primary_type, rg.artist_id, rg.artist_mbid,
         ar.name AS artist,
@@ -59,8 +76,9 @@ export function upcoming({ onlyTracked = true } = {}) {
          AND rg.rg_mbid NOT IN (SELECT rg_mbid FROM dismissed_albums)
        ORDER BY rg.first_release`
     )
-    .all()
-    .map((r) => ({ ...r, in_lidarr: !!r.in_lidarr, tracked: !!r.tracked }));
+    .all();
+  const isOwned = ownedMatcher();
+  return rows.map((r) => ({ ...r, in_lidarr: !!r.in_lidarr, tracked: !!r.tracked, is_owned: isOwned(r.rg_mbid, r.artist, r.title) }));
 }
 
 // Estrenados recientemente: álbumes de estudio de tus artistas con fecha ya pasada
@@ -70,10 +88,10 @@ export function recentlyReleased({ since = null, onlyTracked = false } = {}) {
   const cutoff = since || `${new Date().getFullYear()}-01-01`;
   const today = new Date().toISOString().slice(0, 10);
   const trackedJoin = onlyTracked ? 'JOIN tracked_artists t ON t.artist_id = rg.artist_id' : '';
-  return db
+  const rows = db
     .prepare(
       `SELECT rg.rg_mbid, rg.title, rg.first_release, rg.primary_type, rg.artist_id, rg.artist_mbid,
-        ar.name AS artist, rg.is_owned, rg.owned_album_id,
+        ar.name AS artist, rg.owned_album_id,
         (SELECT 1 FROM lidarr_albums la WHERE la.rg_mbid = rg.rg_mbid) AS in_lidarr,
         (SELECT 1 FROM tracked_artists ta WHERE ta.artist_id = rg.artist_id) AS tracked,
         (SELECT GROUP_CONCAT(DISTINCT tl.name) FROM label_release_groups lrg
@@ -88,8 +106,9 @@ export function recentlyReleased({ since = null, onlyTracked = false } = {}) {
          AND rg.rg_mbid NOT IN (SELECT rg_mbid FROM dismissed_albums)
        ORDER BY rg.first_release DESC, ar.name COLLATE NOCASE`
     )
-    .all({ cutoff, today })
-    .map((r) => ({ ...r, in_lidarr: !!r.in_lidarr, is_owned: !!r.is_owned, tracked: !!r.tracked }));
+    .all({ cutoff, today });
+  const isOwned = ownedMatcher();
+  return rows.map((r) => ({ ...r, in_lidarr: !!r.in_lidarr, tracked: !!r.tracked, is_owned: isOwned(r.rg_mbid, r.artist, r.title) }));
 }
 
 export function dismissGap(rgMbid, title) {

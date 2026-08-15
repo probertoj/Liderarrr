@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled } from '../components.jsx';
 
@@ -18,12 +18,16 @@ export default function AlbumDetail() {
   const [labelTried, setLabelTried] = useState(false);
   const [coverModal, setCoverModal] = useState(false);
   const [coverBust, setCoverBust] = useState(0);
+  const [secMenu, setSecMenu] = useState(false); // menú «⋯» de opciones secundarias
+  const [shownSec, setShownSec] = useState(() => new Set()); // secciones secundarias reveladas
   const lidarrOn = useLidarrEnabled();
 
   const load = () => api.album(id).then(setAlbum).catch((e) => setErr(e.message));
   useEffect(() => {
     setAlbum(null);
     setCreditModal(false);
+    setSecMenu(false);
+    setShownSec(new Set());
     setEditTitle(false);
     setLabels([]);
     setLabelTried(false);
@@ -340,6 +344,50 @@ export default function AlbumDetail() {
             >
               <Trash2 size={14} /> Borrar del disco
             </button>
+            <div className="relative">
+              <button
+                onClick={() => setSecMenu((v) => !v)}
+                title="Más opciones"
+                className={`text-sm px-2.5 py-1.5 rounded-lg border inline-flex items-center gap-1.5 ${
+                  secMenu ? 'border-gold-500/50 bg-gold-500/15 text-gold-300' : 'border-ink-700 bg-ink-850 hover:bg-ink-800'
+                }`}
+              >
+                <MoreHorizontal size={16} />
+              </button>
+              {secMenu && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setSecMenu(false)} />
+                  <div className="absolute right-0 mt-1 z-40 w-56 card p-1 shadow-lg border border-ink-700">
+                    {[
+                      { key: 'disc', label: 'Multidisco', icon: Layers, show: true },
+                      { key: 'versions', label: 'Versiones', icon: Disc3, show: true },
+                      {
+                        key: 'rematch',
+                        label: 'Corregir emparejamiento',
+                        icon: Sparkles,
+                        show: album.match_state === 'matched' || album.match_state === 'orphan',
+                      },
+                      { key: 'tags', label: 'Etiquetas MusicBrainz', icon: Tag, show: album.match_state === 'matched' },
+                    ]
+                      .filter((i) => i.show)
+                      .map((i) => (
+                        <button
+                          key={i.key}
+                          onClick={() => {
+                            setShownSec((s) => new Set(s).add(i.key));
+                            setSecMenu(false);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded text-sm text-neutral-300 hover:bg-ink-800 inline-flex items-center gap-2"
+                        >
+                          <i.icon size={14} className="text-neutral-500" />
+                          {i.label}
+                          {shownSec.has(i.key) && <Check size={13} className="text-emerald-400 ml-auto" />}
+                        </button>
+                      ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
           <p className="text-xs text-neutral-600 mt-2 break-all">{album.path}</p>
         </div>
@@ -347,23 +395,23 @@ export default function AlbumDetail() {
 
       <AboutSection albumId={album.id} />
 
-      <DiscBox album={album} onDone={load} />
+      {/* secciones secundarias: solo si se revelan desde el menú «⋯» */}
+      {shownSec.has('disc') && <DiscBox album={album} onDone={load} />}
+      {shownSec.has('rematch') && (album.match_state === 'matched' || album.match_state === 'orphan') && (
+        <ReMatch album={album} onDone={load} />
+      )}
+      {shownSec.has('versions') && <Editions albumId={album.id} />}
+      {shownSec.has('tags') && album.match_state === 'matched' && <TagWriter albumId={album.id} />}
 
       {album.match_state !== 'matched' && album.match_state !== 'orphan' && (
         <IdentifySection album={album} onDone={load} />
       )}
-
-      {(album.match_state === 'matched' || album.match_state === 'orphan') && <ReMatch album={album} onDone={load} />}
 
       {lidarrOn && album.match_state === 'matched' && <LidarrSection album={album} onDone={load} />}
 
       <SearchSection album={album} />
 
       {album.match_state === 'matched' && <AlbumCreditsSection albumId={album.id} />}
-
-      <Editions albumId={album.id} />
-
-      {album.match_state === 'matched' && <TagWriter albumId={album.id} />}
 
       <div className="card overflow-hidden mb-6">
         <div className="px-4 py-2.5 border-b border-ink-800 flex items-center gap-2 text-sm text-neutral-400">

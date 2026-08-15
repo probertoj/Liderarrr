@@ -98,11 +98,17 @@ export function listeningOverview() {
 
 // La brecha: artistas que escuchas mucho y de los que tienes poco o nada.
 // El mejor candidato a seguir/encargar, porque es tu gusto real, no un algoritmo.
-export function ownershipGap({ minPlays = 15 } = {}) {
+export function ownershipGap({ minPlays = 15, since = null } = {}) {
   const owned = ownedArtistMap();
   const tracked = trackedArtistSet();
   const scrobbles = new Map();
-  for (const r of db.prepare("SELECT artist, COUNT(*) AS plays FROM listens WHERE source='lastfm' GROUP BY LOWER(artist)").all()) {
+  const args = {};
+  let sinceClause = '';
+  if (since) {
+    sinceClause = ' AND ts >= @since';
+    args.since = Number(since);
+  }
+  for (const r of db.prepare(`SELECT artist, COUNT(*) AS plays FROM listens WHERE source='lastfm'${sinceClause} GROUP BY LOWER(artist)`).all(args)) {
     const k = normArtist(r.artist);
     if (!k) continue;
     const e = scrobbles.get(k) || { artist: r.artist, plays: 0 };
@@ -126,6 +132,36 @@ export function ownershipGap({ minPlays = 15 } = {}) {
   }
   out.sort((a, b) => b.plays - a.plays || a.owned_albums - b.owned_albums);
   return out.slice(0, 60);
+}
+
+// Brecha a nivel de ÁLBUM y acotable por fecha: discos que has escuchado (en la ventana
+// dada) y que NO tienes. Con `since` = «último mes/3 meses/este año», sirve para pasar a
+// propios los discos que suenas ahora (p. ej. en Spotify vía Last.fm) y aún no tienes.
+export function unownedScrobbledAlbums({ since = null, minPlays = 2 } = {}) {
+  const ownedAlbums = ownedAlbumSet();
+  const owned = ownedArtistMap();
+  const args = { minPlays };
+  let sinceClause = '';
+  if (since) {
+    sinceClause = ' AND ts >= @since';
+    args.since = Number(since);
+  }
+  const rows = db
+    .prepare(
+      `SELECT artist, album, COUNT(*) AS plays, MAX(ts) AS last
+       FROM listens WHERE source='lastfm' AND album<>''${sinceClause}
+       GROUP BY LOWER(artist), LOWER(album) HAVING plays >= @minPlays
+       ORDER BY plays DESC, last DESC LIMIT 400`
+    )
+    .all(args);
+  const out = [];
+  for (const r of rows) {
+    if (ownedAlbums.has(albumKey(r.artist, r.album))) continue;
+    const o = owned.get(normArtist(r.artist));
+    out.push({ artist: r.artist, album: r.album, plays: r.plays, last: r.last, artist_id: o?.id || null, artist_mbid: o?.mbid || null });
+    if (out.length >= 120) break;
+  }
+  return out;
 }
 
 // Últimas escuchas para el dashboard: álbumes distintos más recientes. Usa el

@@ -189,82 +189,101 @@ export function ArtistPhoto({ id, name, size = 40, className = '', bust, retry =
   );
 }
 
-// Tarjeta de álbum para las parrillas. `selectable` la pone en modo selección (para
-// combinar multidiscos en lote): muestra una marca y, al pinchar, alterna en vez de navegar.
+// Tarjeta de álbum para las parrillas.
+// - `selectable`: modo selección (combinar multidiscos en lote); toda la tarjeta alterna.
+// - Si el disco tiene varias versiones/copias, se pasa `onClick`: entonces la CARÁTULA abre
+//   las versiones (para elegir/limpiar) y el TÍTULO lleva a la ficha del disco.
+// - El nombre del ARTISTA enlaza a su ficha (si hay artist_id).
 export function AlbumCard({ album, onClick, selectable = false, selected = false, onSelectToggle }) {
   const incomplete = album.track_file_count < album.track_count;
-  const body = (
-    <>
-      <div className={`relative rounded-lg overflow-hidden card ${selected ? 'ring-2 ring-gold-500' : ''}`}>
-        <Cover id={album.id} />
-        {selectable ? (
-          <span
-            className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-              selected ? 'bg-gold-500 border-gold-500 text-black' : 'bg-black/40 border-white/70 text-transparent'
-            }`}
-          >
-            <Check size={13} />
-          </span>
-        ) : (
-          <>
-            {incomplete && (
-              <span className="absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/90 text-amber-50">
-                {album.track_file_count}/{album.track_count}
-              </span>
-            )}
-            {(album.dup || album.match_state === 'orphan') && (
-              <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
-                {album.dup && (
-                  <span
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-sky-600/90 text-sky-50"
-                    title={`${album.dup.copies} copias de este disco en tu colección`}
-                  >
-                    ×{album.dup.copies}
-                  </span>
-                )}
-                {album.match_state === 'orphan' && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-600/90 text-violet-50">rareza</span>
-                )}
-              </div>
-            )}
-          </>
-        )}
-        {album.discs > 1 && (
-          <span className="absolute bottom-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-ink-900/85 text-neutral-200 border border-ink-700">
-            {album.discs} discos
-          </span>
-        )}
-      </div>
-      <div className="mt-1.5 px-0.5">
-        <div className="text-sm truncate group-hover:text-gold-400" title={album.title}>
-          {album.title}
-        </div>
-        <div className="text-xs text-neutral-500 truncate">
-          {album.album_artist}
-          {album.year ? ` · ${album.year}` : ''}
-        </div>
-      </div>
-    </>
+  const coverInner = (
+    <div className={`relative rounded-lg overflow-hidden card ${selected ? 'ring-2 ring-gold-500' : ''}`}>
+      <Cover id={album.id} />
+      {selectable ? (
+        <span
+          className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+            selected ? 'bg-gold-500 border-gold-500 text-black' : 'bg-black/40 border-white/70 text-transparent'
+          }`}
+        >
+          <Check size={13} />
+        </span>
+      ) : (
+        <>
+          {incomplete && (
+            <span className="absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/90 text-amber-50">
+              {album.track_file_count}/{album.track_count}
+            </span>
+          )}
+          {(album.dup || album.match_state === 'orphan') && (
+            <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
+              {album.dup && (
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded bg-sky-600/90 text-sky-50"
+                  title={`${album.dup.copies} copias de este disco — pincha la carátula para gestionarlas`}
+                >
+                  ×{album.dup.copies}
+                </span>
+              )}
+              {album.match_state === 'orphan' && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-600/90 text-violet-50">rareza</span>
+              )}
+            </div>
+          )}
+        </>
+      )}
+      {album.discs > 1 && (
+        <span className="absolute bottom-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-ink-900/85 text-neutral-200 border border-ink-700">
+          {album.discs} discos
+        </span>
+      )}
+    </div>
   );
-  // modo selección: alterna. Con onClick (desplegar duplicados): botón. Si no: enlace.
+
+  // modo selección: toda la tarjeta alterna.
   if (selectable) {
     return (
       <button type="button" onClick={onSelectToggle} className="group block w-full text-left">
-        {body}
+        {coverInner}
+        <div className="mt-1.5 px-0.5">
+          <div className="text-sm truncate" title={album.title}>
+            {album.title}
+          </div>
+          <div className="text-xs text-neutral-500 truncate">
+            {album.album_artist}
+            {album.year ? ` · ${album.year}` : ''}
+          </div>
+        </div>
       </button>
     );
   }
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className="group block w-full text-left">
-        {body}
-      </button>
-    );
-  }
+
   return (
-    <Link to={`/album/${album.id}`} className="group block">
-      {body}
-    </Link>
+    <div className="group block">
+      {onClick ? (
+        <button type="button" onClick={onClick} className="block w-full text-left" title="Ver las versiones de este disco">
+          {coverInner}
+        </button>
+      ) : (
+        <Link to={`/album/${album.id}`} className="block">
+          {coverInner}
+        </Link>
+      )}
+      <div className="mt-1.5 px-0.5">
+        <Link to={`/album/${album.id}`} className="text-sm truncate block hover:text-gold-400" title={album.title}>
+          {album.title}
+        </Link>
+        <div className="text-xs text-neutral-500 truncate">
+          {album.artist_id ? (
+            <Link to={`/artista/${album.artist_id}`} className="hover:text-gold-400">
+              {album.album_artist}
+            </Link>
+          ) : (
+            <span>{album.album_artist}</span>
+          )}
+          {album.year ? ` · ${album.year}` : ''}
+        </div>
+      </div>
+    </div>
   );
 }
 
