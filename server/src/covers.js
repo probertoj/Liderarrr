@@ -208,6 +208,122 @@ export function clearNone(albumId) {
   }
 }
 
+// --- añadir carátula a mano -------------------------------------------------
+// Candidatos de portada para elegir en la ficha: Cover Art Archive (oficial, por
+// MBID, vía su API JSON para no ofrecer enlaces rotos) + iTunes (por texto, funciona
+// aunque el álbum no esté identificado). `q` permite refinar la búsqueda de texto.
+async function caaCandidates(kind, mbid) {
+  try {
+    const res = await fetch(`https://coverartarchive.org/${kind}/${encodeURIComponent(mbid)}`, {
+      headers: { 'User-Agent': UA, Accept: 'application/json' },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.images || []).map((im) => ({
+      source: 'caa',
+      front: !!im.front,
+      thumb: im.thumbnails?.small || im.thumbnails?.['250'] || im.thumbnails?.large || im.image,
+      url: im.thumbnails?.large || im.thumbnails?.['500'] || im.image,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function itunesCandidates(term, limit = 10) {
+  try {
+    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=album&limit=${limit}`, {
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.results || [])
+      .filter((r) => r.artworkUrl100)
+      .map((r) => ({
+        source: 'itunes',
+        artist: r.artistName || null,
+        title: r.collectionName || null,
+        year: r.releaseDate ? Number(r.releaseDate.slice(0, 4)) || null : null,
+        thumb: r.artworkUrl100,
+        // iTunes sirve 100x100 pero acepta cualquier tamaño en la URL
+        url: r.artworkUrl100.replace('100x100bb', '600x600bb'),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export async function coverCandidates(albumId, q) {
+  const a = getAlbum.get(albumId);
+  if (!a) throw new Error('Álbum no encontrado');
+  const term = (q && String(q).trim()) || [a.album_artist, a.title].filter(Boolean).join(' ');
+  const jobs = [];
+  if (a.release_mbid) jobs.push(caaCandidates('release', a.release_mbid));
+  if (a.rg_mbid) jobs.push(caaCandidates('release-group', a.rg_mbid));
+  if (term) jobs.push(itunesCandidates(term));
+  const groups = await Promise.all(jobs);
+  const out = [];
+  const seen = new Set();
+  for (const g of groups)
+    for (const c of g) {
+      if (seen.has(c.url)) continue;
+      seen.add(c.url);
+      out.push(c);
+    }
+  // las oficiales de portada (front) primero
+  out.sort((x, y) => Number(y.front || 0) - Number(x.front || 0));
+  return { query: term, candidates: out.slice(0, 24) };
+}
+
+// Aplica una carátula elegida (por URL online) o subida (dataURL base64). Por decisión
+// del usuario se escribe `cover.jpg` en la CARPETA del álbum: permanente, viaja con los
+// ficheros y sobrevive a reescaneos (solo AÑADE un fichero; no toca el audio). Si la
+// carpeta no es escribible, cae a la caché de la app. Siempre cachea para servir al
+// instante y borra la marca "sin carátula".
+export async function applyCover(albumId, { url, dataUrl } = {}) {
+  const a = getAlbum.get(albumId);
+  if (!a) throw new Error('Álbum no encontrado');
+  let buf;
+  let mime;
+  if (dataUrl) {
+    const m = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i.exec(String(dataUrl));
+    if (!m) throw new Error('Imagen no válida');
+    mime = m[1].toLowerCase();
+    buf = Buffer.from(m[2], 'base64');
+  } else if (url) {
+    const img = await fetchImage(String(url));
+    if (!img) throw new Error('No se pudo descargar la imagen de esa URL');
+    buf = img.buf;
+    mime = img.mime;
+  } else {
+    throw new Error('Falta la imagen (url o fichero)');
+  }
+  if (!buf?.length) throw new Error('La imagen está vacía');
+
+  let savedToFolder = false;
+  let coverPath = null;
+  if (a.path) {
+    try {
+      if (fs.statSync(a.path).isDirectory()) {
+        const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+        coverPath = path.join(a.path, `cover.${ext}`);
+        fs.writeFileSync(coverPath, buf);
+        db.prepare('UPDATE albums SET cover = ? WHERE id = ?').run(coverPath, albumId);
+        savedToFolder = true;
+      }
+    } catch {
+      // carpeta inaccesible o de solo lectura: nos quedamos con la caché
+      coverPath = null;
+    }
+  }
+  // siempre cachea (sirve al instante y respalda si no se pudo escribir a la carpeta)
+  cacheAndServe(albumId, buf, mime);
+  clearNone(albumId);
+  return { ok: true, savedToFolder, cover: coverPath };
+}
+
 // Reintentar todas las que faltan: borra las marcas "sin carátula" para que se
 // vuelvan a resolver (útil tras identificar la biblioteca).
 export function retryMissingCovers() {

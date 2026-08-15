@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink, ChevronDown, ChevronRight, Link2, Search, X } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, useLidarrEnabled } from '../components.jsx';
 
@@ -11,6 +11,7 @@ export default function ArtistDetail() {
   const [busy, setBusy] = useState(false);
   const [openKey, setOpenKey] = useState(null); // grupo de duplicados desplegado
   const [openTypes, setOpenTypes] = useState(() => new Set(['Álbumes'])); // por defecto solo Álbumes
+  const [mbidModal, setMbidModal] = useState(false);
   const lidarrOn = useLidarrEnabled();
   const toggleType = (t) =>
     setOpenTypes((s) => {
@@ -109,11 +110,28 @@ export default function ArtistDetail() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-display">{artist.name}</h1>
-          <p className="text-sm text-neutral-500 mb-1">
-            {artist.mbid ? 'en MusicBrainz' : 'artista local (sin MBID)'}
-            {artist.type ? ` · ${artist.type}` : ''}
-            {artist.country ? ` · ${artist.country}` : ''}
-            {artist.began ? ` · ${artist.began}${artist.ended ? `–${artist.ended}` : ''}` : ''}
+          <p className="text-sm text-neutral-500 mb-1 inline-flex items-center gap-1.5 flex-wrap">
+            <span>
+              {artist.mbid ? 'en MusicBrainz' : 'artista local (sin MBID)'}
+              {artist.type ? ` · ${artist.type}` : ''}
+              {artist.country ? ` · ${artist.country}` : ''}
+              {artist.began ? ` · ${artist.began}${artist.ended ? `–${artist.ended}` : ''}` : ''}
+            </span>
+            {artist.mbid && (
+              <>
+                <a
+                  href={`https://musicbrainz.org/artist/${artist.mbid}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-gold-400 hover:underline inline-flex items-center gap-0.5"
+                >
+                  MB <ExternalLink size={10} />
+                </a>
+                <button onClick={() => setMbidModal(true)} className="text-neutral-600 hover:text-gold-400 text-xs underline">
+                  corregir
+                </button>
+              </>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
@@ -123,7 +141,13 @@ export default function ArtistDetail() {
               {following ? 'Siguiendo' : 'Seguir'}
             </span>
           </Button>
-          {!noMbid && (
+          {noMbid ? (
+            <Button variant="gold" onClick={() => setMbidModal(true)} disabled={busy}>
+              <span className="inline-flex items-center gap-1.5">
+                <Link2 size={14} /> Enlazar con MusicBrainz
+              </span>
+            </Button>
+          ) : (
             <Button onClick={refreshDisco} disabled={busy}>
               <span className="inline-flex items-center gap-1.5">
                 <RefreshCw size={14} className={busy ? 'animate-spin' : ''} /> Discografía
@@ -132,6 +156,34 @@ export default function ArtistDetail() {
           )}
         </div>
       </div>
+
+      {/* sin MBID: explica por qué no hay completismo y ofrece enlazar */}
+      {noMbid && (
+        <div className="card p-4 my-5 max-w-lg text-sm">
+          <p className="text-neutral-400">
+            Este artista no está enlazado con MusicBrainz, así que no hay discografía ni completismo. La identificación
+            automática no siempre lo pilla (duplicados, mayúsculas…). Enlázalo a mano y se calcula al instante.
+          </p>
+          <div className="mt-3">
+            <Button variant="gold" onClick={() => setMbidModal(true)}>
+              <span className="inline-flex items-center gap-1.5">
+                <Link2 size={14} /> Enlazar con MusicBrainz
+              </span>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {mbidModal && (
+        <MbidLinkerModal
+          artist={artist}
+          onClose={() => setMbidModal(false)}
+          onLinked={async () => {
+            setMbidModal(false);
+            await load();
+          }}
+        />
+      )}
 
       {/* completismo */}
       {!noMbid && (
@@ -253,6 +305,144 @@ export default function ArtistDetail() {
       )}
 
       {!noMbid && <Relations artistId={id} />}
+    </div>
+  );
+}
+
+// Enlazar (o corregir) el artista con MusicBrainz a mano: busca por nombre y elige el
+// correcto, o pega directamente su MBID. Al fijarlo, el backend recalcula la
+// discografía en el acto. Resuelve casos que la identificación no pilla (duplicados,
+// mayúsculas… p. ej. «Florence + the Machine»).
+const MBID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function MbidLinkerModal({ artist, onClose, onLinked }) {
+  const [q, setQ] = useState(artist.name || '');
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+  const [saving, setSaving] = useState(null);
+  const [raw, setRaw] = useState('');
+
+  const run = async () => {
+    if (!q.trim()) return;
+    setLoading(true);
+    setErr(null);
+    try {
+      setResults(await api.searchArtistMb(q));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // primera búsqueda automática al abrir
+  useEffect(() => {
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const link = async (mbid) => {
+    setSaving(mbid);
+    setErr(null);
+    try {
+      await api.setArtistMbid(artist.id, mbid);
+      await onLinked();
+    } catch (e) {
+      setErr(e.message);
+      setSaving(null);
+    }
+  };
+
+  const rawValid = MBID_RE.test(raw.trim());
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="card w-full max-w-2xl mt-10 p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm text-neutral-300 flex items-center gap-2">
+            <Link2 size={15} /> {artist.mbid ? 'Corregir enlace con MusicBrainz' : 'Enlazar con MusicBrainz'}
+          </h2>
+          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-300" title="Cerrar">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            className="flex-1 bg-ink-850 border border-ink-800 rounded px-2 py-1.5 text-sm outline-none focus:border-gold-500/60"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && run()}
+            placeholder="Nombre del artista en MusicBrainz…"
+          />
+          <Button onClick={run} disabled={loading}>
+            <span className="inline-flex items-center gap-1.5">
+              <Search size={14} /> {loading ? 'Buscando…' : 'Buscar'}
+            </span>
+          </Button>
+        </div>
+
+        {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+        {results && results.length === 0 && !loading && (
+          <p className="text-sm text-neutral-600 mt-3">Sin resultados. Cambia el texto o pega el MBID abajo.</p>
+        )}
+        {results && results.length > 0 && (
+          <div className="mt-3 max-h-80 overflow-y-auto divide-y divide-ink-850/60">
+            {results.map((r) => {
+              const isCurrent = r.mbid === artist.mbid;
+              return (
+                <div key={r.mbid} className="py-2 flex items-center gap-3 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate">
+                      <span className="text-neutral-200">{r.name}</span>
+                      {r.disambiguation ? <span className="text-neutral-500"> — {r.disambiguation}</span> : null}
+                    </div>
+                    <div className="text-xs text-neutral-600">
+                      {r.type ? <span>{r.type}</span> : null}
+                      {r.country ? <span className="ml-2">{r.country}</span> : null}
+                      {r.began ? <span className="ml-2">{r.began}{r.ended ? `–${r.ended}` : ''}</span> : null}
+                      <a
+                        href={`https://musicbrainz.org/artist/${r.mbid}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ml-2 text-gold-400 hover:underline inline-flex items-center gap-0.5"
+                      >
+                        MB <ExternalLink size={11} />
+                      </a>
+                    </div>
+                  </div>
+                  {isCurrent ? (
+                    <span className="text-xs text-emerald-400 shrink-0 inline-flex items-center gap-1">
+                      <Check size={14} /> actual
+                    </span>
+                  ) : (
+                    <Button variant="gold" disabled={saving === r.mbid} onClick={() => link(r.mbid)}>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Check size={14} /> {saving === r.mbid ? '…' : 'Es este'}
+                      </span>
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mt-4 pt-3 border-t border-ink-800">
+          <p className="text-xs text-neutral-600 mb-1.5">¿Ya tienes el MBID? Pégalo aquí:</p>
+          <div className="flex gap-2">
+            <input
+              className="flex-1 bg-ink-850 border border-ink-800 rounded px-2 py-1.5 text-xs font-mono outline-none focus:border-gold-500/60"
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+              placeholder="00000000-0000-0000-0000-000000000000"
+            />
+            <Button disabled={!rawValid || saving === raw.trim().toLowerCase()} onClick={() => link(raw.trim().toLowerCase())}>
+              Enlazar
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

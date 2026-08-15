@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { Cover, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled } from '../components.jsx';
 
@@ -17,6 +17,8 @@ export default function AlbumDetail() {
   const [titleVal, setTitleVal] = useState('');
   const [labels, setLabels] = useState([]);
   const [labelTried, setLabelTried] = useState(false);
+  const [coverModal, setCoverModal] = useState(false);
+  const [coverBust, setCoverBust] = useState(0);
   const lidarrOn = useLidarrEnabled();
 
   const load = () => api.album(id).then(setAlbum).catch((e) => setErr(e.message));
@@ -149,8 +151,15 @@ export default function AlbumDetail() {
 
       <div className="flex flex-col md:flex-row gap-6 mb-6">
         <div className="w-full md:w-64 shrink-0">
-          <div className="rounded-xl overflow-hidden card">
-            <Cover id={album.id} />
+          <div className="rounded-xl overflow-hidden card relative group">
+            <Cover id={album.id} bust={coverBust || undefined} />
+            <button
+              onClick={() => setCoverModal(true)}
+              className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-ink-900/85 border border-ink-700 text-neutral-200 hover:bg-ink-800 hover:border-gold-500/50 backdrop-blur opacity-90 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+              title="Buscar una carátula online o subir una desde tu equipo"
+            >
+              <ImageIcon size={13} /> Carátula
+            </button>
           </div>
         </div>
         <div className="min-w-0 flex-1">
@@ -170,6 +179,32 @@ export default function AlbumDetail() {
                 MusicBrainz <ExternalLink size={11} />
               </a>
             )}
+            {(() => {
+              const q = `${album.artist?.name || album.album_artist || ''} ${album.title || ''}`.trim();
+              if (!q) return null;
+              return (
+                <>
+                  <a
+                    href={`https://www.discogs.com/search/?q=${encodeURIComponent(q)}&type=master`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-gold-400 hover:underline inline-flex items-center gap-1"
+                    title="Buscar la referencia maestra en Discogs"
+                  >
+                    Discogs <ExternalLink size={11} />
+                  </a>
+                  <a
+                    href={`https://record.club/search?q=${encodeURIComponent(q)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-gold-400 hover:underline inline-flex items-center gap-1"
+                    title="Buscar este disco en Record Club"
+                  >
+                    Record Club <ExternalLink size={11} />
+                  </a>
+                </>
+              );
+            })()}
           </div>
           {editTitle ? (
             <div className="flex items-center gap-1.5 my-1">
@@ -374,6 +409,156 @@ export default function AlbumDetail() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {coverModal && (
+        <CoverPickerModal
+          album={album}
+          onClose={() => setCoverModal(false)}
+          onApplied={() => {
+            setCoverBust((n) => n + 1);
+            setCoverModal(false);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Modal para poner carátula a mano: busca candidatos online (Cover Art Archive por MBID
+// + iTunes por texto, con caja editable) o sube una imagen desde el equipo. Lo elegido
+// se escribe como cover.jpg en la carpeta del álbum (backend). Cierra al aplicar.
+function CoverPickerModal({ album, onClose, onApplied }) {
+  const [q, setQ] = useState(`${album.artist?.name || album.album_artist || ''} ${album.title || ''}`.trim());
+  const [candidates, setCandidates] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+  const [applying, setApplying] = useState(null);
+
+  const search = async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      const r = await api.coverCandidates(album.id, q);
+      setCandidates(r.candidates || []);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // primera búsqueda automática al abrir
+  useEffect(() => {
+    search();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const applyUrl = async (url) => {
+    setApplying(url);
+    setErr(null);
+    try {
+      const r = await api.applyCover(album.id, { url });
+      if (!r.savedToFolder) setErr('Guardada en la app, pero no se pudo escribir en la carpeta (¿solo lectura?).');
+      onApplied();
+    } catch (e) {
+      setErr(e.message);
+      setApplying(null);
+    }
+  };
+
+  const onUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setErr('El fichero no es una imagen.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      setApplying('upload');
+      setErr(null);
+      try {
+        const r = await api.applyCover(album.id, { dataUrl: reader.result });
+        if (!r.savedToFolder) setErr('Guardada en la app, pero no se pudo escribir en la carpeta (¿solo lectura?).');
+        onApplied();
+      } catch (e2) {
+        setErr(e2.message);
+        setApplying(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="card w-full max-w-2xl mt-10 p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm text-neutral-300 flex items-center gap-2">
+            <ImageIcon size={15} /> Añadir carátula
+          </h2>
+          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-300" title="Cerrar">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            className="flex-1 bg-ink-850 border border-ink-800 rounded px-2 py-1.5 text-sm outline-none focus:border-gold-500/60"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && search()}
+            placeholder="Artista y álbum…"
+          />
+          <Button onClick={search} disabled={loading}>
+            <span className="inline-flex items-center gap-1.5">
+              <Search size={14} /> {loading ? 'Buscando…' : 'Buscar'}
+            </span>
+          </Button>
+          <label className="text-sm px-3 py-1.5 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+            <Upload size={14} /> Subir
+            <input type="file" accept="image/*" className="hidden" onChange={onUpload} disabled={!!applying} />
+          </label>
+        </div>
+        <p className="text-xs text-neutral-600 mt-1">
+          Se guarda como <span className="text-neutral-500">cover.jpg</span> en la carpeta del álbum (permanente, no toca el
+          audio). Fuentes: Cover Art Archive (oficial) e iTunes.
+        </p>
+
+        {err && <p className="text-sm text-amber-400 mt-3">{err}</p>}
+
+        {candidates && candidates.length === 0 && !loading && (
+          <p className="text-sm text-neutral-600 mt-4">Sin candidatos online. Prueba a cambiar el texto o sube una imagen.</p>
+        )}
+
+        {candidates && candidates.length > 0 && (
+          <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[26rem] overflow-y-auto pr-1">
+            {candidates.map((c) => (
+              <button
+                key={c.url}
+                onClick={() => applyUrl(c.url)}
+                disabled={!!applying}
+                className="relative rounded-lg overflow-hidden border border-ink-800 hover:border-gold-500/70 disabled:opacity-50 group/cand aspect-square bg-ink-850"
+                title={`${c.source === 'caa' ? 'Cover Art Archive' : 'iTunes'}${c.title ? ` · ${c.title}` : ''}${c.year ? ` (${c.year})` : ''}`}
+              >
+                <img src={c.thumb} alt="" className="h-full w-full object-cover" loading="lazy" />
+                {applying === c.url ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <Loader2 size={20} className="animate-spin text-gold-300" />
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/cand:bg-black/40 transition-colors opacity-0 group-hover/cand:opacity-100">
+                    <Check size={22} className="text-gold-200" />
+                  </div>
+                )}
+                {c.front === true && (
+                  <span className="absolute top-1 left-1 text-[10px] px-1 rounded bg-emerald-500/80 text-black">oficial</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

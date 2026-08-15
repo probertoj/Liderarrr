@@ -91,7 +91,7 @@ export function StateBadge({ state }) {
 // —icono atenuado y pulsante— en vez de un hueco en blanco. Si tras los reintentos no
 // hay carátula, el icono queda estático (estado "sin carátula").
 const COVER_RETRIES = 3;
-export function Cover({ id, size = 'full', className = '', noRetry = false }) {
+export function Cover({ id, size = 'full', className = '', noRetry = false, bust }) {
   const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -102,7 +102,7 @@ export function Cover({ id, size = 'full', className = '', noRetry = false }) {
     setFailed(false);
     setLoaded(false);
     return () => clearTimeout(timer.current);
-  }, [id]);
+  }, [id, bust]);
 
   // noRetry (parrillas grandes, p. ej. Artistas): sin reintentos con ?r=N — cada carátula
   // es una sola petición cacheable; si falta, se muestra el placeholder y punto. Evita la
@@ -124,7 +124,13 @@ export function Cover({ id, size = 'full', className = '', noRetry = false }) {
       )}
       {id && !failed && (
         <img
-          src={attempt ? `${coverUrl(id)}?r=${attempt}` : coverUrl(id)}
+          src={
+            attempt
+              ? `${coverUrl(id)}?r=${attempt}${bust ? `&v=${bust}` : ''}`
+              : bust
+                ? `${coverUrl(id)}?v=${bust}`
+                : coverUrl(id)
+          }
           onLoad={() => setLoaded(true)}
           onError={onError}
           loading="lazy"

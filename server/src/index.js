@@ -63,7 +63,7 @@ import { importListFromUrl } from './listimport.js';
 import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCompletism, resolveAlbumLabel } from './editions.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
-import { coverFast, resolveCoverSlow, retryMissingCovers } from './covers.js';
+import { coverFast, resolveCoverSlow, retryMissingCovers, coverCandidates, applyCover } from './covers.js';
 import { diagnostics, pushEvent } from './diag.js';
 import { updateCheck } from './update.js';
 import * as q from './queries.js';
@@ -281,6 +281,23 @@ app.get('/api/corrections', async () => correctedAlbums());
 app.post('/api/corrections/refile-all', async (req, reply) => {
   try {
     return refileAll();
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// fijar a mano el MBID de un artista (cuando la identificación no lo pilla) y
+// recalcular su discografía en el acto para que el completismo funcione ya.
+app.put('/api/artists/:id/mbid', async (req, reply) => {
+  try {
+    const id = Number(req.params.id);
+    const r = q.setArtistMbid(id, req.body?.mbid);
+    let discography = null;
+    try {
+      discography = await enrichArtistDiscography(id);
+    } catch (e) {
+      discography = { error: String(e.message || e) };
+    }
+    return { ...r, discography };
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }
@@ -763,6 +780,24 @@ app.get('/api/cover/:id', async (req, reply) => {
 
 // vuelve a intentar las carátulas que no se encontraron (útil tras identificar)
 app.post('/api/covers/retry-missing', async () => ({ retried: retryMissingCovers() }));
+
+// candidatos de carátula para elegir a mano (Cover Art Archive + iTunes)
+app.get('/api/cover/:id/candidates', async (req, reply) => {
+  try {
+    return await coverCandidates(Number(req.params.id), req.query?.q);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// aplica una carátula elegida (por URL online) o subida (dataURL): escribe cover.jpg
+// en la carpeta del álbum y la cachea. Devuelve si se pudo guardar en la carpeta.
+app.post('/api/cover/:id/apply', async (req, reply) => {
+  try {
+    return await applyCover(Number(req.params.id), { url: req.body?.url, dataUrl: req.body?.dataUrl });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 
 // --- copia de seguridad -----------------------------------------------------
 app.get('/api/backup/database', async (req, reply) => {

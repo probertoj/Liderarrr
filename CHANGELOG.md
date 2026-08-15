@@ -18,6 +18,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 - **Jackett: categoría configurable** (Ajustes → Jackett). Por defecto 3000 (música); **déjala vacía**
   si un tracker (p. ej. Orpheus) no aparece: buscará en todas las categorías (algunos indexers no
   declaran la categoría 3000 en Jackett y el filtro los excluía del agregado «all»).
+- **Ficha de álbum: enlaces a Discogs y Record Club** en la cabecera, junto al de MusicBrainz.
+  Búsqueda directa por artista + álbum (Discogs apunta a la referencia *master*).
+- **Añadir carátula a mano** desde la ficha del álbum: botón sobre la portada que abre un buscador
+  online (Cover Art Archive por MBID + iTunes por texto, editable) o permite subir una imagen desde
+  tu equipo. Lo elegido se guarda como `cover.jpg` en la carpeta del álbum (permanente, solo añade el
+  fichero; no toca el audio).
+- **Enlazar un artista con MusicBrainz a mano** desde su ficha: cuando la identificación no pilla su
+  MBID (duplicados, mayúsculas… p. ej. «Florence + the Machine»), un buscador por nombre —o pegando el
+  MBID— lo enlaza y recalcula su discografía y completismo al instante. Queda fijado (un reescaneo no
+  lo pisa).
 
 ### Corregido
 - **Completismo del artista en vivo**: «faltan», «por estrenar» y el % se calculan cruzando en vivo
