@@ -150,6 +150,7 @@ export const api = {
   editions: (id) => req(`/albums/${id}/editions`),
   albumCredits: (id) => req(`/albums/${id}/credits`),
   albumAbout: (id) => req(`/albums/${id}/about`),
+  albumRecommendations: (id) => req(`/albums/${id}/recommendations`),
   relations: (id) => req(`/artists/${id}/relations`),
   upgrades: () => req('/quality/upgrades'),
   labels: () => req('/labels'),

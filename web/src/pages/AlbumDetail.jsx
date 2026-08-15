@@ -389,6 +389,8 @@ export default function AlbumDetail() {
         </table>
       </div>
 
+      <Recommendations albumId={album.id} artistName={album.artist?.name || album.album_artist} />
+
       {coverModal && (
         <CoverPickerModal
           album={album}
@@ -767,6 +769,103 @@ function TagWriter({ albumId }) {
             </>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Recomendaciones (estilo «Valence Recommendations» de Roon): más de este artista (de
+// tu biblioteca) + artistas afines (Last.fm). Bajo demanda (consulta Last.fm).
+function Recommendations({ albumId, artistName }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      setData(await api.albumRecommendations(albumId));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="card p-4 mb-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+          <Sparkles size={15} /> Recomendaciones
+        </h2>
+        {!data && (
+          <Button onClick={load} disabled={loading}>
+            {loading ? 'Cargando…' : 'Ver recomendaciones'}
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-neutral-600 mt-1">Más de este artista (tu biblioteca) y artistas afines (Last.fm).</p>
+
+      {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+
+      {data && (
+        <>
+          {data.moreFromArtist?.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-xs uppercase tracking-wider text-neutral-600 mb-2">Más de {data.artist?.name || artistName}</h3>
+              <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-3">
+                {data.moreFromArtist.map((al) => (
+                  <Link key={al.id} to={`/album/${al.id}`} className="group">
+                    <div className="rounded-lg overflow-hidden border border-ink-800 group-hover:border-gold-500/40">
+                      <Cover id={al.id} />
+                    </div>
+                    <div className="text-xs mt-1 truncate text-neutral-300" title={al.title}>
+                      {al.title}
+                    </div>
+                    {al.year ? <div className="text-[11px] text-neutral-600">{al.year}</div> : null}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {data.similar?.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-xs uppercase tracking-wider text-neutral-600 mb-2">Te podría gustar</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {data.similar.map((s) =>
+                  s.artist_id ? (
+                    <Link
+                      key={s.name}
+                      to={`/artista/${s.artist_id}`}
+                      className="text-xs px-2 py-1 rounded-full border border-gold-500/30 bg-gold-500/10 text-gold-200 hover:bg-gold-500/20"
+                      title="Lo tienes en tu biblioteca"
+                    >
+                      {s.name}
+                    </Link>
+                  ) : (
+                    <a
+                      key={s.name}
+                      href={s.url || '#'}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs px-2 py-1 rounded-full border border-ink-800 bg-ink-850 text-neutral-300 hover:border-gold-500/40 inline-flex items-center gap-1"
+                    >
+                      {s.name} <ExternalLink size={10} />
+                    </a>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+
+          {!data.moreFromArtist?.length && !data.similar?.length && (
+            <p className="text-sm text-neutral-600 mt-3">
+              {data.lastfm ? 'Sin recomendaciones por ahora.' : 'Configura Last.fm en Ajustes para ver artistas afines.'}
+            </p>
+          )}
+        </>
       )}
     </div>
   );

@@ -42,6 +42,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 - **«Sobre el disco» en la ficha del álbum** (estilo Roon): reseña/descripción del disco (o, si no la hay,
   del artista) desde Last.fm, con «Leer más», y valoración de la comunidad de Discogs (estrellas + nº de
   votos). Se autocarga; ambas fuentes son opcionales (aparecen si tienes configuradas Last.fm/Discogs).
+- **Recomendaciones en la ficha del álbum** (estilo Valence de Roon): «Más de este artista» (otros discos
+  suyos que tienes, con carátula, enlazados) y «Te podría gustar» (artistas afines vía Last.fm, resaltando
+  los que ya tienes). Se carga bajo demanda.
 
 ### Corregido
 - **Completismo del artista en vivo**: «faltan», «por estrenar» y el % se calculan cruzando en vivo

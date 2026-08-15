@@ -97,6 +97,29 @@ export async function artistInfo(name) {
   }
 }
 
+// Artistas similares (señal de popularidad de Last.fm), para recomendaciones «si te
+// gusta esto». Devuelve nombre + MBID + grado de coincidencia (0-1).
+export async function similarArtists(name, limit = 14) {
+  if (!lastfmConfigured() || !name) return [];
+  try {
+    const data = await lfCached(`similar:${name}`.toLowerCase(), {
+      method: 'artist.getSimilar',
+      artist: name,
+      autocorrect: '1',
+      limit: String(limit),
+    });
+    const arr = data.similarartists?.artist || [];
+    return (Array.isArray(arr) ? arr : [arr]).map((a) => ({
+      name: a.name,
+      mbid: a.mbid || null,
+      match: Number(a.match) || 0,
+      url: a.url || null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 // Scrobbles recientes de un usuario. NO se cachea: es historial vivo. Devuelve
 // una página cruda de user.getRecentTracks (200 por página, más nuevos primero).
 export async function recentTracks(user, { from = 0, page = 1, limit = 200 } = {}) {

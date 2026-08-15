@@ -64,6 +64,7 @@ import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCompletism, resolveAlbumLabel } from './editions.js';
 import { albumPersonnel } from './albumcredits.js';
 import { albumAbout } from './about.js';
+import { albumRecommendations } from './recommend.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
 import { coverFast, resolveCoverSlow, retryMissingCovers, coverCandidates, applyCover } from './covers.js';
 import { diagnostics, pushEvent } from './diag.js';
@@ -446,6 +447,14 @@ app.get('/api/albums/:id/credits', async (req, reply) => {
 app.get('/api/albums/:id/about', async (req, reply) => {
   try {
     return await albumAbout(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// recomendaciones: más de este artista (local) + artistas similares (Last.fm)
+app.get('/api/albums/:id/recommendations', async (req, reply) => {
+  try {
+    return await albumRecommendations(Number(req.params.id));
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }
