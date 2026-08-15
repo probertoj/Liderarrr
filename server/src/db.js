@@ -408,6 +408,10 @@ ensureColumn('albums', 'artist_manual', 'artist_manual INTEGER DEFAULT 0');
 // título corregido a mano desde la UI (0.6.3): igual que artist_manual, protege el
 // título de que un reescaneo lo pise con la etiqueta del fichero.
 ensureColumn('albums', 'title_manual', 'title_manual INTEGER DEFAULT 0');
+// (0.8) agrupación de multidiscos DECIDIDA A MANO: cuando el usuario combina o separa
+// discos en la UI, se marca para que la heurística de discgroup.js (regroupDiscs) no lo
+// pise en el siguiente escaneo. 1 = disc_group fijado a mano (aunque sea NULL = separado).
+ensureColumn('albums', 'disc_group_manual', 'disc_group_manual INTEGER DEFAULT 0');
 
 // (0.8) release_groups pasa de clave rg_mbid único a clave COMPUESTA (rg_mbid, artist_id):
 // un mismo release-group puede estar acreditado a varios artistas (splits, colaboraciones)

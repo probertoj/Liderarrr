@@ -41,14 +41,16 @@ function isDiscFolder(name) {
 export function regroupDiscs() {
   const rows = db
     .prepare(
-      `SELECT id, path, album_artist, track_count, track_file_count, disc_count, disc_group
+      `SELECT id, path, album_artist, track_count, track_file_count, disc_count, disc_group, disc_group_manual
        FROM albums WHERE match_state != 'dismissed' AND path IS NOT NULL AND path <> ''`
     )
     .all();
 
-  // agrupa candidatos por (carpeta padre + artista + total de caja)
+  // agrupa candidatos por (carpeta padre + artista + total de caja). Los álbumes con la
+  // agrupación decidida a mano (disc_group_manual) NO participan: la heurística los ignora.
   const buckets = new Map();
   for (const a of rows) {
+    if (a.disc_group_manual) continue;
     const p = String(a.path).replace(/\\/g, '/');
     const base = path.posix.basename(p);
     const parent = path.posix.dirname(p);
@@ -70,11 +72,12 @@ export function regroupDiscs() {
     for (const m of members) desired.set(m.id, g);
   }
 
-  // aplica solo los cambios (idempotente)
+  // aplica solo los cambios (idempotente). Respeta los grupos manuales (no se tocan).
   const setGroup = db.prepare('UPDATE albums SET disc_group = ? WHERE id = ?');
   const tx = db.transaction(() => {
     let changed = 0;
     for (const a of rows) {
+      if (a.disc_group_manual) continue;
       const want = desired.get(a.id) ?? null;
       if ((a.disc_group || null) !== want) {
         setGroup.run(want, a.id);
@@ -87,4 +90,78 @@ export function regroupDiscs() {
   const groups = new Set([...desired.values()].filter(Boolean)).size;
   console.log(`[discgroup] cajas multidisco: ${groups} grupos - ${changed} filas actualizadas`);
   return { groups, changed };
+}
+
+// --- combinar/separar multidiscos A MANO (estilo Plex/Roon) -------------------
+// El usuario decide qué discos son una misma caja. Se marca disc_group_manual para que
+// la heurística (regroupDiscs) no lo pise. Metadato interno: NO toca ficheros.
+
+// Combina 2+ álbumes en una caja multidisco. Si alguno ya estaba en una caja (manual o
+// no), todos sus miembros se absorben en el grupo nuevo. Devuelve el grupo y el nº de discos.
+export function combineAlbums(ids) {
+  const wanted = [...new Set((ids || []).map(Number).filter(Boolean))];
+  if (wanted.length < 2) throw new Error('Elige al menos dos discos para combinar');
+  const rows = db
+    .prepare(`SELECT id, disc_group FROM albums WHERE id IN (${wanted.map(() => '?').join(',')}) AND match_state != 'dismissed'`)
+    .all(...wanted);
+  if (rows.length < 2) throw new Error('No se encontraron los discos a combinar');
+
+  // absorbe también a los que ya compartían disc_group con alguno de los elegidos
+  const existingGroups = [...new Set(rows.map((r) => r.disc_group).filter(Boolean))];
+  const memberIds = new Set(rows.map((r) => r.id));
+  if (existingGroups.length) {
+    for (const m of db
+      .prepare(`SELECT id FROM albums WHERE disc_group IN (${existingGroups.map(() => '?').join(',')})`)
+      .all(...existingGroups))
+      memberIds.add(m.id);
+  }
+
+  const group = `manual:${sha1([...memberIds].sort((a, b) => a - b).join(','))}`;
+  const set = db.prepare('UPDATE albums SET disc_group = ?, disc_group_manual = 1 WHERE id = ?');
+  const tx = db.transaction(() => {
+    for (const id of memberIds) set.run(group, id);
+  });
+  tx();
+  return { group, discs: memberIds.size };
+}
+
+// Separa una caja: quita el disc_group a TODOS los discos del grupo del álbum dado y los
+// marca como manual (para que la heurística no vuelva a agruparlos). Vuelven a ser álbumes
+// independientes.
+export function uncombineAlbum(albumId) {
+  const a = db.prepare('SELECT id, disc_group FROM albums WHERE id = ?').get(Number(albumId));
+  if (!a) throw new Error('Álbum no encontrado');
+  if (!a.disc_group) return { separated: 0 };
+  const r = db.prepare('UPDATE albums SET disc_group = NULL, disc_group_manual = 1 WHERE disc_group = ?').run(a.disc_group);
+  return { separated: r.changes };
+}
+
+// Candidatos para «combinar con…» desde la ficha de un álbum: otros discos del MISMO
+// artista o de la MISMA carpeta padre, que no estén ya en su caja. Para elegir a mano
+// los discos de un doble/triple que la heurística no agrupó bien.
+export function combineCandidates(albumId) {
+  const a = db.prepare('SELECT id, artist_id, path, disc_group FROM albums WHERE id = ?').get(Number(albumId));
+  if (!a) throw new Error('Álbum no encontrado');
+  const parent = a.path ? String(a.path).replace(/\\/g, '/').replace(/\/[^/]*$/, '') : null;
+  const rows = db
+    .prepare(
+      `SELECT id, title, album_artist, year, track_file_count, track_count, path, disc_group
+       FROM albums
+       WHERE id != @id AND match_state != 'dismissed'
+         AND (disc_group IS NULL OR disc_group != @dg)
+         AND (artist_id = @aid OR (@parent IS NOT NULL AND path LIKE @parentLike))
+       ORDER BY path`
+    )
+    .all({ id: a.id, aid: a.artist_id, dg: a.disc_group || '', parent, parentLike: parent ? `${parent}/%` : null });
+  // dedup y marca si el candidato ya está en otra caja
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    album_artist: r.album_artist,
+    year: r.year,
+    track_file_count: r.track_file_count,
+    track_count: r.track_count,
+    path: r.path,
+    in_box: !!r.disc_group,
+  }));
 }

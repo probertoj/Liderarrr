@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { db, DATA_DIR, getAllSettings, getSetting, setSetting } from './db.js';
 import { runScan, scanStatus } from './scanner.js';
-import { regroupDiscs } from './discgroup.js';
+import { regroupDiscs, combineAlbums, uncombineAlbum, combineCandidates } from './discgroup.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch } from './identify.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
 import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab, enqueueLidarrAdd, lidarrAddStatus, resumeAddQueue, lidarrConfig } from './lidarr.js';
@@ -277,6 +277,28 @@ app.put('/api/albums/:id/artist', async (req, reply) => {
 app.put('/api/albums/:id/artists', async (req, reply) => {
   try {
     return q.setAlbumArtists(Number(req.params.id), req.body?.artists);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// multidiscos a mano: combinar varios en una caja, separar una caja, y candidatos a combinar
+app.post('/api/albums/combine', async (req, reply) => {
+  try {
+    return combineAlbums(req.body?.ids);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/albums/:id/uncombine', async (req, reply) => {
+  try {
+    return uncombineAlbum(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.get('/api/albums/:id/combine-candidates', async (req, reply) => {
+  try {
+    return combineCandidates(Number(req.params.id));
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

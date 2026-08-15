@@ -190,32 +190,50 @@ export function ArtistPhoto({ id, name, size = 40, className = '', bust, retry =
   );
 }
 
-// Tarjeta de álbum para las parrillas.
-export function AlbumCard({ album, onClick }) {
+// Tarjeta de álbum para las parrillas. `selectable` la pone en modo selección (para
+// combinar multidiscos en lote): muestra una marca y, al pinchar, alterna en vez de navegar.
+export function AlbumCard({ album, onClick, selectable = false, selected = false, onSelectToggle }) {
   const incomplete = album.track_file_count < album.track_count;
   const body = (
     <>
-      <div className="relative rounded-lg overflow-hidden card">
+      <div className={`relative rounded-lg overflow-hidden card ${selected ? 'ring-2 ring-gold-500' : ''}`}>
         <Cover id={album.id} />
-        {incomplete && (
-          <span className="absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/90 text-amber-50">
-            {album.track_file_count}/{album.track_count}
+        {selectable ? (
+          <span
+            className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+              selected ? 'bg-gold-500 border-gold-500 text-black' : 'bg-black/40 border-white/70 text-transparent'
+            }`}
+          >
+            <Check size={13} />
           </span>
-        )}
-        {(album.dup || album.match_state === 'orphan') && (
-          <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
-            {album.dup && (
-              <span
-                className="text-[10px] px-1.5 py-0.5 rounded bg-sky-600/90 text-sky-50"
-                title={`${album.dup.copies} copias de este disco en tu colección`}
-              >
-                ×{album.dup.copies}
+        ) : (
+          <>
+            {incomplete && (
+              <span className="absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/90 text-amber-50">
+                {album.track_file_count}/{album.track_count}
               </span>
             )}
-            {album.match_state === 'orphan' && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-600/90 text-violet-50">rareza</span>
+            {(album.dup || album.match_state === 'orphan') && (
+              <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
+                {album.dup && (
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-sky-600/90 text-sky-50"
+                    title={`${album.dup.copies} copias de este disco en tu colección`}
+                  >
+                    ×{album.dup.copies}
+                  </span>
+                )}
+                {album.match_state === 'orphan' && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-600/90 text-violet-50">rareza</span>
+                )}
+              </div>
             )}
-          </div>
+          </>
+        )}
+        {album.discs > 1 && (
+          <span className="absolute bottom-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-ink-900/85 text-neutral-200 border border-ink-700">
+            {album.discs} discos
+          </span>
         )}
       </div>
       <div className="mt-1.5 px-0.5">
@@ -229,7 +247,14 @@ export function AlbumCard({ album, onClick }) {
       </div>
     </>
   );
-  // con onClick (p. ej. desplegar duplicados) es un botón; si no, enlaza al álbum
+  // modo selección: alterna. Con onClick (desplegar duplicados): botón. Si no: enlace.
+  if (selectable) {
+    return (
+      <button type="button" onClick={onSelectToggle} className="group block w-full text-left">
+        {body}
+      </button>
+    );
+  }
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className="group block w-full text-left">

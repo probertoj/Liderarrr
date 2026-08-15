@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled } from '../components.jsx';
 
@@ -346,6 +346,8 @@ export default function AlbumDetail() {
       </div>
 
       <AboutSection albumId={album.id} />
+
+      <DiscBox album={album} onDone={load} />
 
       {album.match_state !== 'matched' && album.match_state !== 'orphan' && (
         <IdentifySection album={album} onDone={load} />
@@ -770,6 +772,173 @@ function TagWriter({ albumId }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Multidisco a mano (estilo Plex/Roon): combina este disco con otros (los discos de un
+// doble/triple que la heurística no agrupó) o separa la caja. Metadato interno, no toca
+// ficheros. La Discoteca muestra la caja como un solo álbum.
+function DiscBox({ album, onDone }) {
+  const [modal, setModal] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const inBox = !!album.disc_group && album.discMembers?.length > 1;
+
+  const separate = async () => {
+    if (!window.confirm('¿Separar la caja multidisco? Cada disco vuelve a ser un álbum independiente.')) return;
+    setBusy(true);
+    try {
+      await api.uncombineAlbum(album.id);
+      await onDone();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card p-4 mb-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+          <Layers size={15} /> Multidisco
+        </h2>
+        <div className="flex gap-2">
+          <Button onClick={() => setModal(true)} disabled={busy}>
+            <span className="inline-flex items-center gap-1.5">
+              <Layers size={14} /> Combinar con…
+            </span>
+          </Button>
+          {inBox && (
+            <button
+              onClick={separate}
+              disabled={busy}
+              className="text-sm px-3 py-1.5 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1.5 disabled:opacity-50"
+            >
+              Separar la caja
+            </button>
+          )}
+        </div>
+      </div>
+      <p className="text-xs text-neutral-600 mt-1">
+        {inBox
+          ? 'Este disco es parte de una caja multidisco: la Discoteca la cuenta como un solo álbum.'
+          : 'Combínalo con otros discos (un doble/triple que no se agrupó bien) para que la Discoteca los cuente como uno solo.'}
+      </p>
+
+      {inBox && (
+        <div className="mt-3 divide-y divide-ink-850/60">
+          {album.discMembers.map((m) => (
+            <div key={m.id} className="py-1.5 flex items-center justify-between text-sm">
+              <Link to={`/album/${m.id}`} className={m.id === album.id ? 'text-gold-300' : 'text-neutral-300 hover:text-gold-400'}>
+                {m.title}
+              </Link>
+              <span className="text-neutral-500">
+                {m.track_file_count}/{m.track_count} pistas
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {modal && (
+        <CombineModal
+          album={album}
+          onClose={() => setModal(false)}
+          onDone={async () => {
+            setModal(false);
+            await onDone();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Modal para elegir con qué discos combinar (candidatos = mismo artista o misma carpeta).
+function CombineModal({ album, onClose, onDone }) {
+  const [cands, setCands] = useState(null);
+  const [sel, setSel] = useState(() => new Set());
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    api
+      .combineCandidates(album.id)
+      .then(setCands)
+      .catch((e) => setErr(e.message))
+      .finally(() => setLoading(false));
+  }, [album.id]);
+
+  const toggle = (id) =>
+    setSel((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+
+  const combine = async () => {
+    if (!sel.size) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.combineAlbums([album.id, ...sel]);
+      await onDone();
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="card w-full max-w-lg mt-16 p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm text-neutral-300 flex items-center gap-2">
+            <Layers size={14} /> Combinar «{album.title}» con…
+          </h2>
+          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-300" title="Cerrar">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="text-xs text-neutral-600 mb-3">Otros discos del mismo artista o carpeta. Marca los que forman la misma caja.</p>
+
+        {err && <p className="text-sm text-red-400 mb-2">{err}</p>}
+        {loading && <Spinner label="Buscando discos…" />}
+        {cands && cands.length === 0 && !loading && (
+          <p className="text-sm text-neutral-600">No hay otros discos del mismo artista o carpeta para combinar.</p>
+        )}
+
+        {cands && cands.length > 0 && (
+          <div className="max-h-80 overflow-y-auto divide-y divide-ink-850/60">
+            {cands.map((c) => (
+              <label key={c.id} className="py-2 flex items-center gap-3 text-sm cursor-pointer">
+                <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} className="accent-gold-500" />
+                <span className="min-w-0 flex-1">
+                  <span className="truncate block text-neutral-200">{c.title}</span>
+                  <span className="text-xs text-neutral-600">
+                    {c.track_file_count}/{c.track_count} pistas
+                    {c.in_box ? ' · ya en otra caja' : ''}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 mt-4">
+          <Button onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button variant="gold" onClick={combine} disabled={busy || !sel.size}>
+            <span className="inline-flex items-center gap-1.5">
+              {busy && <Loader2 size={14} className="animate-spin" />} Combinar {sel.size ? `(${sel.size + 1})` : ''}
+            </span>
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

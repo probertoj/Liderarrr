@@ -51,6 +51,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 - **Fotos de artista** (como las carátulas): se resuelven automáticamente desde Deezer (sin clave) y puedes
   cambiarlas a mano (buscar en Deezer o subir una imagen) desde la ficha del artista. Aparecen en la ficha
   del artista y como avatar en los créditos de los discos. Se guardan en la caché de la app.
+- **Combinar multidiscos a mano** (estilo Plex/Roon): para los dobles/triples que la heurística no agrupó
+  bien. Dos vías: en la **Discoteca**, «Combinar discos» activa un modo selección (cada disco por separado)
+  para elegir varios y unirlos en una caja; y en la **ficha del álbum**, «Combinar con…» ofrece los discos
+  del mismo artista o carpeta, y «Separar la caja» la deshace. Lo decidido a mano queda protegido de la
+  heurística de reescaneo. Las cajas se muestran como un solo álbum, con insignia del nº de discos.
 
 ### Corregido
 - **Completismo del artista en vivo**: «faltan», «por estrenar» y el % se calculan cruzando en vivo
