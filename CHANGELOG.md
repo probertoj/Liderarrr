@@ -9,6 +9,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+---
+
+## [0.7.0] — 2026-08-14
+
+Objetivo: **independencia de Lidarr**. La app ya funciona entera sin él — descubre (MusicBrainz +
+radar), busca (Prowlarr/Jackett con freeleech), descarga (qBittorrent), importa (hardlink) y
+automatiza, todo nativo. Lidarr queda como integración opcional.
+
 ### Cambiado
 - **Lidarr ahora es opcional (independencia).** Si no tienes Lidarr configurado, la app funciona
   entera con el flujo nativo: los botones «Lidarr» de la ficha del álbum, huecos del artista,
