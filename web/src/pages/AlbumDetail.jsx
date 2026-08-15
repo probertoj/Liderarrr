@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { Cover, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled } from '../components.jsx';
+import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled } from '../components.jsx';
 
 export default function AlbumDetail() {
   const { id } = useParams();
@@ -958,16 +958,6 @@ function AboutSection({ albumId }) {
 // Créditos ricos del álbum (estilo Roon): personal con sus roles/instrumentos, desde
 // MusicBrainz. Cada persona enlaza a su ficha si la tienes en la biblioteca, o a MB.
 // Se carga bajo demanda (varias peticiones a MB).
-function initials(name) {
-  return String(name || '')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase();
-}
-
 function AlbumCreditsSection({ albumId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1010,9 +1000,7 @@ function AlbumCreditsSection({ albumId }) {
           {data.people.map((p) => {
             const inner = (
               <div className="flex items-center gap-2.5 p-2 rounded-lg border border-ink-800 bg-ink-850/60 hover:border-gold-500/40 h-full">
-                <div className="w-10 h-10 shrink-0 rounded-full bg-ink-800 border border-ink-700 flex items-center justify-center text-xs text-neutral-400">
-                  {initials(p.name)}
-                </div>
+                <ArtistPhoto id={p.artist_id} name={p.name} size={40} />
                 <div className="min-w-0">
                   <div className="text-sm truncate text-neutral-200">{p.name}</div>
                   <div className="text-xs text-neutral-500 truncate" title={p.role_text}>

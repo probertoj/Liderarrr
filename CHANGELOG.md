@@ -48,6 +48,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 - **«Versiones» en la ficha del álbum** (antes «Ediciones (Discogs)»): ahora unifica todas las ediciones
   oficiales de MusicBrainz (prensaje por país, año, formato y sello, cada una enlazada) con las de Discogs
   y su radar de posibles upgrades. Cada fuente es opcional.
+- **Fotos de artista** (como las carátulas): se resuelven automáticamente desde Deezer (sin clave) y puedes
+  cambiarlas a mano (buscar en Deezer o subir una imagen) desde la ficha del artista. Aparecen en la ficha
+  del artista y como avatar en los créditos de los discos. Se guardan en la caché de la app.
 
 ### Corregido
 - **Completismo del artista en vivo**: «faltan», «por estrenar» y el % se calculan cruzando en vivo

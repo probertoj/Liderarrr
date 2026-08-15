@@ -151,6 +151,8 @@ export const api = {
   albumCredits: (id) => req(`/albums/${id}/credits`),
   albumAbout: (id) => req(`/albums/${id}/about`),
   albumRecommendations: (id) => req(`/albums/${id}/recommendations`),
+  artistPhotoCandidates: (id, q) => req(`/artist/${id}/photo/candidates${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  applyArtistPhoto: (id, body) => req(`/artist/${id}/photo/apply`, { method: 'POST', body }),
   relations: (id) => req(`/artists/${id}/relations`),
   upgrades: () => req('/quality/upgrades'),
   labels: () => req('/labels'),
@@ -172,6 +174,7 @@ export const api = {
 };
 
 export const coverUrl = (id) => `/api/cover/${id}`;
+export const artistPhotoUrl = (id) => `/api/artist/${id}/photo`;
 
 // Sondea la cola de envío a Lidarr (que corre en segundo plano) hasta que termina,
 // llamando a onUpdate(status) en cada paso. Devuelve una función para cancelar.

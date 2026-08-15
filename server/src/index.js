@@ -67,6 +67,7 @@ import { albumAbout } from './about.js';
 import { albumRecommendations } from './recommend.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
 import { coverFast, resolveCoverSlow, retryMissingCovers, coverCandidates, applyCover } from './covers.js';
+import { artistPhotoFast, resolveArtistPhotoSlow, artistPhotoCandidates, applyArtistPhoto } from './artistpix.js';
 import { diagnostics, pushEvent } from './diag.js';
 import { updateCheck } from './update.js';
 import * as q from './queries.js';
@@ -815,6 +816,34 @@ app.get('/api/cover/:id', async (req, reply) => {
 
 // vuelve a intentar las carátulas que no se encontraron (útil tras identificar)
 app.post('/api/covers/retry-missing', async () => ({ retried: retryMissingCovers() }));
+
+// --- fotos de artista (Deezer + manual), en paralelo a las carátulas -----------
+app.get('/api/artist/:id/photo', async (req, reply) => {
+  const id = Number(req.params.id);
+  const r = artistPhotoFast(id);
+  if (r.status === 'ok') {
+    reply.header('Content-Type', r.contentType);
+    reply.header('Cache-Control', 'public, max-age=86400');
+    return reply.send(fs.createReadStream(r.path));
+  }
+  if (r.status === 'pending' && req.query?.r == null) resolveArtistPhotoSlow(id).catch(() => {});
+  reply.header('Cache-Control', 'public, max-age=30');
+  return reply.code(404).send();
+});
+app.get('/api/artist/:id/photo/candidates', async (req, reply) => {
+  try {
+    return await artistPhotoCandidates(Number(req.params.id), req.query?.q);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/artist/:id/photo/apply', async (req, reply) => {
+  try {
+    return await applyArtistPhoto(Number(req.params.id), { url: req.body?.url, dataUrl: req.body?.dataUrl });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 
 // candidatos de carátula para elegir a mano (Cover Art Archive + iTunes)
 app.get('/api/cover/:id/candidates', async (req, reply) => {

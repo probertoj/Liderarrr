@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, Component } from 'react';
 import { Link } from 'react-router-dom';
 import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2 } from 'lucide-react';
-import { api, coverUrl, fmtBytes } from './api.js';
+import { api, coverUrl, artistPhotoUrl, fmtBytes } from './api.js';
 
 // ¿Lidarr configurado? La UI oculta sus caminos cuando no lo está (Lidarr es opcional:
 // el flujo nativo —buscar/descargar, auto-descarga— es el que manda). Se consulta una
@@ -137,6 +137,54 @@ export function Cover({ id, size = 'full', className = '', noRetry = false, bust
           className={`absolute inset-0 h-full w-full object-cover transition-opacity ${loaded ? 'opacity-100' : 'opacity-0'}`}
           alt=""
         />
+      )}
+    </div>
+  );
+}
+
+// Foto de artista (Deezer + manual), circular, con iniciales de respaldo. Sin id, o
+// si la imagen falla/no existe, muestra las iniciales. `retry` reintenta una vez tras
+// un momento (útil en la ficha del artista, donde la resolución llega en 2º plano).
+function artistInitials(name) {
+  return String(name || '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
+
+export function ArtistPhoto({ id, name, size = 40, className = '', bust, retry = false }) {
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const timer = useRef(null);
+  useEffect(() => {
+    setFailed(false);
+    setAttempt(0);
+    return () => clearTimeout(timer.current);
+  }, [id, bust]);
+
+  const onError = () => {
+    if (retry && attempt < 2) {
+      timer.current = setTimeout(() => setAttempt((a) => a + 1), 2500 * (attempt + 1));
+    } else {
+      setFailed(true);
+    }
+  };
+
+  const showImg = id && !failed;
+  const q = [attempt ? `r=${attempt}` : '', bust ? `v=${bust}` : ''].filter(Boolean).join('&');
+  const src = q ? `${artistPhotoUrl(id)}?${q}` : artistPhotoUrl(id);
+  return (
+    <div
+      className={`shrink-0 rounded-full overflow-hidden bg-ink-800 border border-ink-700 flex items-center justify-center text-neutral-400 ${className}`}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.32) }}
+    >
+      {showImg ? (
+        <img src={src} onError={onError} className="h-full w-full object-cover" alt="" loading="lazy" />
+      ) : (
+        <span>{artistInitials(name)}</span>
       )}
     </div>
   );

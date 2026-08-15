@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink, ChevronDown, ChevronRight, Link2, Search, X } from 'lucide-react';
+import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink, ChevronDown, ChevronRight, Link2, Search, X, Image as ImageIcon, Upload } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, useLidarrEnabled } from '../components.jsx';
+import { AlbumCard, ArtistPhoto, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, useLidarrEnabled } from '../components.jsx';
 
 export default function ArtistDetail() {
   const { id } = useParams();
@@ -12,6 +12,8 @@ export default function ArtistDetail() {
   const [openKey, setOpenKey] = useState(null); // grupo de duplicados desplegado
   const [openTypes, setOpenTypes] = useState(() => new Set(['Álbumes'])); // por defecto solo Álbumes
   const [mbidModal, setMbidModal] = useState(false);
+  const [photoModal, setPhotoModal] = useState(false);
+  const [photoBust, setPhotoBust] = useState(0);
   const lidarrOn = useLidarrEnabled();
   const toggleType = (t) =>
     setOpenTypes((s) => {
@@ -108,7 +110,18 @@ export default function ArtistDetail() {
       </Link>
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
+        <div className="flex items-start gap-4">
+          <div className="relative group shrink-0">
+            <ArtistPhoto id={artist.id} name={artist.name} size={84} bust={photoBust || undefined} retry className="shadow" />
+            <button
+              onClick={() => setPhotoModal(true)}
+              title="Cambiar la foto del artista (buscar en Deezer o subir)"
+              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-ink-900 border border-ink-700 text-neutral-300 hover:border-gold-500/60 hover:text-gold-300 flex items-center justify-center"
+            >
+              <ImageIcon size={13} />
+            </button>
+          </div>
+          <div>
           <h1 className="text-2xl font-display">{artist.name}</h1>
           <p className="text-sm text-neutral-500 mb-1 inline-flex items-center gap-1.5 flex-wrap">
             <span>
@@ -133,6 +146,7 @@ export default function ArtistDetail() {
               </>
             )}
           </p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant={following ? 'gold' : 'default'} onClick={toggleFollow} disabled={busy}>
@@ -181,6 +195,17 @@ export default function ArtistDetail() {
           onLinked={async () => {
             setMbidModal(false);
             await load();
+          }}
+        />
+      )}
+
+      {photoModal && (
+        <PhotoPickerModal
+          artist={artist}
+          onClose={() => setPhotoModal(false)}
+          onApplied={() => {
+            setPhotoBust((n) => n + 1);
+            setPhotoModal(false);
           }}
         />
       )}
@@ -314,6 +339,129 @@ export default function ArtistDetail() {
 // discografía en el acto. Resuelve casos que la identificación no pilla (duplicados,
 // mayúsculas… p. ej. «Florence + the Machine»).
 const MBID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Poner foto al artista: buscar candidatos en Deezer (por nombre, editable) o subir una
+// imagen desde el equipo. Se guarda en la caché de la app (los artistas no tienen carpeta).
+function PhotoPickerModal({ artist, onClose, onApplied }) {
+  const [q, setQ] = useState(artist.name || '');
+  const [candidates, setCandidates] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+  const [applying, setApplying] = useState(null);
+
+  const search = async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      const r = await api.artistPhotoCandidates(artist.id, q);
+      setCandidates(r.candidates || []);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    search();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const applyUrl = async (url) => {
+    setApplying(url);
+    setErr(null);
+    try {
+      await api.applyArtistPhoto(artist.id, { url });
+      onApplied();
+    } catch (e) {
+      setErr(e.message);
+      setApplying(null);
+    }
+  };
+
+  const onUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setErr('El fichero no es una imagen.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      setApplying('upload');
+      setErr(null);
+      try {
+        await api.applyArtistPhoto(artist.id, { dataUrl: reader.result });
+        onApplied();
+      } catch (e2) {
+        setErr(e2.message);
+        setApplying(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="card w-full max-w-2xl mt-10 p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm text-neutral-300 flex items-center gap-2">
+            <ImageIcon size={15} /> Foto del artista
+          </h2>
+          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-300" title="Cerrar">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            className="flex-1 bg-ink-850 border border-ink-800 rounded px-2 py-1.5 text-sm outline-none focus:border-gold-500/60"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && search()}
+            placeholder="Nombre del artista…"
+          />
+          <Button onClick={search} disabled={loading}>
+            <span className="inline-flex items-center gap-1.5">
+              <Search size={14} /> {loading ? 'Buscando…' : 'Buscar'}
+            </span>
+          </Button>
+          <label className="text-sm px-3 py-1.5 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+            <Upload size={14} /> Subir
+            <input type="file" accept="image/*" className="hidden" onChange={onUpload} disabled={!!applying} />
+          </label>
+        </div>
+        <p className="text-xs text-neutral-600 mt-1">Fuente: Deezer. Se guarda en la app (no toca tu música).</p>
+
+        {err && <p className="text-sm text-amber-400 mt-3">{err}</p>}
+        {candidates && candidates.length === 0 && !loading && (
+          <p className="text-sm text-neutral-600 mt-4">Sin candidatos. Prueba a cambiar el texto o sube una imagen.</p>
+        )}
+
+        {candidates && candidates.length > 0 && (
+          <div className="mt-4 grid grid-cols-3 sm:grid-cols-5 gap-3 max-h-[26rem] overflow-y-auto pr-1">
+            {candidates.map((c, i) => (
+              <button
+                key={`${c.url}:${i}`}
+                onClick={() => applyUrl(c.url)}
+                disabled={!!applying}
+                className="relative rounded-full overflow-hidden border border-ink-800 hover:border-gold-500/70 disabled:opacity-50 aspect-square bg-ink-850"
+                title={c.name}
+              >
+                <img src={c.thumb} alt="" className="h-full w-full object-cover" loading="lazy" />
+                {applying === c.url && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <Loader2 size={20} className="animate-spin text-gold-300" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MbidLinkerModal({ artist, onClose, onLinked }) {
   const [q, setQ] = useState(artist.name || '');
   const [results, setResults] = useState(null);
