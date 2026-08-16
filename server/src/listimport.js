@@ -1,4 +1,5 @@
 import { addChallenge } from './challenges.js';
+import { rosyList } from './rosyoverdrive.js';
 
 // Importar una lista de un agregador (AlbumOfTheYear, etc.) por URL y crear un reto.
 // Muchos están tras Cloudflare (challenge JS): una petición normal del servidor recibe
@@ -106,7 +107,17 @@ export async function importListFromUrl(url, name) {
   if (!/^https?:\/\//i.test(String(url || ''))) throw new Error('Pon una URL válida (http/https)');
   url = url.trim();
   const isAoty = /albumoftheyear\.org/i.test(url);
-  const { lines, listTitle, partial } = isAoty ? await importAoty(url, name) : importGeneric(await fetchViaReader(url));
+  const isRosy = /rosyoverdrive\.com/i.test(url);
+  let lines;
+  let listTitle = null;
+  let partial = false;
+  if (isRosy) {
+    // Rosy Overdrive: parseo directo del HTML (encabezados «Artista – Álbum»), fiable y
+    // sin depender del lector. El título del post nombra el reto si no se dio nombre.
+    ({ lines, listTitle } = await rosyList(url));
+  } else {
+    ({ lines, listTitle, partial } = isAoty ? await importAoty(url, name) : importGeneric(await fetchViaReader(url)));
+  }
   if (!lines.length) {
     throw new Error('No reconocí ninguna lista de álbumes en esa URL. Prueba a abrirla, copiar el texto y usar «pegar la lista».');
   }
