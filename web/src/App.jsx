@@ -44,7 +44,7 @@ const NAV = [
     ],
   },
   {
-    label: 'La caza',
+    label: 'I Hear a New World',
     items: [
       { to: '/seguidos', label: 'Seguidos', Icon: Star },
       { to: '/huecos', label: 'Huecos', Icon: Compass },

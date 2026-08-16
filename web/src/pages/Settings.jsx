@@ -415,6 +415,28 @@ export default function Settings() {
         <TestButton service="jackett" label="Jackett" beforeTest={save} />
       </section>
 
+      {/* 3e · Prioridad de trackers — desempata la descarga de un clic y el auto-grab */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">
+          3e · Prioridad de trackers <span className="text-xs text-neutral-500">(opcional)</span>
+        </h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Cuando la descarga de un clic (o el auto-grab) encuentra el MISMO disco en la MISMA calidad en varios
+          trackers, elige el del tracker que pongas más arriba. Un nombre por línea, del preferido al menos preferido;
+          los no listados van los últimos. Usa los nombres tal como aparecen en la columna del indexer en los resultados
+          de búsqueda. A igual calidad y tracker, decide el número de seeders.
+        </p>
+        <Field label="Orden de preferencia" hint="Un tracker por línea, el preferido arriba.">
+          <textarea
+            value={s.tracker_priority || ''}
+            onChange={set('tracker_priority')}
+            rows={4}
+            className={input}
+            placeholder={'Redacted\nOrpheus\nWaffles'}
+          />
+        </Field>
+      </section>
+
       {/* 3d. qBittorrent — materializa la descarga cuando el motor es Jackett */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">

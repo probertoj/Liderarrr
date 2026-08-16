@@ -24,11 +24,32 @@ function formatRank(title) {
   return 30; // desconocido
 }
 
+// Prioridad de trackers configurada (ajuste `tracker_priority`): un nombre por línea, el
+// preferido arriba, en minúsculas. Vacío = todos igual.
+export function trackerPriorityList() {
+  return String(getSetting('tracker_priority') || '')
+    .split(/[\n;,]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+// Posición del tracker de una release en la lista de prioridad (menor = más prioritario;
+// no listado = detrás de todos). Casa por igualdad o inclusión, para tolerar sufijos del
+// nombre del indexer ("Redacted (API)" ~ "redacted").
+function trackerRank(indexer, priority) {
+  if (!priority.length) return 0;
+  const n = String(indexer || '').toLowerCase().trim();
+  if (!n) return priority.length;
+  const i = priority.findIndex((p) => n === p || n.includes(p) || p.includes(n));
+  return i === -1 ? priority.length : i;
+}
+
 // ③ Elige la mejor release de una lista de resultados para {artist, album}:
 //  - descarta las MUERTAS (0 seeders) — justo el caso que dejaba descargas paradas;
 //  - exige coincidencia mínima con el álbum (evita agarrar algo ajeno);
-//  - puntúa por formato + seeders (+ bonus si el artista también aparece).
-export function pickBestRelease(results, { artist, album, minSeeders = 1, freeleechOnly = false } = {}) {
+//  - ordena por CALIDAD (formato + bonus de artista), luego por PRIORIDAD DE TRACKER (a
+//    igual calidad, el disco del tracker que prefieras) y por último por seeders.
+export function pickBestRelease(results, { artist, album, minSeeders = 1, freeleechOnly = false, trackerPriority = [] } = {}) {
   const na = normName(artist);
   const nal = normName(album);
   const scored = [];
@@ -39,11 +60,13 @@ export function pickBestRelease(results, { artist, album, minSeeders = 1, freele
     if (freeleechOnly && r.freeleech !== true) continue;
     const nt = normName(r.title);
     if (nal && !nt.includes(nal)) continue; // no parece ser ese álbum
-    const score = formatRank(r.title) + Math.min(20, Math.log2((r.seeders || 0) + 1) * 4) + (na && nt.includes(na) ? 10 : 0);
-    scored.push({ r, score });
+    // Calidad/relevancia SIN seeders: así, a igual calidad, manda la prioridad de tracker
+    // y solo después los seeders (antes los seeders entraban en el score y colaban).
+    const score = formatRank(r.title) + (na && nt.includes(na) ? 10 : 0);
+    scored.push({ r, score, rank: trackerRank(r.indexer, trackerPriority) });
   }
   if (!scored.length) return null;
-  scored.sort((a, b) => b.score - a.score || (b.r.seeders || 0) - (a.r.seeders || 0));
+  scored.sort((a, b) => b.score - a.score || a.rank - b.rank || (b.r.seeders || 0) - (a.r.seeders || 0));
   return scored[0].r;
 }
 
@@ -53,8 +76,9 @@ export async function searchAndGrabBest(query, context = {}) {
   const engine = getSetting('search_engine') || 'prowlarr';
   const minSeeders = Number(getSetting('auto_grab_min_seeders')) || 1;
   const freeleechOnly = getSetting('auto_grab_freeleech_only') === '1';
+  const trackerPriority = trackerPriorityList();
   const results = engine === 'jackett' ? await jackettSearch(query) : await prowlarrSearch(query);
-  const best = pickBestRelease(results, { artist: context.artist, album: context.album, minSeeders, freeleechOnly });
+  const best = pickBestRelease(results, { artist: context.artist, album: context.album, minSeeders, freeleechOnly, trackerPriority });
   if (!best)
     return {
       grabbed: false,
