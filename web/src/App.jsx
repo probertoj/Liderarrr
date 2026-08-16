@@ -32,7 +32,7 @@ const Settings = lazy(() => import('./pages/Settings.jsx'));
 
 const NAV = [
   {
-    label: 'Tu colección',
+    label: 'Coleccionista de discos',
     items: [
       { to: '/', label: 'Dashboard', Icon: LayoutDashboard, end: true },
       { to: '/discoteca', label: 'Discoteca', Icon: Disc },
