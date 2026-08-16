@@ -63,6 +63,28 @@ export function setDownloadStatus(id, status, dest) {
   );
 }
 
+// Cierra el pedido que corresponde a una carpeta recién importada, venga del auto-import
+// o de la importación MANUAL (que antes no tocaba el registro, dejando el pedido en
+// 'requested' para siempre aunque el disco ya estuviera enlazado). Casa por artista+álbum
+// y, si no, por el nombre de la descarga contra el release_title guardado. Devuelve el id
+// casado o null. Es best-effort: no debe tumbar la importación si algo falla.
+export function reconcileImported({ sourceName, artist, album, dest } = {}) {
+  const rows = db
+    .prepare("SELECT * FROM downloads WHERE status != 'imported' ORDER BY requested_at DESC")
+    .all();
+  if (!rows.length) return null;
+  const sn = norm(sourceName);
+  const ar = norm(artist);
+  const al = norm(album);
+  const hit = rows.find((r) => {
+    if (ar && al && norm(r.artist) === ar && norm(r.album) === al) return true;
+    const rt = norm(r.release_title);
+    return !!(rt && sn && (rt === sn || rt.includes(sn) || sn.includes(rt)));
+  });
+  if (hit) setDownloadStatus(hit.id, 'imported', dest);
+  return hit ? hit.id : null;
+}
+
 export function downloadsList(limit = 100) {
   return db.prepare('SELECT * FROM downloads ORDER BY requested_at DESC LIMIT ?').all(limit);
 }

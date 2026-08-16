@@ -63,7 +63,13 @@ export async function runAutoImport() {
         continue; // el contenido no es accesible desde aquí
       }
       if (!isDir) continue; // MVP: solo carpetas (los álbumes vienen en carpeta)
-      if (isImported.get(path.resolve(cp))) continue; // ya importado
+      if (isImported.get(path.resolve(cp))) {
+        // ya importada (a mano o en una pasada anterior): si aún tenía un pedido abierto,
+        // ciérralo — así el backlog deja de mostrarse como "pedido" eternamente.
+        const done = matchRequest(t);
+        if (done && done.status !== 'imported') setDownloadStatus(done.id, 'imported');
+        continue;
+      }
       autoImportStatus.checked++;
 
       const req = matchRequest(t);
