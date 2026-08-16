@@ -54,6 +54,7 @@ import {
   radarFeed,
   resolveRadarItem,
   dismissRadarItem,
+  addHipersonicaTierList,
 } from './radar.js';
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
@@ -414,6 +415,14 @@ app.post('/api/curators', async (req, reply) => {
   }
 });
 app.delete('/api/curators/:id', async (req) => unfollowCurator(Number(req.params.id)));
+// Hipersónica: pegar una tier list (de pago, no sondeable) para añadirla al radar
+app.post('/api/radar/hipersonica', async (req, reply) => {
+  try {
+    return addHipersonicaTierList(req.body?.text, req.body?.date);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 app.post('/api/curators/:id/refresh', async (req, reply) => {
   try {
     return await refreshCurator(Number(req.params.id));

@@ -3,6 +3,7 @@ import * as mb from './musicbrainz.js';
 import { normName, matchKey } from './matchkey.js';
 import { pressingConcernsLists } from './rosyoverdrive.js';
 import { reviewsLists } from './ravensingstheblues.js';
+import { tierListToLists } from './hipersonica.js';
 
 // Radar de novedades curadas (0.6 fase 3). Sigues a curadores de buymusic.club
 // (usuarios que publican semanalmente lo mejor de Bandcamp) y sus selecciones
@@ -95,6 +96,10 @@ async function fetchSource(source, username) {
   if (source === 'ravensingstheblues') {
     return { user: { username: 'reviews', name: 'Raven Sings the Blues · Reseñas' }, lists: await reviewsLists() };
   }
+  if (source === 'hipersonica') {
+    // de pago y atada a la sesión del navegador: no se puede sondear. Se añade pegando.
+    throw new Error('Hipersónica se añade pegando la tier list; no se puede refrescar automáticamente.');
+  }
   const u = String(username || '').trim().replace(/^@/, '');
   if (!u) throw new Error('Falta el nombre de usuario');
   return parseBuyMusicClub(await fetchCuratorPage(u));
@@ -113,6 +118,23 @@ export async function followCurator(username, source = 'buymusicclub') {
   return { ok: true, curator_id: row.id, lists: lists.length, added };
 }
 
+// Hipersónica: añade al radar una tier list PEGADA por el usuario (el post de pago no se
+// puede leer server-side). Crea/actualiza el curador fijo y vuelca los discos con su
+// nivel (type) y género (label). Reutiliza el ingest común.
+export function addHipersonicaTierList(text, date) {
+  const { lists, items } = tierListToLists(text, { date });
+  if (!items) throw new Error('No reconocí ninguna tier list en ese texto. Pega el post completo (con los niveles «DISCOS QUE …» y las líneas «género:»).');
+  const source = 'hipersonica';
+  db.prepare(
+    `INSERT INTO curators (source, username, name, added_at, refreshed_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(source, username) DO UPDATE SET refreshed_at=excluded.refreshed_at`
+  ).run(source, 'tier-list', 'Hipersónica · Tier List', Date.now(), Date.now());
+  const row = db.prepare('SELECT id FROM curators WHERE source = ? AND username = ?').get(source, 'tier-list');
+  const added = ingest(row.id, lists, source);
+  return { ok: true, curator_id: row.id, items, added };
+}
+
 export function unfollowCurator(id) {
   db.prepare('DELETE FROM radar_items WHERE curator_id = ?').run(id);
   db.prepare('DELETE FROM curators WHERE id = ?').run(id);
@@ -122,6 +144,7 @@ export function unfollowCurator(id) {
 export async function refreshCurator(id) {
   const c = db.prepare('SELECT id, source, username FROM curators WHERE id = ?').get(id);
   if (!c) throw new Error('Curador no encontrado');
+  if (c.source === 'hipersonica') return { ok: true, lists: 0, added: 0, manual: true }; // se actualiza pegando
   const { lists } = await fetchSource(c.source, c.username);
   const added = ingest(c.id, lists, c.source);
   db.prepare('UPDATE curators SET refreshed_at = ? WHERE id = ?').run(Date.now(), c.id);

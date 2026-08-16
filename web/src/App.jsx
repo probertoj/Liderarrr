@@ -53,7 +53,7 @@ const NAV = [
     ],
   },
   {
-    label: 'El gusto',
+    label: 'Losing My Edge',
     items: [
       { to: '/escuchas', label: 'Escuchas', Icon: Headphones },
       { to: '/retos', label: 'Retos', Icon: Trophy },

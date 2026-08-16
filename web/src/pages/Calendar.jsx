@@ -386,6 +386,26 @@ function CuratorManager({ curators, onChange }) {
   const [u, setU] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [hsOpen, setHsOpen] = useState(false);
+  const [hsText, setHsText] = useState('');
+  const [hsDate, setHsDate] = useState('');
+  const [hsMsg, setHsMsg] = useState(null);
+  const addHs = async () => {
+    if (!hsText.trim()) return;
+    setBusy(true);
+    setErr(null);
+    setHsMsg(null);
+    try {
+      const r = await api.addHipersonicaTierList(hsText, hsDate || undefined);
+      setHsMsg(`Añadidos ${r.items} discos al radar.`);
+      setHsText('');
+      await onChange();
+    } catch (e2) {
+      setErr(e2.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const follow = async (e) => {
     e?.preventDefault();
@@ -482,6 +502,45 @@ function CuratorManager({ curators, onChange }) {
           )}
         </div>
       )}
+      <div>
+        <button
+          type="button"
+          onClick={() => setHsOpen((o) => !o)}
+          className="text-xs text-neutral-400 hover:text-gold-300 inline-flex items-center gap-1"
+          title="Pega el texto de una tier list de música de Hipersónica (de pago, no se puede sondear)"
+        >
+          <Plus size={12} /> Pegar tier list de Hipersónica
+        </button>
+        {hsOpen && (
+          <div className="mt-2 space-y-2">
+            <textarea
+              value={hsText}
+              onChange={(e) => setHsText(e.target.value)}
+              rows={5}
+              placeholder="Pega aquí el texto de la tier list (con «DIRECTO AL EXCEL», «DISCOS QUE SÍ»… y las líneas «género:»)…"
+              className="w-full bg-ink-850 border border-ink-800 rounded px-2 py-1 text-sm"
+            />
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="date"
+                value={hsDate}
+                onChange={(e) => setHsDate(e.target.value)}
+                className="bg-ink-850 border border-ink-800 rounded px-2 py-1 text-xs text-neutral-300"
+                title="Fecha de la tier list (por defecto, hoy)"
+              />
+              <button
+                type="button"
+                onClick={addHs}
+                disabled={busy || !hsText.trim()}
+                className="text-xs px-2 py-1 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 disabled:opacity-50"
+              >
+                Añadir al radar
+              </button>
+              {hsMsg && <span className="text-xs text-emerald-400">{hsMsg}</span>}
+            </div>
+          </div>
+        )}
+      </div>
       {err && <ErrorMsg>{err}</ErrorMsg>}
       {curators.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -498,7 +557,9 @@ function CuratorManager({ curators, onChange }) {
                     ? 'https://rosyoverdrive.com/tag/pressing-concerns/'
                     : c.source === 'ravensingstheblues'
                       ? 'https://ravensingstheblues.com/category/reviews/'
-                      : `https://www.buymusic.club/user/${c.username}`
+                      : c.source === 'hipersonica'
+                        ? 'https://www.hipersonica.com/s/tier-list/'
+                        : `https://www.buymusic.club/user/${c.username}`
                 }
                 target="_blank"
                 rel="noreferrer"
