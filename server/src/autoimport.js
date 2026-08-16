@@ -3,7 +3,7 @@ import path from 'node:path';
 import { db, getSetting } from './db.js';
 import { qbCompletedTorrents } from './qbittorrent.js';
 import { importFolder, importConfig } from './importer.js';
-import { matchRequest, setDownloadStatus } from './downloads.js';
+import { matchRequest, setDownloadStatus, reconcileAgainstLibrary } from './downloads.js';
 import { runScan } from './scanner.js';
 
 // AUTO-IMPORT: cierra el bucle de descargas sin Lidarr. Sondea qBittorrent, y por cada
@@ -45,6 +45,15 @@ export async function runAutoImport() {
   running = true;
   Object.assign(autoImportStatus, { running: true, imported: 0, checked: 0, errors: [] });
   try {
+    // Primero, cierra los pedidos cuyo álbum ya está en la biblioteca — independiente de
+    // qBittorrent. Esto arregla el caso en que todo se quedaba en "pedido" pese a estar ya
+    // importado (infohash vacío, categoría/ruta que no casaban, o importación manual).
+    try {
+      const closed = reconcileAgainstLibrary();
+      if (closed) console.log(`[autoimport] ${closed} pedido(s) cerrados por cruce con la biblioteca`);
+    } catch (e) {
+      autoImportStatus.errors.push(`reconcile: ${String(e.message || e)}`);
+    }
     let torrents;
     try {
       torrents = await qbCompletedTorrents();

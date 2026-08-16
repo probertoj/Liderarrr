@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { matchKey } from './matchkey.js';
 
 // Registro nativo de descargas/pedidos (independencia de Lidarr). Cuando Liderarr
 // agarra una release apunta el pedido aquí con el contexto del álbum; el auto-import
@@ -98,4 +99,45 @@ export function activeRequestRgs() {
       .all()
       .map((r) => r.rg_mbid)
   );
+}
+
+// "Artista - Álbum" de un release_title de scene ("The Delgados - Domestiques [1996]
+// [Album] FLAC…"): corta en el primer corchete/paréntesis y parte por " - ". Best-effort
+// para los pedidos que solo guardaron el título de la release (sin artista/álbum).
+function parseReleaseTitle(rt) {
+  const s = String(rt || '').split(/\s[[(]/)[0].trim();
+  const i = s.indexOf(' - ');
+  if (i === -1) return null;
+  return { artist: s.slice(0, i).trim(), album: s.slice(i + 3).trim() };
+}
+
+// Cierra los pedidos cuyo álbum YA ESTÁ en tu biblioteca. Es la fuente de verdad real:
+// un pedido está "importado" si su disco aparece en la colección. Independiente de
+// qBittorrent (categoría/ruta/sesión), que es donde el auto-import se caía en silencio y
+// dejaba todo en "pedido". Casa por rg_mbid, por artista+álbum (matchKey) y, en último
+// recurso, parseando el release_title. Devuelve cuántos pedidos cerró.
+export function reconcileAgainstLibrary() {
+  const pending = db
+    .prepare("SELECT id, rg_mbid, artist, album, release_title FROM downloads WHERE status IN ('requested','importing')")
+    .all();
+  if (!pending.length) return 0;
+  const libRg = new Set(
+    db.prepare("SELECT DISTINCT rg_mbid FROM albums WHERE rg_mbid IS NOT NULL AND match_state != 'dismissed'").all().map((r) => r.rg_mbid)
+  );
+  const libKey = new Set(
+    db.prepare("SELECT album_artist, title FROM albums WHERE match_state != 'dismissed'").all().map((r) => matchKey(r.album_artist, r.title))
+  );
+  let closed = 0;
+  for (const d of pending) {
+    let hit = (d.rg_mbid && libRg.has(d.rg_mbid)) || (d.artist && d.album && libKey.has(matchKey(d.artist, d.album)));
+    if (!hit && d.release_title) {
+      const p = parseReleaseTitle(d.release_title);
+      if (p && p.album && libKey.has(matchKey(p.artist, p.album))) hit = true;
+    }
+    if (hit) {
+      setDownloadStatus(d.id, 'imported');
+      closed++;
+    }
+  }
+  return closed;
 }
