@@ -143,22 +143,28 @@ function AddForm({ onDone }) {
       />
 
       <div>
-        <div className="text-xs text-neutral-400 mb-1">Importar una lista por URL (AlbumOfTheYear y similares)</div>
+        <div className="text-xs text-neutral-400 mb-1">Importar una lista por URL</div>
         <div className="flex gap-2">
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && importUrl()}
-            placeholder="https://www.albumoftheyear.org/list/…"
+            placeholder="Pega la URL de la lista (AOTY, record.club, Rosy Overdrive…)"
             className="flex-1 bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
           />
           <Button onClick={importUrl} disabled={busy}>
             {busy ? '…' : 'Importar'}
           </Button>
         </div>
-        <div className="text-[11px] text-neutral-600 mt-1">
-          Usa un lector externo para pasar protecciones anti-bot (AOTY tiene Cloudflare). Las listas largas con scroll
-          pueden venir a medias; para la completa, usa «pegar» de abajo.
+        <div className="text-[11px] text-neutral-600 mt-1 space-y-0.5">
+          <div>
+            <span className="text-neutral-500">Reconoce bien:</span> AlbumOfTheYear (listas con ranking, aunque sean
+            largas), record.club (listas públicas de usuario), Rosy Overdrive (posts con «Artista – Álbum»).
+          </div>
+          <div>
+            Otras webs se intentan con un lector genérico (busca líneas «Artista - Álbum»). RateYourMusic bloquea a
+            los bots: para esas, usa «pegar la lista» de abajo. Las listas largas con scroll pueden venir a medias.
+          </div>
         </div>
       </div>
 
