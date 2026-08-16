@@ -694,6 +694,13 @@ export default function Settings() {
         </a>
       </section>
 
+      {/* 7 · guiño (Talking Heads — «Once in a Lifetime»). Solo el título, a propósito. */}
+      <section className="card p-5 mt-4 opacity-70">
+        <h2 className="font-display text-lg text-neutral-400">
+          7 · Letting the days goes by, let the water hold me down
+        </h2>
+      </section>
+
       {/* Barra de guardado flotante: aparece al cambiar cualquier ajuste, cerca de donde
           estás (antes el único botón Guardar quedaba arriba y era fácil olvidarlo). */}
       {dirty && (

@@ -26,6 +26,7 @@ const Upgrades = lazy(() => import('./pages/Upgrades.jsx'));
 const Labels = lazy(() => import('./pages/Labels.jsx'));
 const Diagnostics = lazy(() => import('./pages/Diagnostics.jsx'));
 const Imports = lazy(() => import('./pages/Imports.jsx'));
+const HowItWorks = lazy(() => import('./pages/HowItWorks.jsx'));
 const Corrections = lazy(() => import('./pages/Corrections.jsx'));
 const Trash = lazy(() => import('./pages/Trash.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
@@ -69,8 +70,9 @@ const NAV = [
     ],
   },
   {
-    label: 'Cuenta',
+    label: 'How did I get here?',
     items: [
+      { to: '/como-funciona', label: '¿Cómo funciona todo esto?', Icon: HelpCircle },
       { to: '/ajustes', label: 'Ajustes', Icon: SettingsIcon },
       { to: '/diagnostico', label: 'Diagnóstico', Icon: Stethoscope },
     ],
@@ -301,6 +303,7 @@ export default function App() {
             <Route path="/rarezas" element={<Rarities />} />
             <Route path="/papelera" element={<Trash />} />
             <Route path="/ajustes" element={<Settings />} />
+            <Route path="/como-funciona" element={<HowItWorks />} />
           </Routes>
           </Suspense>
         </ErrorBoundary>

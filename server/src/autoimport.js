@@ -5,6 +5,7 @@ import { qbCompletedTorrents } from './qbittorrent.js';
 import { importFolder, importConfig } from './importer.js';
 import { matchRequest, setDownloadStatus, reconcileAgainstLibrary, pruneDownloads } from './downloads.js';
 import { runScan } from './scanner.js';
+import { runIdentify } from './identify.js';
 
 // AUTO-IMPORT: cierra el bucle de descargas sin Lidarr. Sondea qBittorrent, y por cada
 // torrent COMPLETADO cuyo contenido cuelgue de la carpeta de torrents configurada y no
@@ -110,6 +111,14 @@ export async function runAutoImport() {
         await runScan();
       } catch (e) {
         console.warn('[autoimport] rescan tras importar falló:', String(e.message || e));
+      }
+      // identify LIGERO: solo los álbumes 'pending' (los recién importados), para que lo
+      // que baja no espere al refresco nocturno para aparecer identificado. runIdentify
+      // tiene su propio guard y respeta el límite de MusicBrainz.
+      try {
+        await runIdentify({ force: false });
+      } catch (e) {
+        console.warn('[autoimport] identify tras importar falló:', String(e.message || e));
       }
     }
   } finally {
