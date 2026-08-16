@@ -163,11 +163,12 @@ function pickBest(list, title) {
   if (!list || !list.length) return null;
   const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
   const target = norm(title);
-  const exact = list.find((r) => norm(r.title) === target);
-  if (exact) return exact;
-  // prioriza álbumes de estudio sobre recopilatorios/directos
-  const studio = list.find((r) => r.primary_type === 'Album' && !(r.secondary_types || []).length);
-  return studio || list[0];
+  const isStudio = (r) => r.primary_type === 'Album' && !(r.secondary_types || []).length;
+  // Entre coincidencias EXACTAS de título, prioriza el álbum de estudio sobre el single/EP
+  // homónimo (p. ej. el álbum vs el single "Heaven or Las Vegas"). Si no hay exactas, el
+  // mejor álbum de estudio; si no, el primero.
+  const exact = list.filter((r) => norm(r.title) === target);
+  return exact.find(isStudio) || exact[0] || list.find(isStudio) || list[0];
 }
 
 // Procesa todos los álbumes pendientes (o unmatched si force). Trabajo lento en

@@ -144,7 +144,16 @@ export async function searchReleaseGroup(artist, title) {
     ? `releasegroup:"${lucene(clean)}" AND artist:"${lucene(artist)}"`
     : `releasegroup:"${lucene(clean)}"`;
   const data = await mbCached(`rg-search:${artist || ''}:${clean}`.toLowerCase(), `/release-group?query=${enc(q)}&limit=5`);
-  const rg = (data['release-groups'] || [])[0];
+  const list = data['release-groups'] || [];
+  if (!list.length) return null;
+  const nrm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const target = nrm(clean);
+  const isStudio = (r) => r['primary-type'] === 'Album' && !((r['secondary-types'] || []).length);
+  // Entre coincidencias EXACTAS de título, prioriza el álbum de estudio sobre el single/EP
+  // homónimo: MB puede devolver primero el single "Heaven or Las Vegas" en vez del álbum,
+  // y coger el [0] a ciegas lo archivaba como Single (oculto en la sección plegada). Si no
+  // hay exactas, se respeta el mejor por score de MB.
+  const rg = list.filter((r) => nrm(r.title) === target).find(isStudio) || list[0];
   if (!rg) return null;
   return {
     rg_mbid: rg.id,
