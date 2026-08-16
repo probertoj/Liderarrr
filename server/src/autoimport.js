@@ -3,7 +3,7 @@ import path from 'node:path';
 import { db, getSetting } from './db.js';
 import { qbCompletedTorrents } from './qbittorrent.js';
 import { importFolder, importConfig } from './importer.js';
-import { matchRequest, setDownloadStatus, reconcileAgainstLibrary } from './downloads.js';
+import { matchRequest, setDownloadStatus, reconcileAgainstLibrary, pruneDownloads } from './downloads.js';
 import { runScan } from './scanner.js';
 
 // AUTO-IMPORT: cierra el bucle de descargas sin Lidarr. Sondea qBittorrent, y por cada
@@ -53,6 +53,14 @@ export async function runAutoImport() {
       if (closed) console.log(`[autoimport] ${closed} pedido(s) cerrados por cruce con la biblioteca`);
     } catch (e) {
       autoImportStatus.errors.push(`reconcile: ${String(e.message || e)}`);
+    }
+    // poda la cola: fuera lo importado viejo y la basura, para que no crezca sin fin
+    try {
+      const pruned = pruneDownloads();
+      if (pruned.closed || pruned.junk)
+        console.log(`[autoimport] poda de la cola: ${pruned.closed} cerrados viejos, ${pruned.junk} basura`);
+    } catch (e) {
+      autoImportStatus.errors.push(`prune: ${String(e.message || e)}`);
     }
     let torrents;
     try {

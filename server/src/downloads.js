@@ -1,4 +1,4 @@
-import { db } from './db.js';
+import { db, getSetting } from './db.js';
 import { matchKey } from './matchkey.js';
 
 // Registro nativo de descargas/pedidos (independencia de Lidarr). Cuando Liderarr
@@ -86,8 +86,37 @@ export function reconcileImported({ sourceName, artist, album, dest } = {}) {
   return hit ? hit.id : null;
 }
 
+// Días que un pedido ya cerrado (imported/error) sigue visible/guardado antes de podarse.
+const keepDays = () => Number(getSetting('downloads_keep_days')) || 3;
+
 export function downloadsList(limit = 100) {
-  return db.prepare('SELECT * FROM downloads ORDER BY requested_at DESC LIMIT ?').all(limit);
+  // Pendientes (requested/importing) SIEMPRE; los cerrados solo mientras son recientes,
+  // así lo importado desaparece del panel pasado el plazo aunque aún no se haya podado.
+  const cutoff = Date.now() - keepDays() * 86400000;
+  return db
+    .prepare(
+      `SELECT * FROM downloads
+       WHERE status IN ('requested','importing') OR COALESCE(updated_at, requested_at) >= ?
+       ORDER BY requested_at DESC LIMIT ?`
+    )
+    .all(cutoff, limit);
+}
+
+// Poda la cola: borra los pedidos ya cerrados (imported/error) más viejos que el plazo, y
+// la basura (requested sin rg_mbid, sin artista y sin título: grabs fallidos o de prueba
+// que nunca podrán casar). El historial real de importaciones vive en la tabla `imports`,
+// así que borrar pedidos cerrados no pierde nada. Devuelve cuántos borró de cada tipo.
+export function pruneDownloads() {
+  const cutoff = Date.now() - keepDays() * 86400000;
+  const closed = db
+    .prepare("DELETE FROM downloads WHERE status IN ('imported','error') AND COALESCE(updated_at, requested_at) < ?")
+    .run(cutoff).changes;
+  const junk = db
+    .prepare(
+      "DELETE FROM downloads WHERE status = 'requested' AND rg_mbid IS NULL AND (artist IS NULL OR artist = '') AND (release_title IS NULL OR release_title = '')"
+    )
+    .run().changes;
+  return { closed, junk };
 }
 
 // rg_mbids con pedido en curso (requested/importing) para pintar "pedido/descargando"
