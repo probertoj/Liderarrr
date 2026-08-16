@@ -121,7 +121,7 @@ export const api = {
 
   // radar de curadores / Bandcamp (0.6 fase 3)
   curators: () => req('/curators'),
-  followCurator: (username) => req('/curators', { method: 'POST', body: { username } }),
+  followCurator: (username, source) => req('/curators', { method: 'POST', body: { username, source } }),
   unfollowCurator: (id) => req(`/curators/${id}`, { method: 'DELETE' }),
   refreshCurator: (id) => req(`/curators/${id}/refresh`, { method: 'POST' }),
   radar: (since, unowned) => {

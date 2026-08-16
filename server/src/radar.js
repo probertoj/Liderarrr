@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import * as mb from './musicbrainz.js';
 import { normName, matchKey } from './matchkey.js';
+import { pressingConcernsLists } from './rosyoverdrive.js';
 
 // Radar de novedades curadas (0.6 fase 3). Sigues a curadores de buymusic.club
 // (usuarios que publican semanalmente lo mejor de Bandcamp) y sus selecciones
@@ -53,7 +54,7 @@ const upsertItem = db.prepare(
 const day = (s) => (s ? String(s).slice(0, 10) : null);
 
 // Vuelca las listas del curador a radar_items. Devuelve cuántos ítems nuevos.
-function ingest(curatorId, lists) {
+function ingest(curatorId, lists, source = 'buymusicclub') {
   const now = Date.now();
   const before = db.prepare('SELECT COUNT(*) AS n FROM radar_items WHERE curator_id = ?').get(curatorId).n;
   const tx = db.transaction(() => {
@@ -62,7 +63,7 @@ function ingest(curatorId, lists) {
         const extId = String(it.id ?? it.externalId ?? `${l.id}:${it.order}`);
         upsertItem.run({
           curator_id: curatorId,
-          source: 'buymusicclub',
+          source,
           external_id: extId,
           list_slug: l.slug || null,
           list_title: l.title || l.description || null,
@@ -84,17 +85,27 @@ function ingest(curatorId, lists) {
   return after - before;
 }
 
-export async function followCurator(username, source = 'buymusicclub') {
+// Obtiene {user, lists} según la fuente. buymusic.club: página del usuario (Next.js).
+// rosyoverdrive: la columna «Pressing Concerns» (un curador fijo, sin usuario variable).
+async function fetchSource(source, username) {
+  if (source === 'rosyoverdrive') {
+    return { user: { username: 'pressing-concerns', name: 'Rosy Overdrive · Pressing Concerns' }, lists: await pressingConcernsLists() };
+  }
   const u = String(username || '').trim().replace(/^@/, '');
   if (!u) throw new Error('Falta el nombre de usuario');
-  const { user, lists } = parseBuyMusicClub(await fetchCuratorPage(u));
+  return parseBuyMusicClub(await fetchCuratorPage(u));
+}
+
+export async function followCurator(username, source = 'buymusicclub') {
+  const { user, lists } = await fetchSource(source, username);
+  const uname = user.username || String(username || '').trim().replace(/^@/, '');
   db.prepare(
     `INSERT INTO curators (source, username, name, added_at, refreshed_at)
      VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(source, username) DO UPDATE SET name=excluded.name, refreshed_at=excluded.refreshed_at`
-  ).run(source, user.username || u, user.name || user.username || u, Date.now(), Date.now());
-  const row = db.prepare('SELECT id FROM curators WHERE source = ? AND username = ?').get(source, user.username || u);
-  const added = ingest(row.id, lists);
+  ).run(source, uname, user.name || uname, Date.now(), Date.now());
+  const row = db.prepare('SELECT id FROM curators WHERE source = ? AND username = ?').get(source, uname);
+  const added = ingest(row.id, lists, source);
   return { ok: true, curator_id: row.id, lists: lists.length, added };
 }
 
@@ -107,8 +118,8 @@ export function unfollowCurator(id) {
 export async function refreshCurator(id) {
   const c = db.prepare('SELECT id, source, username FROM curators WHERE id = ?').get(id);
   if (!c) throw new Error('Curador no encontrado');
-  const { lists } = parseBuyMusicClub(await fetchCuratorPage(c.username));
-  const added = ingest(c.id, lists);
+  const { lists } = await fetchSource(c.source, c.username);
+  const added = ingest(c.id, lists, c.source);
   db.prepare('UPDATE curators SET refreshed_at = ? WHERE id = ?').run(Date.now(), c.id);
   return { ok: true, lists: lists.length, added };
 }

@@ -402,6 +402,20 @@ function CuratorManager({ curators, onChange }) {
       setBusy(false);
     }
   };
+  // Fuentes con curador FIJO (no un usuario variable): un clic las sigue.
+  const followPreset = async (source) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.followCurator('', source);
+      await onChange();
+    } catch (e2) {
+      setErr(e2.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const hasRosy = curators.some((c) => c.source === 'rosyoverdrive');
   const refresh = async (id) => {
     setBusy(true);
     try {
@@ -441,6 +455,17 @@ function CuratorManager({ curators, onChange }) {
           {busy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Seguir
         </button>
       </form>
+      {!hasRosy && (
+        <button
+          type="button"
+          onClick={() => followPreset('rosyoverdrive')}
+          disabled={busy}
+          className="text-xs px-2 py-1 rounded border border-ink-700 bg-ink-850 text-neutral-300 hover:border-gold-500/50 hover:text-gold-300 inline-flex items-center gap-1 disabled:opacity-50"
+          title="Sigue la columna «Pressing Concerns» de Rosy Overdrive (reseñas de novedades)"
+        >
+          <Plus size={12} /> Seguir Rosy Overdrive · Pressing Concerns
+        </button>
+      )}
       {err && <ErrorMsg>{err}</ErrorMsg>}
       {curators.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -452,7 +477,11 @@ function CuratorManager({ curators, onChange }) {
             >
               <Radio size={11} className="text-gold-400/70" />
               <a
-                href={`https://www.buymusic.club/user/${c.username}`}
+                href={
+                  c.source === 'rosyoverdrive'
+                    ? 'https://rosyoverdrive.com/tag/pressing-concerns/'
+                    : `https://www.buymusic.club/user/${c.username}`
+                }
                 target="_blank"
                 rel="noreferrer"
                 className="hover:text-gold-400"

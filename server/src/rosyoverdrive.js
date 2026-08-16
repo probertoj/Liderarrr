@@ -75,12 +75,65 @@ export function parseRosyPost(html, year) {
   return out;
 }
 
+const PC_TAG = 'https://rosyoverdrive.com/tag/pressing-concerns/';
+
+// URLs de los posts recientes de la columna «Pressing Concerns» (de más nuevo a más
+// viejo, tal como los lista la página de la etiqueta).
+export async function pressingConcernsPostUrls(limit = 12) {
+  const html = await fetchRosy(PC_TAG);
+  const re = /https:\/\/rosyoverdrive\.com\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]*pressing-concerns[a-z0-9-]*\//gi;
+  const urls = [...new Set(html.match(re) || [])];
+  return urls.slice(0, limit);
+}
+
+// Título del post ya decodificado (entidades HTML) y sin el sufijo « – Rosy Overdrive».
+export function postTitle(html) {
+  const raw = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1];
+  if (!raw) return null;
+  return stripTags(raw).replace(/\s*[|–—-]\s*Rosy Overdrive.*$/i, '').trim() || null;
+}
+
+// Posts de «Pressing Concerns» normalizados a la MISMA forma que las listas de
+// buymusic.club (`{ slug, title, published_at, ListItems:[{artist,title,label,releaseDate,url}] }`),
+// para que el `ingest` del radar los trague sin cambios. Cada post = una «lista».
+export async function pressingConcernsLists(limit = 12) {
+  const urls = await pressingConcernsPostUrls(limit);
+  const lists = [];
+  for (const url of urls) {
+    let html;
+    try {
+      html = await fetchRosy(url); // eslint-disable-line no-await-in-loop
+    } catch {
+      continue; // un post que falle no tumba al resto
+    }
+    const entries = parseRosyPost(html, yearFromUrl(url));
+    if (!entries.length) continue;
+    const slug = (() => { try { return new URL(url).pathname; } catch { return url; } })();
+    const dm = url.match(/\/(\d{4})\/(\d{2})\/(\d{2})\//);
+    const published = dm ? `${dm[1]}-${dm[2]}-${dm[3]}` : null;
+    lists.push({
+      id: slug,
+      slug,
+      title: postTitle(html) || 'Pressing Concerns',
+      published_at: published,
+      ListItems: entries.map((e, i) => ({
+        id: `${slug}#${i}`,
+        artist: e.artist,
+        title: e.title,
+        label: e.label,
+        releaseDate: e.release_date,
+        url,
+        order: i,
+      })),
+    });
+  }
+  return lists;
+}
+
 // Para importar como reto: entradas «Artista - Álbum» de un post-lista (Top N…) + el
 // título del post (para nombrar el reto). Una sola descarga.
 export async function rosyList(url) {
   const html = await fetchRosy(url);
   const lines = parseRosyPost(html, yearFromUrl(url)).map((e) => `${e.artist} - ${e.title}`);
-  const listTitle =
-    (html.match(/<title[^>]*>([^<]+)<\/title>/i) || [])[1]?.replace(/\s*[|–-]\s*Rosy Overdrive.*$/i, '').trim() || null;
-  return { lines, listTitle };
+  return { lines, listTitle: postTitle(html) };
 }
