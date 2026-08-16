@@ -2,6 +2,7 @@ import { db } from './db.js';
 import * as mb from './musicbrainz.js';
 import { normName, matchKey } from './matchkey.js';
 import { pressingConcernsLists } from './rosyoverdrive.js';
+import { reviewsLists } from './ravensingstheblues.js';
 
 // Radar de novedades curadas (0.6 fase 3). Sigues a curadores de buymusic.club
 // (usuarios que publican semanalmente lo mejor de Bandcamp) y sus selecciones
@@ -90,6 +91,9 @@ function ingest(curatorId, lists, source = 'buymusicclub') {
 async function fetchSource(source, username) {
   if (source === 'rosyoverdrive') {
     return { user: { username: 'pressing-concerns', name: 'Rosy Overdrive · Pressing Concerns' }, lists: await pressingConcernsLists() };
+  }
+  if (source === 'ravensingstheblues') {
+    return { user: { username: 'reviews', name: 'Raven Sings the Blues · Reseñas' }, lists: await reviewsLists() };
   }
   const u = String(username || '').trim().replace(/^@/, '');
   if (!u) throw new Error('Falta el nombre de usuario');

@@ -416,6 +416,7 @@ function CuratorManager({ curators, onChange }) {
     }
   };
   const hasRosy = curators.some((c) => c.source === 'rosyoverdrive');
+  const hasRaven = curators.some((c) => c.source === 'ravensingstheblues');
   const refresh = async (id) => {
     setBusy(true);
     try {
@@ -455,16 +456,31 @@ function CuratorManager({ curators, onChange }) {
           {busy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Seguir
         </button>
       </form>
-      {!hasRosy && (
-        <button
-          type="button"
-          onClick={() => followPreset('rosyoverdrive')}
-          disabled={busy}
-          className="text-xs px-2 py-1 rounded border border-ink-700 bg-ink-850 text-neutral-300 hover:border-gold-500/50 hover:text-gold-300 inline-flex items-center gap-1 disabled:opacity-50"
-          title="Sigue la columna «Pressing Concerns» de Rosy Overdrive (reseñas de novedades)"
-        >
-          <Plus size={12} /> Seguir Rosy Overdrive · Pressing Concerns
-        </button>
+      {(!hasRosy || !hasRaven) && (
+        <div className="flex flex-wrap gap-2">
+          {!hasRosy && (
+            <button
+              type="button"
+              onClick={() => followPreset('rosyoverdrive')}
+              disabled={busy}
+              className="text-xs px-2 py-1 rounded border border-ink-700 bg-ink-850 text-neutral-300 hover:border-gold-500/50 hover:text-gold-300 inline-flex items-center gap-1 disabled:opacity-50"
+              title="Sigue la columna «Pressing Concerns» de Rosy Overdrive (reseñas de novedades)"
+            >
+              <Plus size={12} /> Rosy Overdrive · Pressing Concerns
+            </button>
+          )}
+          {!hasRaven && (
+            <button
+              type="button"
+              onClick={() => followPreset('ravensingstheblues')}
+              disabled={busy}
+              className="text-xs px-2 py-1 rounded border border-ink-700 bg-ink-850 text-neutral-300 hover:border-gold-500/50 hover:text-gold-300 inline-flex items-center gap-1 disabled:opacity-50"
+              title="Sigue las reseñas de Raven Sings the Blues"
+            >
+              <Plus size={12} /> Raven Sings the Blues · Reseñas
+            </button>
+          )}
+        </div>
       )}
       {err && <ErrorMsg>{err}</ErrorMsg>}
       {curators.length > 0 && (
@@ -480,7 +496,9 @@ function CuratorManager({ curators, onChange }) {
                 href={
                   c.source === 'rosyoverdrive'
                     ? 'https://rosyoverdrive.com/tag/pressing-concerns/'
-                    : `https://www.buymusic.club/user/${c.username}`
+                    : c.source === 'ravensingstheblues'
+                      ? 'https://ravensingstheblues.com/category/reviews/'
+                      : `https://www.buymusic.club/user/${c.username}`
                 }
                 target="_blank"
                 rel="noreferrer"
