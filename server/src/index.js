@@ -223,7 +223,10 @@ app.get('/api/library/filters', async () => q.filterOptions());
 app.get('/api/albums/:id', async (req, reply) => {
   const a = q.albumDetail(Number(req.params.id));
   if (!a) return reply.code(404).send({ error: 'No encontrado' });
-  const owned = lidarrOwnedIds();
+  // «en Lidarr» solo tiene sentido si Lidarr sigue conectado; si no, su tabla queda vieja
+  // tras «liberar de Lidarr» y marcaría discos como suyos que ya no lo son.
+  const lid = lidarrConfig();
+  const owned = lid.url && lid.key ? lidarrOwnedIds() : new Set();
   a.inLidarr = a.rg_mbid ? owned.has(a.rg_mbid) : false;
   return a;
 });

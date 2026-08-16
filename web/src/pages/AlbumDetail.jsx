@@ -336,7 +336,7 @@ export default function AlbumDetail() {
                 </span>
               </Button>
             )}
-            {album.inLidarr && <span className="text-sm text-emerald-400 self-center">✓ en Lidarr</span>}
+            {lidarrOn && album.inLidarr && <span className="text-sm text-emerald-400 self-center">✓ en Lidarr</span>}
             <button
               onClick={refile}
               disabled={busy}
