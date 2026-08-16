@@ -58,7 +58,7 @@ import {
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
 import { listeningOverview, ownershipGap, ownedUnplayed, unownedScrobbledAlbums, hasScrobbles } from './listening.js';
-import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing } from './challenges.js';
+import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing, nextChallengeListens } from './challenges.js';
 import { importListFromUrl } from './listimport.js';
 import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCompletism, resolveAlbumLabel } from './editions.js';
@@ -541,6 +541,8 @@ app.get('/api/listening/unplayed', async () => ownedUnplayed());
 
 // --- retos ------------------------------------------------------------------
 app.get('/api/challenges', async () => listChallenges());
+// dashboard: siguiente(s) disco(s) por escuchar de tus retos (los que tienes y no oíste)
+app.get('/api/challenges/next-listens', async (req) => nextChallengeListens(Number(req.query?.limit) || 5));
 app.post('/api/challenges', async (req, reply) => {
   try {
     return addChallenge(req.body?.name, req.body?.text);

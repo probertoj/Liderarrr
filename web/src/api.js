@@ -144,6 +144,7 @@ export const api = {
   albumGap: (since) => req(`/listening/album-gap${since ? `?since=${since}` : ''}`),
   unplayed: () => req('/listening/unplayed'),
   challenges: () => req('/challenges'),
+  nextChallengeListens: () => req('/challenges/next-listens'),
   addChallenge: (name, text) => req('/challenges', { method: 'POST', body: { name, text } }),
   importChallengeUrl: (url, name) => req('/challenges/import', { method: 'POST', body: { url, name } }),
   challenge: (id) => req(`/challenges/${id}`),

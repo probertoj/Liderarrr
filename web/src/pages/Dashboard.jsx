@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip,
 } from 'recharts';
-import { CalendarClock, Search, X, User, Disc3, Star, Download, Loader2, ExternalLink } from 'lucide-react';
+import { CalendarClock, Search, X, User, Disc3, Star, Download, Loader2, ExternalLink, Headphones } from 'lucide-react';
 import { api, coverUrl, fmtBytes } from '../api.js';
 import { PageHeader, StatCard, Section, Spinner, ErrorMsg, SearchModal } from '../components.jsx';
 
@@ -216,6 +216,7 @@ export default function Dashboard() {
   const [charts, setCharts] = useState(null);
   const [recent, setRecent] = useState(null);
   const [upcoming, setUpcoming] = useState(null);
+  const [nextListens, setNextListens] = useState(null);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
@@ -223,6 +224,7 @@ export default function Dashboard() {
     api.charts().then(setCharts).catch(() => {});
     api.recent().then(setRecent).catch(() => {});
     api.upcoming().then(setUpcoming).catch(() => {});
+    api.nextChallengeListens().then(setNextListens).catch(() => {});
   }, []);
 
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
@@ -261,6 +263,32 @@ export default function Dashboard() {
         <StatCard label="Sin pérdida" value={`${ov.losslessPct}%`} sub="de las pistas" />
         <StatCard label="Incompletos" value={ov.incomplete} sub={ov.states?.orphan ? `${ov.states.orphan} rarezas` : 'les falta alguna pista'} />
       </div>
+
+      {/* siguiente por escuchar de tus retos */}
+      {nextListens?.length > 0 && (
+        <Section
+          title="Siguiente por escuchar de tus retos"
+          className="mb-8"
+          action={<Link to="/retos" className="text-xs text-gold-400 hover:underline">Ver retos →</Link>}
+        >
+          <div className="card p-3">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+              {nextListens.map((n) => (
+                <Link key={n.owned_album_id} to={`/album/${n.owned_album_id}`} className="group block" title={`De «${n.challenge}»`}>
+                  <div className="aspect-square rounded-lg overflow-hidden bg-ink-850 border border-ink-800 group-hover:border-gold-400 transition-colors flex items-center justify-center relative">
+                    <img src={coverUrl(n.owned_album_id)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                    <span className="absolute bottom-1 right-1 bg-ink-900/80 rounded-full p-1">
+                      <Headphones size={11} className="text-gold-300" />
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-neutral-300 truncate">{n.album}</div>
+                  <div className="text-[11px] text-neutral-600 truncate">{n.artist}</div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </Section>
+      )}
 
       {/* actividad reciente */}
       <div className="grid lg:grid-cols-3 gap-6 mb-4">
