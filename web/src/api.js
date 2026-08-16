@@ -124,7 +124,8 @@ export const api = {
   followCurator: (username, source) => req('/curators', { method: 'POST', body: { username, source } }),
   unfollowCurator: (id) => req(`/curators/${id}`, { method: 'DELETE' }),
   refreshCurator: (id) => req(`/curators/${id}/refresh`, { method: 'POST' }),
-  addHipersonicaTierList: (text, date) => req('/radar/hipersonica', { method: 'POST', body: { text, date } }),
+  addHipersonicaTierList: (text, date, toChallenge) =>
+    req('/radar/hipersonica', { method: 'POST', body: { text, date, toChallenge } }),
   radar: (since, unowned) => {
     const p = new URLSearchParams();
     if (since) p.set('since', since);

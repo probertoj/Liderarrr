@@ -3,7 +3,8 @@ import * as mb from './musicbrainz.js';
 import { normName, matchKey } from './matchkey.js';
 import { pressingConcernsLists } from './rosyoverdrive.js';
 import { reviewsLists } from './ravensingstheblues.js';
-import { tierListToLists } from './hipersonica.js';
+import { tierListToLists, parseTierList } from './hipersonica.js';
+import { appendToChallenge } from './challenges.js';
 
 // Radar de novedades curadas (0.6 fase 3). Sigues a curadores de buymusic.club
 // (usuarios que publican semanalmente lo mejor de Bandcamp) y sus selecciones
@@ -121,7 +122,7 @@ export async function followCurator(username, source = 'buymusicclub') {
 // Hipersónica: añade al radar una tier list PEGADA por el usuario (el post de pago no se
 // puede leer server-side). Crea/actualiza el curador fijo y vuelca los discos con su
 // nivel (type) y género (label). Reutiliza el ingest común.
-export function addHipersonicaTierList(text, date) {
+export function addHipersonicaTierList(text, date, toChallenge) {
   const { lists, items } = tierListToLists(text, { date });
   if (!items) throw new Error('No reconocí ninguna tier list en ese texto. Pega el post completo (con los niveles «DISCOS QUE …» y las líneas «género:»).');
   const source = 'hipersonica';
@@ -132,7 +133,16 @@ export function addHipersonicaTierList(text, date) {
   ).run(source, 'tier-list', 'Hipersónica · Tier List', Date.now(), Date.now());
   const row = db.prepare('SELECT id FROM curators WHERE source = ? AND username = ?').get(source, 'tier-list');
   const added = ingest(row.id, lists, source);
-  return { ok: true, curator_id: row.id, items, added };
+  const result = { ok: true, curator_id: row.id, items, added };
+  // Enviar los niveles elegidos (p. ej. Excel + Sí) a un reto AMPLIABLE por nombre.
+  if (toChallenge?.name && Array.isArray(toChallenge.tiers) && toChallenge.tiers.length) {
+    const wanted = new Set(toChallenge.tiers);
+    const entries = parseTierList(text)
+      .filter((it) => wanted.has(it.tier))
+      .map((it) => ({ artist: it.artist, album: it.album }));
+    result.challenge = appendToChallenge(toChallenge.name, entries);
+  }
+  return result;
 }
 
 export function unfollowCurator(id) {
@@ -226,6 +236,7 @@ export function radarFeed({ since = null, unownedOnly = false } = {}) {
     if (unownedOnly && is_owned) continue;
     out.push({
       id: r.id,
+      source: r.source,
       curator: r.curator,
       curator_username: r.curator_username,
       list_title: r.list_title,

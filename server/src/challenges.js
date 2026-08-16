@@ -128,6 +128,44 @@ export function addChallenge(name, text) {
   return { id, item_count: items.length };
 }
 
+// Añade entradas [{artist, album, year?}] a un reto EXISTENTE por nombre (o lo crea si no
+// existe), sin duplicar (cruza por matchKey). Para retos «ampliables» que se rellenan cada
+// semana, p. ej. «Los Excels 2026 de Hipersónica». Devuelve el id y cuántas se añadieron.
+export function appendToChallenge(name, entries) {
+  const nm = String(name || '').trim();
+  if (!nm) throw new Error('Falta el nombre del reto');
+  const list = (entries || []).filter((e) => e && e.artist && e.album);
+  if (!list.length) return { id: null, added: 0 };
+  let row = db.prepare('SELECT id FROM challenges WHERE name = ? LIMIT 1').get(nm);
+  let id;
+  if (row) {
+    id = row.id;
+  } else {
+    id = Number(
+      db.prepare("INSERT INTO challenges (name, source, item_count, added_at) VALUES (?, 'hipersonica', 0, ?)").run(nm, Date.now()).lastInsertRowid
+    );
+  }
+  const seen = new Set(
+    db.prepare('SELECT artist, album FROM challenge_items WHERE challenge_id = ?').all(id).map((r) => matchKey(r.artist, r.album))
+  );
+  let pos = db.prepare('SELECT COALESCE(MAX(position), -1) AS m FROM challenge_items WHERE challenge_id = ?').get(id).m + 1;
+  const ins = db.prepare('INSERT INTO challenge_items (challenge_id, position, artist, album, year) VALUES (?, ?, ?, ?, ?)');
+  let added = 0;
+  const tx = db.transaction(() => {
+    for (const e of list) {
+      const k = matchKey(e.artist, e.album);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      ins.run(id, pos++, e.artist, e.album, e.year ?? null);
+      added++;
+    }
+    db.prepare('UPDATE challenges SET item_count = (SELECT COUNT(*) FROM challenge_items WHERE challenge_id = ?) WHERE id = ?').run(id, id);
+  });
+  tx();
+  resolveItems(id);
+  return { id, added };
+}
+
 export function listChallenges() {
   return db
     .prepare(

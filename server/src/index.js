@@ -418,7 +418,7 @@ app.delete('/api/curators/:id', async (req) => unfollowCurator(Number(req.params
 // Hipersónica: pegar una tier list (de pago, no sondeable) para añadirla al radar
 app.post('/api/radar/hipersonica', async (req, reply) => {
   try {
-    return addHipersonicaTierList(req.body?.text, req.body?.date);
+    return addHipersonicaTierList(req.body?.text, req.body?.date, req.body?.toChallenge);
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

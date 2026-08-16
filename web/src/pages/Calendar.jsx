@@ -237,6 +237,15 @@ function LabelManager({ labels, onChange }) {
   );
 }
 
+// Color del badge de nivel de Hipersónica (de mejor a peor).
+const TIER_STYLE = {
+  'Directo al Excel': 'border-gold-500/50 bg-gold-500/15 text-gold-300',
+  Sí: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+  OK: 'border-sky-500/40 bg-sky-500/10 text-sky-300',
+  Meh: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
+  No: 'border-red-500/40 bg-red-500/10 text-red-300',
+};
+
 // Fila del radar: un ítem de Bandcamp curado. No trae MBID; el botón Lidarr lo
 // resuelve contra MusicBrainz al vuelo (artista+título) y, si acierta, lo envía.
 function RadarRow({ r, onSearch, onFollowMbid, onQueue, lidarrOn }) {
@@ -302,14 +311,21 @@ function RadarRow({ r, onSearch, onFollowMbid, onQueue, lidarrOn }) {
         className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
       />
       <div className="min-w-0 flex-1">
-        <div className="truncate">
-          <span>{r.artist}</span>
-          <span className="text-neutral-500"> — {r.title}</span>
+        <div className="truncate flex items-center gap-1.5">
+          {r.source === 'hipersonica' && r.type && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full border shrink-0 ${TIER_STYLE[r.type] || 'border-ink-700 text-neutral-400'}`}>
+              {r.type}
+            </span>
+          )}
+          <span className="truncate">
+            <span>{r.artist}</span>
+            <span className="text-neutral-500"> — {r.title}</span>
+          </span>
         </div>
         <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
           <span>
             {r.release_date}
-            {r.type && r.type !== 'album' ? ` · ${r.type}` : ''}
+            {r.type && r.type !== 'album' && r.source !== 'hipersonica' ? ` · ${r.type}` : ''}
             {r.label ? ` · ${r.label}` : ''}
           </span>
           <span className="text-neutral-700">vía {r.curator}</span>
@@ -390,14 +406,23 @@ function CuratorManager({ curators, onChange }) {
   const [hsText, setHsText] = useState('');
   const [hsDate, setHsDate] = useState('');
   const [hsMsg, setHsMsg] = useState(null);
+  const [hsToCh, setHsToCh] = useState(true); // enviar niveles a un reto ampliable
+  const [hsTiers, setHsTiers] = useState(['Directo al Excel', 'Sí']);
+  const hsYear = (hsDate || new Date().toISOString()).slice(0, 4);
+  const [hsChName, setHsChName] = useState('');
+  const chName = hsChName || `Los Excels ${hsYear} de Hipersónica`;
+  const toggleTier = (t) => setHsTiers((p) => (p.includes(t) ? p.filter((x) => x !== t) : [...p, t]));
   const addHs = async () => {
     if (!hsText.trim()) return;
     setBusy(true);
     setErr(null);
     setHsMsg(null);
     try {
-      const r = await api.addHipersonicaTierList(hsText, hsDate || undefined);
-      setHsMsg(`Añadidos ${r.items} discos al radar.`);
+      const toChallenge = hsToCh && hsTiers.length ? { name: chName, tiers: hsTiers } : undefined;
+      const r = await api.addHipersonicaTierList(hsText, hsDate || undefined, toChallenge);
+      setHsMsg(
+        `Añadidos ${r.items} discos al radar${r.challenge ? `; ${r.challenge.added} al reto «${chName}»` : ''}.`
+      );
       setHsText('');
       await onChange();
     } catch (e2) {
@@ -537,6 +562,39 @@ function CuratorManager({ curators, onChange }) {
                 Añadir al radar
               </button>
               {hsMsg && <span className="text-xs text-emerald-400">{hsMsg}</span>}
+            </div>
+            <div className="rounded border border-ink-800 bg-ink-900/40 p-2 space-y-2">
+              <label className="flex items-center gap-2 text-xs text-neutral-300 cursor-pointer">
+                <input type="checkbox" checked={hsToCh} onChange={(e) => setHsToCh(e.target.checked)} />
+                También añadir estos niveles a un reto ampliable
+              </label>
+              {hsToCh && (
+                <div className="space-y-2 pl-5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {['Directo al Excel', 'Sí', 'OK', 'Meh', 'No'].map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => toggleTier(t)}
+                        className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                          hsTiers.includes(t)
+                            ? 'border-gold-500/50 bg-gold-500/15 text-gold-300'
+                            : 'border-ink-700 bg-ink-850 text-neutral-500'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    value={hsChName}
+                    onChange={(e) => setHsChName(e.target.value)}
+                    placeholder={`Los Excels ${hsYear} de Hipersónica`}
+                    className="w-full bg-ink-850 border border-ink-800 rounded px-2 py-1 text-xs text-neutral-200"
+                    title="Nombre del reto. Si ya existe, se le añaden los discos nuevos (sin duplicar)."
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
