@@ -16,7 +16,7 @@ import { qbTest, qbAdd } from './qbittorrent.js';
 import { deleteAlbumFromDisk } from './albumdelete.js';
 import { refileAlbum, correctedAlbums, refileAll } from './refile.js';
 import { pendingImports, importFolder } from './importer.js';
-import { recordGrab, magnetHash, downloadsList } from './downloads.js';
+import { recordGrab, magnetHash, downloadsList, activeRequestRgs } from './downloads.js';
 import { runAutoImport, autoImportStatus, autoImportEnabled } from './autoimport.js';
 import { runAutoGrab, autoGrabConfig, autoGrabStatus, searchAndGrabBest } from './autograb.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground } from './musicbrainz.js';
@@ -249,8 +249,16 @@ app.get('/api/artists/:id', async (req, reply) => {
     missingSingles: comp.missingSingles,
     upcoming: comp.upcoming,
   };
-  const owned = lidarrOwnedIds();
-  for (const m of [...comp.missing, ...comp.missingEps, ...comp.missingSingles]) m.in_lidarr = owned.has(m.rg_mbid);
+  // Estado «ya pedido» de cada hueco: del registro NATIVO (requested/importing) siempre, y
+  // de Lidarr SOLO si sigue conectado (si no, su tabla queda vieja tras «liberar de Lidarr»
+  // y marcaba discos como pedidos que no lo están, dejando el botón «Descargar» sin nada).
+  const lid = lidarrConfig();
+  const owned = lid.url && lid.key ? lidarrOwnedIds() : new Set();
+  const requested = activeRequestRgs();
+  for (const m of [...comp.missing, ...comp.missingEps, ...comp.missingSingles]) {
+    m.in_lidarr = owned.has(m.rg_mbid);
+    m.requested = requested.has(m.rg_mbid);
+  }
   return a;
 });
 app.post('/api/artists/:id/scope', async (req) => q.setArtistScope(Number(req.params.id), req.body?.scope));

@@ -694,6 +694,7 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
   const [busy, setBusy] = useState(null);
   const [queue, setQueue] = useState(null);
   const [search, setSearch] = useState(null); // query del modal de búsqueda manual
+  const [msg, setMsg] = useState(null); // feedback de «Descargar todos»
 
   // Con Lidarr → se lo mandamos (envío encolado, no bloqueante). Sin Lidarr (opcional)
   // → descarga nativa: agarra la mejor release por Prowlarr/Jackett y el auto-import
@@ -720,27 +721,43 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
   };
 
   const addAll = async () => {
-    const toSend = items.filter((i) => !added[i.rg_mbid] && !i.in_lidarr);
-    if (!toSend.length) return;
+    const toSend = items.filter((i) => !added[i.rg_mbid] && !i.in_lidarr && !i.requested);
+    if (!toSend.length) {
+      setMsg('No hay nada que descargar: todo está pedido o ya en tu biblioteca.');
+      return;
+    }
     setBusy('all');
+    setMsg(null);
     try {
       if (lidarrOn) {
         await api.lidarrAddBulk(toSend.map((i) => ({ rg_mbid: i.rg_mbid, artist_mbid: artistMbid })));
         pollLidarrQueue(setQueue);
         setAdded((p) => ({ ...p, ...Object.fromEntries(toSend.map((i) => [i.rg_mbid, true])) }));
       } else {
-        // nativo: secuencial (los indexers se consultan en vivo). Marca las que agarra.
+        // nativo: secuencial (los indexers se consultan en vivo). Marca las que agarra y
+        // resume qué pasó (antes los fallos se tragaban en silencio → «no responde»).
+        let ok = 0;
+        const fails = [];
         for (const i of toSend) {
           try {
             const res = await api.grabBest(`${artistName || ''} ${i.title}`.trim(), { rg_mbid: i.rg_mbid, artist: artistName, album: i.title });
-            if (res.grabbed) setAdded((p) => ({ ...p, [i.rg_mbid]: true }));
-          } catch {
-            /* uno que falla no corta la tanda */
+            if (res.grabbed) {
+              ok += 1;
+              setAdded((p) => ({ ...p, [i.rg_mbid]: true }));
+            } else {
+              fails.push(`${i.title}: ${res.reason || 'sin release'}`);
+            }
+          } catch (e) {
+            fails.push(`${i.title}: ${e.message}`);
           }
         }
+        setMsg(
+          `Pedidos ${ok} de ${toSend.length}.` +
+            (fails.length ? ` Sin éxito: ${fails.slice(0, 2).join(' · ')}${fails.length > 2 ? '…' : ''}` : '')
+        );
       }
     } catch (e) {
-      alert(e.message);
+      setMsg(e.message);
     } finally {
       setBusy(null);
     }
@@ -769,9 +786,10 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
             {queue.errors?.length ? ` · ${queue.errors.length} con error` : ''}.
           </p>
         ))}
+      {msg && <p className="text-xs text-neutral-400 mb-2">{msg}</p>}
       <div className="space-y-1.5">
         {items.map((m) => {
-          const done = added[m.rg_mbid] || m.in_lidarr;
+          const done = added[m.rg_mbid] || m.in_lidarr || m.requested;
           return (
             <div key={m.rg_mbid} className="card px-3 py-2 flex items-center gap-2 text-sm">
               <span className="truncate flex-1 min-w-0">
@@ -794,7 +812,7 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
               </button>
               {done ? (
                 <span className="text-emerald-400 text-xs inline-flex items-center gap-1 shrink-0">
-                  <Check size={14} /> {lidarrOn ? 'en Lidarr' : 'pedido'}
+                  <Check size={14} /> {m.in_lidarr ? 'en Lidarr' : 'pedido'}
                 </span>
               ) : (
                 <button
