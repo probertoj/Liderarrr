@@ -59,9 +59,34 @@ async function prowlarrFetch(path, { method = 'GET', body } = {}) {
   return res.status === 204 ? null : res.json();
 }
 
+// Clientes de descarga configurados EN Prowlarr (Settings → Download Clients). Es a
+// donde Prowlarr empuja lo que agarra: si no hay ninguno, un «grab» no descarga nada.
+export async function prowlarrDownloadClients() {
+  const list = await prowlarrFetch('/downloadclient');
+  return Array.isArray(list) ? list : [];
+}
+
 export async function prowlarrTest() {
   const status = await prowlarrFetch('/system/status');
-  return { ok: true, version: status.version, name: status.appName || 'Prowlarr' };
+  // CLAVE sin Lidarr: Liderarr NO habla con qBittorrent en el flujo Prowlarr; le pide a
+  // Prowlarr que agarre, y Prowlarr empuja a SU cliente de descarga. En un montaje *Arr
+  // clásico ese cliente vive en Lidarr, no en Prowlarr, así que al «liberar de Lidarr» es
+  // fácil quedarse sin cliente en Prowlarr y que los grabs no descarguen nada. Lo avisamos.
+  let clientMsg;
+  try {
+    const clients = await prowlarrDownloadClients();
+    const enabled = clients.filter((c) => c.enable);
+    if (!clients.length) {
+      clientMsg = '⚠️ SIN cliente de descarga en Prowlarr → los «grab» no descargarán. Añade qBittorrent en Prowlarr → Settings → Download Clients.';
+    } else if (!enabled.length) {
+      clientMsg = `⚠️ ${clients.length} cliente(s) de descarga pero ninguno ACTIVADO en Prowlarr.`;
+    } else {
+      clientMsg = `cliente de descarga OK: ${enabled.map((c) => c.name || c.implementation).join(', ')}`;
+    }
+  } catch (e) {
+    clientMsg = `(no se pudo comprobar el cliente de descarga: ${String(e.message || e)})`;
+  }
+  return { ok: true, name: `Prowlarr ${status.version} · ${clientMsg}`, version: status.version };
 }
 
 function mapRelease(r) {
