@@ -103,11 +103,35 @@ function importGeneric(md) {
   return { lines: uniq, listTitle: listTitleOf(md), partial: false };
 }
 
+// record.club: app Nuxt tras Cloudflare (el blob __NUXT__ está minificado; no se parsea a
+// mano). El LECTOR la renderiza bien. Cada disco es un enlace de release con el TÍTULO
+// seguido de uno o varios enlaces de artista → "Artista - Álbum" (varios con &). Ignora
+// las carátulas (apuntan a cdn.rcrd.club) y el sidebar de "más listas" (enlaces /lists/).
+function extractRecordClub(md) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of String(md || '').split(/\r?\n/)) {
+    if (!/record\.club\/releases\//.test(raw)) continue;
+    const alb = raw.match(/\[([^\]]+)\]\(https:\/\/record\.club\/releases\/[^)]+\)/);
+    if (!alb) continue;
+    const artists = [...raw.matchAll(/\[([^\]]+)\]\(https:\/\/record\.club\/artists\/[^)]+\)/g)].map((m) => m[1].trim());
+    if (!artists.length) continue;
+    const line = `${artists.join(' & ')} - ${alb[1].trim()}`;
+    const k = line.toLowerCase();
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push(line);
+    }
+  }
+  return out;
+}
+
 export async function importListFromUrl(url, name) {
   if (!/^https?:\/\//i.test(String(url || ''))) throw new Error('Pon una URL válida (http/https)');
   url = url.trim();
   const isAoty = /albumoftheyear\.org/i.test(url);
   const isRosy = /rosyoverdrive\.com/i.test(url);
+  const isRecordClub = /record\.club/i.test(url);
   let lines;
   let listTitle = null;
   let partial = false;
@@ -115,6 +139,10 @@ export async function importListFromUrl(url, name) {
     // Rosy Overdrive: parseo directo del HTML (encabezados «Artista – Álbum»), fiable y
     // sin depender del lector. El título del post nombra el reto si no se dio nombre.
     ({ lines, listTitle } = await rosyList(url));
+  } else if (isRecordClub) {
+    const md = await fetchViaReader(url);
+    lines = extractRecordClub(md);
+    listTitle = (listTitleOf(md) || '').replace(/,\s*a list by .*$/i, '').trim() || null;
   } else {
     ({ lines, listTitle, partial } = isAoty ? await importAoty(url, name) : importGeneric(await fetchViaReader(url)));
   }
