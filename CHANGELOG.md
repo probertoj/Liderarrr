@@ -11,6 +11,46 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.0] — 2026-08-16
+
+Tanda grande centrada en el **radar multifuente** (descubrir novedades curadas fuera de Bandcamp),
+el pulido de la **importación de descargas** y la **velocidad de los retos**.
+
+### Añadido
+- **Radar multifuente.** Además de los curadores de buymusic.club, el radar sigue ahora a tres sitios más,
+  cruzados con tu biblioteca igual que el resto:
+  - **Rosy Overdrive · Pressing Concerns** (auto): sondea la columna y trae los discos reseñados con fecha y sello.
+  - **Raven Sings the Blues · Reseñas** (auto): lee su RSS de reseñas (artista/álbum del enlace de Bandcamp).
+  - **Hipersónica · Tier List** (manual): como es Substack de pago y no se puede leer desde el servidor, se
+    **pega** el texto de la tier list; cada disco entra con su **nivel** (badge de color: Directo al Excel / Sí /
+    OK / Meh / No) y su género.
+- **Retos desde una tier list de Hipersónica.** Al pegar la tier list puedes mandar los niveles que elijas
+  (por defecto **Excel + Sí**) a un **reto ampliable** por nombre (p. ej. «Los Excels 2026 de Hipersónica»):
+  se crea o se le añaden los discos nuevos **sin duplicar**, semana a semana.
+- **Importar listas de Rosy Overdrive como reto** por URL (parseo directo del post).
+- **Prioridad de trackers** (Ajustes → «3e»): con el mismo disco a la misma calidad en varios trackers, la
+  descarga de un clic y el auto-grab eligen el del tracker que pongas más arriba. Orden: calidad → prioridad de
+  tracker → seeders.
+- **Filtros combinables en Artistas**: «Seguidos» y «Faltan discos» (activables a la vez), orden «Más discos por
+  completar» y contador «faltan N» por tarjeta.
+- **Dashboard · «Siguiente por escuchar de tus retos»**: sugiere los discos de tus retos que ya tienes y aún no
+  has escuchado, con carátulas clicables.
+
+### Cambiado
+- **Importar descargas: se cierran los pedidos de verdad.** Importar (manual o auto) marca el pedido como
+  «importado»; además, un cruce con la biblioteca cierra cualquier pedido cuyo álbum ya tengas, sin depender de
+  qBittorrent. La cola se **autolimpia**: lo importado desaparece pasados unos días y la basura se poda sola.
+- **Retos más rápidos.** Abrir un reto ya no rehace el índice de toda la biblioteca ni consulta las escuchas disco
+  a disco (era lento en listas largas): ambos índices se calculan de una vez y se cachean.
+- Renombres de secciones de navegación: **«La caza» → «I Hear a New World»** y **«El gusto» → «Losing My Edge»**.
+
+### Arreglado
+- **Identificación álbum vs single homónimo.** Cuando un artista tiene un single y un álbum con el mismo título
+  (p. ej. Cocteau Twins «Heaven or Las Vegas»), se elegía a veces el single y el disco quedaba archivado como
+  «single» (oculto en la sección plegada de la ficha). Ahora, a igualdad de título, se prefiere el álbum de estudio.
+
+---
+
 ## [0.8.2] — 2026-08-16
 
 ### Añadido
