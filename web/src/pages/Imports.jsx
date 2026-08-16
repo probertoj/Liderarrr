@@ -42,8 +42,8 @@ function AutoImportPanel() {
         </Button>
       </div>
       <p className="text-xs text-neutral-600 mt-1">
-        Cierra el bucle sin Lidarr: al terminar una descarga en qBittorrent, se enlaza a tu biblioteca organizada.
-        {dl.enabled ? ' Se ejecuta solo cada pocos minutos.' : ' Actívalo en Ajustes → Importar descargas.'}
+        Al terminar una descarga en qBittorrent, se enlaza a tu biblioteca organizada.
+        {dl.enabled ? ' Se ejecuta solo cada 3 minutos.' : ' Actívalo en Ajustes → Importar descargas.'}
       </p>
       {dl.items?.length > 0 && (
         <div className="mt-3 max-h-56 overflow-y-auto divide-y divide-ink-850/60 text-sm">

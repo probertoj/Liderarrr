@@ -60,7 +60,7 @@ const NAV = [
     ],
   },
   {
-    label: 'Identificación',
+    label: 'Identikit',
     items: [
       { to: '/sin-identificar', label: 'Sin identificar', Icon: HelpCircle },
       { to: '/correcciones', label: 'Correcciones', Icon: Wrench },
