@@ -193,6 +193,15 @@ export default function AlbumDetail() {
                   >
                     Record Club <ExternalLink size={11} />
                   </a>
+                  <a
+                    href={`https://open.spotify.com/search/${encodeURIComponent(q)}/albums`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-gold-400 hover:underline inline-flex items-center gap-1"
+                    title="Buscar este disco en Spotify (útil para sincronizar tu biblioteca de Spotify con la local)"
+                  >
+                    Spotify <ExternalLink size={11} />
+                  </a>
                 </>
               );
             })()}
