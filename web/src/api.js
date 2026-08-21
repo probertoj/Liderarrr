@@ -88,6 +88,7 @@ export const api = {
   importRun: (sourceDir, override = {}) => req('/imports/run', { method: 'POST', body: { sourceDir, ...override } }),
   downloads: () => req('/downloads'),
   autoImportRun: () => req('/imports/auto-run', { method: 'POST' }),
+  clearImportedDownloads: () => req('/downloads/clear-imported', { method: 'POST' }),
   autograb: () => req('/autograb'),
   autograbRun: (dryRun) => req('/autograb/run', { method: 'POST', body: { dryRun } }),
   grabBest: (query, context) => req('/grab-best', { method: 'POST', body: { query, context } }),

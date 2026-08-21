@@ -27,6 +27,11 @@ export const autoImportStatus = {
   imported: 0,
   checked: 0,
   errors: [],
+  // diagnóstico: por qué el automático (no) importa
+  torrents: 0, // completados que devolvió qBittorrent (tras el filtro de categoría)
+  underSource: 0, // de esos, cuántos cuelgan de tu carpeta de torrents configurada
+  alreadyImported: 0, // ya enlazados en una pasada anterior
+  source: null, // carpeta de torrents con la que se comparó
 };
 
 let running = false;
@@ -44,7 +49,16 @@ export async function runAutoImport() {
   if (!autoImportEnabled()) return { ...autoImportStatus, skipped: 'desactivado o sin configurar' };
   const { source } = importConfig();
   running = true;
-  Object.assign(autoImportStatus, { running: true, imported: 0, checked: 0, errors: [] });
+  Object.assign(autoImportStatus, {
+    running: true,
+    imported: 0,
+    checked: 0,
+    errors: [],
+    torrents: 0,
+    underSource: 0,
+    alreadyImported: 0,
+    source,
+  });
   try {
     // Primero, cierra los pedidos cuyo álbum ya está en la biblioteca — independiente de
     // qBittorrent. Esto arregla el caso en que todo se quedaba en "pedido" pese a estar ya
@@ -70,10 +84,12 @@ export async function runAutoImport() {
       autoImportStatus.errors.push(`qBittorrent: ${String(e.message || e)}`);
       return autoImportStatus;
     }
+    autoImportStatus.torrents = torrents.length;
     let importedAny = false;
     for (const t of torrents) {
       const cp = norm(t.contentPath);
       if (!cp || !within(cp, source)) continue; // solo lo que cuelga de la carpeta de torrents
+      autoImportStatus.underSource++;
       let isDir = false;
       try {
         isDir = fs.statSync(cp).isDirectory();
@@ -84,6 +100,7 @@ export async function runAutoImport() {
       if (isImported.get(path.resolve(cp))) {
         // ya importada (a mano o en una pasada anterior): si aún tenía un pedido abierto,
         // ciérralo — así el backlog deja de mostrarse como "pedido" eternamente.
+        autoImportStatus.alreadyImported++;
         const done = matchRequest(t);
         if (done && done.status !== 'imported') setDownloadStatus(done.id, 'imported');
         continue;

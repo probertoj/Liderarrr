@@ -16,7 +16,7 @@ import { qbTest, qbAdd } from './qbittorrent.js';
 import { deleteAlbumFromDisk } from './albumdelete.js';
 import { refileAlbum, correctedAlbums, refileAll } from './refile.js';
 import { pendingImports, importFolder } from './importer.js';
-import { recordGrab, magnetHash, downloadsList, activeRequestRgs } from './downloads.js';
+import { recordGrab, magnetHash, downloadsList, activeRequestRgs, clearImported } from './downloads.js';
 import { runAutoImport, autoImportStatus, autoImportEnabled } from './autoimport.js';
 import { runAutoGrab, autoGrabConfig, autoGrabStatus, searchAndGrabBest } from './autograb.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground } from './musicbrainz.js';
@@ -822,6 +822,8 @@ app.post('/api/lidarr/add-bulk', async (req, reply) => {
 
 // --- auto-import (cerrar el bucle) + registro de descargas -------------------
 app.get('/api/downloads', async () => ({ enabled: autoImportEnabled(), status: autoImportStatus, items: downloadsList() }));
+// limpiar del registro las descargas ya cerradas (importadas/con error)
+app.post('/api/downloads/clear-imported', async () => ({ cleared: clearImported() }));
 // auto-descarga nativa (③+④): estado/config y ejecución manual (dryRun para simular)
 app.get('/api/autograb', async () => ({ ...autoGrabConfig(), status: autoGrabStatus }));
 app.post('/api/autograb/run', async (req) => runAutoGrab({ dryRun: !!req.body?.dryRun }));

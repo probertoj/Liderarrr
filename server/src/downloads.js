@@ -102,6 +102,12 @@ export function downloadsList(limit = 100) {
     .all(cutoff, limit);
 }
 
+// Limpieza MANUAL: borra ya del registro los pedidos cerrados (imported/error), sin
+// esperar a la poda automática. Para el botón «Limpiar importadas». Devuelve cuántos.
+export function clearImported() {
+  return db.prepare("DELETE FROM downloads WHERE status IN ('imported','error')").run().changes;
+}
+
 // Poda la cola: borra los pedidos ya cerrados (imported/error) más viejos que el plazo, y
 // la basura (requested sin rg_mbid, sin artista y sin título: grabs fallidos o de prueba
 // que nunca podrán casar). El historial real de importaciones vive en la tabla `imports`,

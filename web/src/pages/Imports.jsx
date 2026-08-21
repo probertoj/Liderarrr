@@ -24,8 +24,19 @@ function AutoImportPanel() {
       setBusy(false);
     }
   };
+  const clear = async () => {
+    setBusy(true);
+    try {
+      await api.clearImportedDownloads();
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
   if (!dl) return null;
   const STATE = { requested: 'pedido', importing: 'importando', imported: 'importado', error: 'error' };
+  const st = dl.status || {};
+  const hasClosed = dl.items?.some((d) => d.status === 'imported' || d.status === 'error');
   return (
     <div className="card p-4 mb-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -35,16 +46,55 @@ function AutoImportPanel() {
             {dl.enabled ? 'activado' : 'desactivado'}
           </span>
         </h2>
-        <Button onClick={runNow} disabled={busy}>
-          <span className="inline-flex items-center gap-1.5">
-            <RefreshCw size={14} className={busy ? 'animate-spin' : ''} /> {busy ? 'Importando…' : 'Importar terminadas ahora'}
-          </span>
-        </Button>
+        <div className="flex items-center gap-2">
+          {hasClosed && (
+            <button
+              onClick={clear}
+              disabled={busy}
+              className="text-xs px-2 py-1.5 rounded-lg border border-ink-700 bg-ink-850 text-neutral-400 hover:text-neutral-200 disabled:opacity-50"
+              title="Quitar del panel las descargas ya importadas (o con error)"
+            >
+              Limpiar importadas
+            </button>
+          )}
+          <Button onClick={runNow} disabled={busy}>
+            <span className="inline-flex items-center gap-1.5">
+              <RefreshCw size={14} className={busy ? 'animate-spin' : ''} /> {busy ? 'Importando…' : 'Importar terminadas ahora'}
+            </span>
+          </Button>
+        </div>
       </div>
       <p className="text-xs text-neutral-600 mt-1">
         Al terminar una descarga en qBittorrent, se enlaza a tu biblioteca organizada.
         {dl.enabled ? ' Se ejecuta solo cada 3 minutos.' : ' Actívalo en Ajustes → Importar descargas.'}
       </p>
+
+      {/* diagnóstico de la última pasada: revela POR QUÉ el automático (no) importa */}
+      {dl.enabled && st.lastRun && (
+        <div className="text-[11px] mt-1.5 space-y-0.5">
+          <div className="text-neutral-500">
+            Última pasada: qBittorrent devolvió <b className="text-neutral-300">{st.torrents ?? 0}</b> completados ·{' '}
+            <b className="text-neutral-300">{st.underSource ?? 0}</b> bajo tu carpeta de torrents ·{' '}
+            <b className="text-neutral-300">{st.imported ?? 0}</b> importados
+            {st.alreadyImported ? ` · ${st.alreadyImported} ya estaban` : ''}.
+          </div>
+          {st.torrents === 0 && (
+            <div className="text-amber-400/80">
+              ⚠ qBittorrent no devolvió descargas completadas. Si pusiste una <b>categoría</b> en Ajustes, solo mira esa
+              categoría — comprueba que tus torrents la tengan (o quítala). Y que estén completos.
+            </div>
+          )}
+          {st.torrents > 0 && st.underSource === 0 && (
+            <div className="text-amber-400/80">
+              ⚠ Ninguna cuelga de la carpeta de torrents configurada (<code>{st.source || '—'}</code>). La ruta que ve
+              Liderarr y la que ve qBittorrent deben coincidir (mismo montaje en el contenedor).
+            </div>
+          )}
+          {st.errors?.slice(0, 3).map((e, i) => (
+            <div key={i} className="text-red-400">{e}</div>
+          ))}
+        </div>
+      )}
       {dl.items?.length > 0 && (
         <div className="mt-3 max-h-56 overflow-y-auto divide-y divide-ink-850/60 text-sm">
           {dl.items.slice(0, 30).map((d) => (
