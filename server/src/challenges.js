@@ -1,5 +1,5 @@
 import { db } from './db.js';
-import { matchKey } from './matchkey.js';
+import { matchKey, normName } from './matchkey.js';
 
 // Retos: listas de álbumes "que hay que tener/oír" (1001 Albums, Rolling Stone
 // 500, o cualquier lista que pegues). Se cruzan con tu biblioteca (lo que tienes)
@@ -182,18 +182,34 @@ export function challengeDetail(id) {
   if (!c) return null;
   resolveItems(id); // re-resuelve por si la biblioteca cambió
   const plays = playsIndex();
-  const items = db
+  const rows = db
     .prepare('SELECT position, artist, album, year, owned_album_id FROM challenge_items WHERE challenge_id = ? ORDER BY position')
-    .all(id)
-    .map((it) => ({
-      position: it.position,
-      artist: it.artist,
-      album: it.album,
-      year: it.year,
-      owned: !!it.owned_album_id,
-      owned_album_id: it.owned_album_id,
-      listened: (plays.get(playKey(it.artist, it.album)) || 0) > 0,
-    }));
+    .all(id);
+  // Enlaces rápidos: artist_id (para ir a la ficha del artista) y album_id (a la del disco
+  // si lo tienes). El artista se resuelve por el álbum poseído (fiable) o por nombre; el
+  // disco solo enlaza si está en tu colección.
+  const artistByName = new Map();
+  for (const a of db.prepare('SELECT id, name FROM artists').all()) {
+    const k = normName(a.name);
+    if (k && !artistByName.has(k)) artistByName.set(k, a.id);
+  }
+  const ownedIds = rows.map((r) => r.owned_album_id).filter(Boolean);
+  const albumArtist = new Map();
+  if (ownedIds.length) {
+    for (const a of db.prepare(`SELECT id, artist_id FROM albums WHERE id IN (${ownedIds.map(() => '?').join(',')})`).all(...ownedIds))
+      albumArtist.set(a.id, a.artist_id);
+  }
+  const items = rows.map((it) => ({
+    position: it.position,
+    artist: it.artist,
+    album: it.album,
+    year: it.year,
+    owned: !!it.owned_album_id,
+    owned_album_id: it.owned_album_id,
+    album_id: it.owned_album_id || null,
+    artist_id: (it.owned_album_id && albumArtist.get(it.owned_album_id)) || artistByName.get(normName(it.artist)) || null,
+    listened: (plays.get(playKey(it.artist, it.album)) || 0) > 0,
+  }));
   const owned = items.filter((i) => i.owned).length;
   const listened = items.filter((i) => i.listened).length;
   return {

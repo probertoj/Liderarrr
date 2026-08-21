@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button, SearchModal, useLidarrEnabled } from '../components.jsx';
@@ -310,7 +311,17 @@ function Detail({ id, onBack }) {
           <div key={it.position} className="card px-3 py-2 flex items-center justify-between text-sm">
             <span className="min-w-0 truncate">
               <span className="text-neutral-600 mr-2">{it.position + 1}.</span>
-              {it.artist} — {it.album}
+              {it.artist_id ? (
+                <Link to={`/artista/${it.artist_id}`} className="hover:text-gold-400">{it.artist}</Link>
+              ) : (
+                it.artist
+              )}
+              {' — '}
+              {it.album_id ? (
+                <Link to={`/album/${it.album_id}`} className="hover:text-gold-400">{it.album}</Link>
+              ) : (
+                it.album
+              )}
               {it.year ? <span className="text-neutral-600"> · {it.year}</span> : ''}
             </span>
             <div className="flex items-center gap-2 shrink-0 ml-2 text-xs">
