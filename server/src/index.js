@@ -59,7 +59,7 @@ import {
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
 import { listeningOverview, ownershipGap, ownedUnplayed, unownedScrobbledAlbums, hasScrobbles } from './listening.js';
-import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing, nextChallengeListens } from './challenges.js';
+import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing, nextChallengeListens, createChallenge, addItemsToChallenge, removeChallengeItem } from './challenges.js';
 import { importListFromUrl } from './listimport.js';
 import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCompletism, resolveAlbumLabel } from './editions.js';
@@ -567,11 +567,25 @@ app.get('/api/challenges', async () => listChallenges());
 app.get('/api/challenges/next-listens', async (req) => nextChallengeListens(Number(req.query?.limit) || 5));
 app.post('/api/challenges', async (req, reply) => {
   try {
-    return addChallenge(req.body?.name, req.body?.text);
+    // sin texto → reto VACÍO editable; con texto → parsea la lista como hasta ahora
+    const text = req.body?.text;
+    if (!text || !String(text).trim()) return createChallenge(req.body?.name);
+    return addChallenge(req.body?.name, text);
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }
 });
+// editar un reto: añadir discos (texto «Artista - Álbum») o quitar uno por posición
+app.post('/api/challenges/:id/items', async (req, reply) => {
+  try {
+    return addItemsToChallenge(Number(req.params.id), req.body?.text);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.delete('/api/challenges/:id/items/:position', async (req) =>
+  removeChallengeItem(Number(req.params.id), Number(req.params.position))
+);
 // importar una lista por URL (AOTY y similares) vía lector que ejecuta JS
 app.post('/api/challenges/import', async (req, reply) => {
   try {

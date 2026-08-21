@@ -166,6 +166,51 @@ export function appendToChallenge(name, entries) {
   return { id, added };
 }
 
+// Crea un reto VACÍO (para irlo rellenando a mano). Retos editables: p. ej. «Discos que
+// voy a escuchar este año», al que añades discos según salen.
+export function createChallenge(name) {
+  const res = db
+    .prepare("INSERT INTO challenges (name, source, item_count, added_at) VALUES (?, 'manual', 0, ?)")
+    .run(String(name || '').trim() || 'Reto sin título', Date.now());
+  return { id: Number(res.lastInsertRowid), item_count: 0 };
+}
+
+// Añade discos (texto «Artista - Álbum», una línea por disco) a un reto por su ID, sin
+// duplicar (matchKey). Devuelve cuántos se añadieron.
+export function addItemsToChallenge(id, text) {
+  const c = db.prepare('SELECT id FROM challenges WHERE id = ?').get(id);
+  if (!c) throw new Error('Reto no encontrado');
+  const items = parseList(text);
+  if (!items.length) throw new Error('No se ha reconocido ningún "Artista - Álbum"');
+  const seen = new Set(
+    db.prepare('SELECT artist, album FROM challenge_items WHERE challenge_id = ?').all(id).map((r) => matchKey(r.artist, r.album))
+  );
+  let pos = db.prepare('SELECT COALESCE(MAX(position), -1) AS m FROM challenge_items WHERE challenge_id = ?').get(id).m + 1;
+  const ins = db.prepare('INSERT INTO challenge_items (challenge_id, position, artist, album, year) VALUES (?, ?, ?, ?, ?)');
+  let added = 0;
+  const tx = db.transaction(() => {
+    for (const it of items) {
+      const k = matchKey(it.artist, it.album);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      ins.run(id, pos++, it.artist, it.album, it.year ?? null);
+      added++;
+    }
+    db.prepare('UPDATE challenges SET item_count = (SELECT COUNT(*) FROM challenge_items WHERE challenge_id = ?) WHERE id = ?').run(id, id);
+  });
+  tx();
+  resolveItems(id);
+  return { added };
+}
+
+// Quita un disco del reto por su posición. item_count se recalcula. Las posiciones pueden
+// quedar con huecos (no importa: se ordena por posición igual).
+export function removeChallengeItem(id, position) {
+  db.prepare('DELETE FROM challenge_items WHERE challenge_id = ? AND position = ?').run(id, position);
+  db.prepare('UPDATE challenges SET item_count = (SELECT COUNT(*) FROM challenge_items WHERE challenge_id = ?) WHERE id = ?').run(id, id);
+  return { ok: true };
+}
+
 export function listChallenges() {
   return db
     .prepare(

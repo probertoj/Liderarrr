@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download } from 'lucide-react';
+import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download, X } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button, SearchModal, useLidarrEnabled } from '../components.jsx';
 
@@ -104,9 +104,10 @@ function AddForm({ onDone }) {
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    if (!text.trim()) return;
+    if (!text.trim() && !name.trim()) return;
     setBusy(true);
     try {
+      // sin texto → reto VACÍO (para irlo rellenando luego)
       await api.addChallenge(name, text);
       onDone();
     } catch (e) {
@@ -181,9 +182,12 @@ function AddForm({ onDone }) {
           placeholder={'Radiohead - OK Computer (1997)\nThe Beatles - Revolver\nMiles Davis — Kind of Blue'}
           className="w-full bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm font-mono"
         />
-        <div className="flex justify-end mt-2">
-          <Button variant="gold" onClick={submit} disabled={busy}>
-            {busy ? 'Creando…' : 'Crear reto'}
+        <div className="flex items-center justify-between mt-2 gap-2 flex-wrap">
+          <span className="text-[11px] text-neutral-600">
+            ¿Reto propio que irás rellenando? Pon solo un nombre y créalo vacío; luego añades discos desde el reto.
+          </span>
+          <Button variant="gold" onClick={submit} disabled={busy || (!text.trim() && !name.trim())}>
+            {busy ? 'Creando…' : text.trim() ? 'Crear reto' : 'Crear reto vacío'}
           </Button>
         </div>
       </div>
@@ -198,6 +202,9 @@ function Detail({ id, onBack }) {
   const [filter, setFilter] = useState('all'); // all | missing | unheard
   const [search, setSearch] = useState(null); // query del modal de búsqueda manual
   const [queued, setQueued] = useState({}); // position -> 'sending' | 'ok' | 'fail'
+  const [addOpen, setAddOpen] = useState(false);
+  const [addText, setAddText] = useState('');
+  const [addBusy, setAddBusy] = useState(false);
   const lidarrOn = useLidarrEnabled();
 
   const load = () => api.challenge(id).then(setC).catch((e) => setErr(e.message));
@@ -260,6 +267,26 @@ function Detail({ id, onBack }) {
     onBack();
   };
 
+  // Retos editables: añadir discos (texto «Artista - Álbum») y quitar uno.
+  const addItems = async () => {
+    if (!addText.trim()) return;
+    setAddBusy(true);
+    try {
+      await api.addChallengeItems(id, addText);
+      setAddText('');
+      setAddOpen(false);
+      await load();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setAddBusy(false);
+    }
+  };
+  const del = async (position) => {
+    await api.removeChallengeItem(id, position);
+    await load();
+  };
+
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!c) return <Spinner />;
 
@@ -283,6 +310,11 @@ function Detail({ id, onBack }) {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button onClick={() => setAddOpen((v) => !v)}>
+            <span className="inline-flex items-center gap-1.5">
+              <Plus size={14} /> Añadir discos
+            </span>
+          </Button>
           <Button variant="gold" onClick={sendMissing} disabled={sending}>
             <span className="inline-flex items-center gap-1.5">
               <Send size={14} /> {sending ? (lidarrOn ? 'Enviando…' : 'Descargando…') : lidarrOn ? 'Faltantes a Lidarr' : 'Descargar faltantes'}
@@ -293,6 +325,26 @@ function Detail({ id, onBack }) {
           </Button>
         </div>
       </div>
+
+      {addOpen && (
+        <div className="card p-3 mb-4 space-y-2">
+          <div className="text-xs text-neutral-500">
+            Pega o escribe discos, una línea «Artista - Álbum» (con año opcional). No duplica los que ya están.
+          </div>
+          <textarea
+            value={addText}
+            onChange={(e) => setAddText(e.target.value)}
+            rows={4}
+            placeholder={'The Cure - Disintegration\nBig Thief - Dragon New Warm Mountain I Believe in You (2022)'}
+            className="w-full bg-ink-850 border border-ink-800 rounded px-2.5 py-1.5 text-sm font-mono"
+          />
+          <div className="flex justify-end">
+            <Button variant="gold" onClick={addItems} disabled={addBusy || !addText.trim()}>
+              {addBusy ? 'Añadiendo…' : 'Añadir al reto'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-2 mb-3 text-sm">
         {['all', 'missing', 'unheard'].map((f) => (
@@ -353,6 +405,13 @@ function Detail({ id, onBack }) {
                 </>
               )}
               {it.listened && <span className="text-emerald-400">oído</span>}
+              <button
+                onClick={() => del(it.position)}
+                title="Quitar del reto"
+                className="text-neutral-600 hover:text-red-400 shrink-0"
+              >
+                <X size={14} />
+              </button>
             </div>
           </div>
         ))}
