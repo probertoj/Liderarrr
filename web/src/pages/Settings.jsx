@@ -528,6 +528,18 @@ export default function Settings() {
             terminado; requiere «Permitir importar» y qBittorrent configurado)
           </span>
         </label>
+        {s.auto_import === '1' && (
+          <Field label="Cada cuántos minutos" hint="Frecuencia del auto-import (mínimo 1; por defecto 3). El cambio se aplica sin reiniciar.">
+            <input
+              type="number"
+              min="1"
+              value={s.auto_import_interval_min ?? '3'}
+              onChange={set('auto_import_interval_min')}
+              className={`${input} w-24`}
+              placeholder="3"
+            />
+          </Field>
+        )}
       </section>
 
       {/* 4. Auto-Lidarr */}

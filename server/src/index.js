@@ -956,10 +956,18 @@ function scheduleNightly() {
 // terminado. Barato si está desactivado (runAutoImport sale enseguida). Es lo que
 // "cierra el bucle" sin Lidarr.
 function scheduleAutoImport() {
-  const MIN = Number(getSetting('auto_import_interval_min')) || 3;
-  setInterval(() => {
-    runAutoImport().catch((e) => console.warn('[autoimport] tick falló:', String(e.message || e)));
-  }, Math.max(1, MIN) * 60 * 1000);
+  // Auto-reprogramado: relee el intervalo del ajuste en cada ciclo, para que cambiarlo en
+  // Ajustes tenga efecto sin reiniciar el contenedor.
+  const tick = () => {
+    runAutoImport()
+      .catch((e) => console.warn('[autoimport] tick falló:', String(e.message || e)))
+      .finally(() => {
+        const min = Math.max(1, Number(getSetting('auto_import_interval_min')) || 3);
+        setTimeout(tick, min * 60 * 1000);
+      });
+  };
+  const min = Math.max(1, Number(getSetting('auto_import_interval_min')) || 3);
+  setTimeout(tick, min * 60 * 1000);
 }
 
 // Errores fatales: los logueamos para que se VEAN. Antes, un error no capturado

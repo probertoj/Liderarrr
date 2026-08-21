@@ -133,6 +133,7 @@ export default function Imports() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [edits, setEdits] = useState({}); // source_dir -> { artist, album, year }
   const [done, setDone] = useState({}); // source_dir -> dest
+  const [itemErr, setItemErr] = useState({}); // source_dir -> mensaje de error
 
   const load = () => {
     setData(null);
@@ -149,6 +150,11 @@ export default function Imports() {
   const run = async (it) => {
     setBusy(it.source_dir);
     setErr(null);
+    setItemErr((p) => {
+      const n = { ...p };
+      delete n[it.source_dir];
+      return n;
+    });
     try {
       const r = await api.importRun(it.source_dir, {
         artist: field(it.source_dir, 'artist', it.artist),
@@ -157,7 +163,9 @@ export default function Imports() {
       });
       setDone((p) => ({ ...p, [it.source_dir]: { dest: r.dest, method: r.method } }));
     } catch (e) {
-      setErr(e.message);
+      // error POR ÍTEM (antes salía un banner global y no sabías cuál falló); reintentar es
+      // volver a pulsar su botón.
+      setItemErr((p) => ({ ...p, [it.source_dir]: e.message }));
     } finally {
       setBusy(null);
     }
@@ -283,15 +291,19 @@ export default function Imports() {
                   />
                 </label>
                 <Button
-                  variant={it.inLibrary ? 'default' : 'gold'}
+                  variant={itemErr[it.source_dir] ? 'default' : it.inLibrary ? 'default' : 'gold'}
                   disabled={busy === it.source_dir}
                   onClick={() => runWithWarn(it)}
                 >
                   <span className="inline-flex items-center gap-1.5">
-                    <Link2 size={14} /> {busy === it.source_dir ? 'Enlazando…' : 'Importar'}
+                    <Link2 size={14} />{' '}
+                    {busy === it.source_dir ? 'Enlazando…' : itemErr[it.source_dir] ? 'Reintentar' : 'Importar'}
                   </span>
                 </Button>
               </div>
+            )}
+            {itemErr[it.source_dir] && !done[it.source_dir] && (
+              <p className="text-xs text-red-400 mt-2">{itemErr[it.source_dir]}</p>
             )}
           </div>
         ))}
