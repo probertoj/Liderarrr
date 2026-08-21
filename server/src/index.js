@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { db, DATA_DIR, getAllSettings, getSetting, setSetting } from './db.js';
 import { runScan, scanStatus } from './scanner.js';
 import { regroupDiscs, combineAlbums, uncombineAlbum, combineCandidates } from './discgroup.js';
-import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch } from './identify.js';
+import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch, matchByMbUrl } from './identify.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
 import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab, enqueueLidarrAdd, lidarrAddStatus, resumeAddQueue, lidarrConfig } from './lidarr.js';
 import { prowlarrTest, prowlarrSearch, prowlarrGrab } from './prowlarr.js';
@@ -682,6 +682,14 @@ app.get('/api/albums/:id/candidates', async (req, reply) => {
 app.post('/api/albums/:id/match', async (req, reply) => {
   try {
     return await manualMatch(Number(req.params.id), req.body?.rg_mbid);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// salvaguarda final: enlazar un álbum pegando una URL de MusicBrainz (release-group o release)
+app.post('/api/albums/:id/match-url', async (req, reply) => {
+  try {
+    return await matchByMbUrl(Number(req.params.id), req.body?.url);
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

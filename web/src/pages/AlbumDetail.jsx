@@ -1612,6 +1612,22 @@ function ManualSearch({ album, onDone }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
   const [saving, setSaving] = useState(null);
+  const [url, setUrl] = useState('');
+  const [urlBusy, setUrlBusy] = useState(false);
+
+  // Salvaguarda final: pega el enlace de MusicBrainz (release-group o release) y lo fija.
+  const linkUrl = async () => {
+    if (!url.trim()) return;
+    setUrlBusy(true);
+    setErr(null);
+    try {
+      await api.matchByUrl(album.id, url.trim());
+      await onDone();
+    } catch (e) {
+      setErr(e.message);
+      setUrlBusy(false);
+    }
+  };
 
   const run = async () => {
     if (!q.trim()) return;
@@ -1664,6 +1680,28 @@ function ManualSearch({ album, onDone }) {
         Acotado a <span className="text-neutral-500">{album.album_artist || 'el artista'}</span>. Edita el texto si el
         título está mal etiquetado.
       </p>
+
+      {/* salvaguarda final: pegar el enlace de MusicBrainz directamente */}
+      <div className="mt-3 pt-3 border-t border-ink-850/60">
+        <div className="flex gap-2">
+          <input
+            className="flex-1 bg-ink-850 border border-ink-800 rounded px-2 py-1.5 text-sm outline-none focus:border-gold-500/60"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && linkUrl()}
+            placeholder="…o pega el enlace de MusicBrainz (release-group o release)"
+          />
+          <Button onClick={linkUrl} disabled={urlBusy || !url.trim()}>
+            <span className="inline-flex items-center gap-1.5">
+              {urlBusy ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />} Enlazar
+            </span>
+          </Button>
+        </div>
+        <p className="text-xs text-neutral-600 mt-1">
+          Si sabes cuál es en MusicBrainz, pega su URL (p. ej. <span className="text-neutral-500">musicbrainz.org/release-group/…</span>)
+          y se fija directamente, sin depender del buscador.
+        </p>
+      </div>
 
       {err && <p className="text-sm text-red-400 mt-2">{err}</p>}
       {results && results.length === 0 && !loading && (

@@ -363,6 +363,14 @@ export async function releaseGroupById(mbid) {
   };
 }
 
+// Release group al que pertenece un RELEASE concreto (para resolver un enlace de MB de
+// tipo /release/{mbid} al grupo que identifica el álbum).
+export async function releaseGroupOfRelease(releaseMbid) {
+  if (!releaseMbid) return null;
+  const data = await mbCached(`rel-rg:${releaseMbid}`, `/release/${enc(releaseMbid)}?inc=release-groups`);
+  return data?.['release-group']?.id || null;
+}
+
 // Créditos/personal de un álbum (estilo Roon): relaciones de artista a nivel de RELEASE
 // (productor, ingeniero, mezcla…) + a nivel de GRABACIÓN (intérpretes con su instrumento
 // por pista) + obras (compositor/letrista). Los créditos cuelgan de una RELEASE concreta,

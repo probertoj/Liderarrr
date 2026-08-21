@@ -318,3 +318,23 @@ export async function manualMatch(albumId, rgMbid) {
   if (rg?.credits) syncAlbumCreditsFromMb(albumId, rg.credits);
   return db.prepare('SELECT id, title, match_state, rg_mbid, primary_type FROM albums WHERE id = ?').get(albumId);
 }
+
+// Salvaguarda final: fija el álbum a partir de un ENLACE de MusicBrainz pegado por el
+// usuario. Acepta la URL de un release-group (…/release-group/{mbid}), la de un release
+// (…/release/{mbid}, que se resuelve a su grupo) o el MBID pelado. Reutiliza manualMatch
+// (que trae el tipo/año reales del grupo).
+export async function matchByMbUrl(albumId, url) {
+  const s = String(url || '').trim();
+  const U = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+  const rg = s.match(new RegExp(`release-group/(${U})`, 'i'));
+  if (rg) return manualMatch(albumId, rg[1].toLowerCase());
+  const rel = s.match(new RegExp(`/release/(${U})`, 'i'));
+  if (rel) {
+    const rgMbid = await mb.releaseGroupOfRelease(rel[1].toLowerCase());
+    if (!rgMbid) throw new Error('Ese enlace es de un «release» y no encontré su release-group en MusicBrainz.');
+    return manualMatch(albumId, rgMbid);
+  }
+  const bare = s.match(new RegExp(`^(${U})$`, 'i'));
+  if (bare) return manualMatch(albumId, bare[1].toLowerCase());
+  throw new Error('Enlace de MusicBrainz no reconocido. Pega la URL de un release-group (o de un release), o su MBID.');
+}

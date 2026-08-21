@@ -56,6 +56,7 @@ export const api = {
   combineCandidates: (id) => req(`/albums/${id}/combine-candidates`),
   candidates: (id) => req(`/albums/${id}/candidates`),
   match: (id, rg_mbid) => req(`/albums/${id}/match`, { method: 'POST', body: { rg_mbid } }),
+  matchByUrl: (id, url) => req(`/albums/${id}/match-url`, { method: 'POST', body: { url } }),
   mbReleaseGroups: (q, artist, artistMbid) =>
     req(
       `/mb/release-groups?q=${encodeURIComponent(q)}${artist ? `&artist=${encodeURIComponent(artist)}` : ''}${
