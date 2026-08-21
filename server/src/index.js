@@ -970,18 +970,19 @@ function scheduleNightly() {
 // terminado. Barato si está desactivado (runAutoImport sale enseguida). Es lo que
 // "cierra el bucle" sin Lidarr.
 function scheduleAutoImport() {
-  // Auto-reprogramado: relee el intervalo del ajuste en cada ciclo, para que cambiarlo en
-  // Ajustes tenga efecto sin reiniciar el contenedor.
-  const tick = () => {
-    runAutoImport()
-      .catch((e) => console.warn('[autoimport] tick falló:', String(e.message || e)))
-      .finally(() => {
-        const min = Math.max(1, Number(getSetting('auto_import_interval_min')) || 3);
-        setTimeout(tick, min * 60 * 1000);
-      });
-  };
-  const min = Math.max(1, Number(getSetting('auto_import_interval_min')) || 3);
-  setTimeout(tick, min * 60 * 1000);
+  // Temporizador FIJO (setInterval) que comprueba cada 30 s y lanza el auto-import cuando
+  // ha pasado el intervalo configurado. Robusto: aunque una pasada tarde mucho (p. ej. el
+  // escaneo tras importar miles de álbumes) o falle, el temporizador NO se detiene —cosa
+  // que sí pasaba con el setTimeout auto-reprogramado si una pasada no resolvía—. Relee el
+  // intervalo en cada comprobación, así cambiarlo en Ajustes aplica sin reiniciar.
+  let lastRun = 0;
+  setInterval(() => {
+    if (autoImportStatus.running) return; // no solapar con una pasada en curso
+    const min = Math.max(1, Number(getSetting('auto_import_interval_min')) || 3);
+    if (Date.now() - lastRun < min * 60 * 1000) return;
+    lastRun = Date.now();
+    runAutoImport().catch((e) => console.warn('[autoimport] tick falló:', String(e.message || e)));
+  }, 30 * 1000);
 }
 
 // Errores fatales: los logueamos para que se VEAN. Antes, un error no capturado

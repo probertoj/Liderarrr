@@ -4,6 +4,15 @@ import { DownloadCloud, Link2, RefreshCw, Zap } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button } from '../components.jsx';
 
+// «hace Ns / Nm / Nh» a partir de un timestamp (para ver si el auto-import se dispara solo).
+function fmtAgo(ts) {
+  if (!ts) return 'nunca';
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return `hace ${s}s`;
+  if (s < 3600) return `hace ${Math.round(s / 60)}m`;
+  return `hace ${Math.round(s / 3600)}h`;
+}
+
 // Panel de auto-import (cierre del bucle sin Lidarr): estado, botón para importar las
 // descargas terminadas ahora mismo, y las últimas descargas registradas con su estado.
 function AutoImportPanel() {
@@ -73,10 +82,13 @@ function AutoImportPanel() {
       {dl.enabled && st.lastRun && (
         <div className="text-[11px] mt-1.5 space-y-0.5">
           <div className="text-neutral-500">
-            Última pasada: qBittorrent devolvió <b className="text-neutral-300">{st.torrents ?? 0}</b> completados ·{' '}
+            Última pasada <span className="text-neutral-400">{fmtAgo(st.lastRun)}</span>
+            {st.running ? <span className="text-gold-300"> · en curso…</span> : ''}: qBittorrent devolvió{' '}
+            <b className="text-neutral-300">{st.torrents ?? 0}</b> completados ·{' '}
             <b className="text-neutral-300">{st.underSource ?? 0}</b> bajo tu carpeta de torrents ·{' '}
             <b className="text-neutral-300">{st.imported ?? 0}</b> importados
-            {st.alreadyImported ? ` · ${st.alreadyImported} ya estaban` : ''}.
+            {st.alreadyImported ? ` · ${st.alreadyImported} ya estaban` : ''}
+            {st.errors?.length ? ` · ${st.errors.length} con error` : ''}.
           </div>
           {st.torrents === 0 && (
             <div className="text-amber-400/80">
@@ -104,9 +116,10 @@ function AutoImportPanel() {
               )}
             </div>
           )}
-          {st.errors?.slice(0, 3).map((e, i) => (
+          {st.errors?.slice(0, 6).map((e, i) => (
             <div key={i} className="text-red-400">{e}</div>
           ))}
+          {st.errors?.length > 6 && <div className="text-red-400/70">…y {st.errors.length - 6} más.</div>}
         </div>
       )}
       {dl.items?.length > 0 && (
