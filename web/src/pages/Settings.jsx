@@ -483,6 +483,22 @@ export default function Settings() {
           veto. No borra ni copia el origen (sigues sembrando). Requiere que ambas carpetas estén en el mismo volumen
           (monta <code className="text-neutral-400">/data</code> completo) y la biblioteca en escritura (<code className="text-neutral-400">:rw</code>).
         </p>
+        <HowTo title="Estructura recomendada (TRaSH Guides) — evita el 99% de los problemas">
+          <p className="mb-1">
+            Monta UNA sola carpeta <code className="text-neutral-400">data</code> del host en{' '}
+            <code className="text-neutral-400">/data</code>, con <b>el mismo path en Liderarr y en qBittorrent</b>. Así
+            qBittorrent reporta <code className="text-neutral-400">/data/torrents/music/…</code> y Liderarr ve
+            exactamente esa ruta → los hardlinks funcionan y el auto-import va solo.
+          </p>
+          <pre className="text-[11px] text-neutral-500 bg-ink-900/60 rounded p-2 my-1 overflow-x-auto">{`data/
+├── torrents/music/   ← qBittorrent descarga aquí  → /data/torrents/music
+└── media/music/      ← biblioteca organizada       → /data/media/music`}</pre>
+          <p className="text-neutral-500">
+            Docker: <code className="text-neutral-400">-v /host/data:/data</code> en AMBOS contenedores. Guía completa
+            en <a href="https://trash-guides.info/File-and-Folder-Structure/" target="_blank" rel="noreferrer" className="text-gold-400 hover:underline">trash-guides.info</a>.
+            Si tus rutas ya difieren y no quieres tocar montajes, usa el «Remapeo de rutas» de abajo.
+          </p>
+        </HowTo>
         <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer">
           <input
             type="checkbox"
@@ -496,6 +512,18 @@ export default function Settings() {
         </Field>
         <Field label="Carpeta de la biblioteca (destino)" hint="Tu biblioteca organizada. Ej.: /data/media/music">
           <input value={s.import_dest_dir || ''} onChange={set('import_dest_dir')} className={input} placeholder="/data/media/music" />
+        </Field>
+        <Field
+          label="Remapeo de rutas qBittorrent → Liderarr (opcional)"
+          hint="Solo si qBittorrent reporta las descargas en un path distinto al que monta Liderarr. Una regla por línea: rutaQB => rutaLocal"
+        >
+          <textarea
+            value={s.import_qb_path_map || ''}
+            onChange={set('import_qb_path_map')}
+            rows={2}
+            className={input}
+            placeholder={'/downloads => /data/torrents\n/mnt/user/data => /data'}
+          />
         </Field>
         <Field
           label="Estructura de carpetas"

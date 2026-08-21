@@ -55,8 +55,10 @@ services:
     ports:
       - '3861:3861'
     volumes:
-      - ./data:/data
-      - /ruta/a/tu/musica:/music:ro
+      # Estructura TRaSH Guides (recomendada): una carpeta «data» con torrents/ y media/
+      # dentro, montada en /data — y con EL MISMO PATH (/data) en qBittorrent. Así los
+      # hardlinks funcionan y el auto-import va solo. La BD vive en /data/liderarrr.db.
+      - /ruta/a/tu/data:/data
     environment:
       - TZ=Europe/Madrid
       # Recomendado: cifra las credenciales en disco (elige una frase larga y no la cambies).
@@ -67,8 +69,18 @@ services:
 docker compose up -d
 ```
 
-Abre `http://IP-DEL-HOST:3861` → **Ajustes** → pon tu carpeta de música (`/music`) → «Actualizar
-todo». El escaneo y la identificación corren en segundo plano y se repiten solos cada noche (03:00).
+**Estructura de carpetas ([TRaSH Guides](https://trash-guides.info/File-and-Folder-Structure/)):** monta
+una sola carpeta `data` en `/data`, **con el mismo path en Liderarr y en qBittorrent**, para que
+las descargas y la biblioteca compartan sistema de ficheros (hardlinks) y las rutas coincidan:
+
+```
+data/
+├── torrents/music/   ← qBittorrent descarga aquí   → Ajustes: /data/torrents/music
+└── media/music/      ← biblioteca organizada         → Ajustes: /data/media/music
+```
+
+Abre `http://IP-DEL-HOST:3861` → **Ajustes** → pon tus carpetas → «Actualizar todo». El escaneo y la
+identificación corren en segundo plano y se repiten solos cada noche (03:00).
 
 ### Guías paso a paso por plataforma
 

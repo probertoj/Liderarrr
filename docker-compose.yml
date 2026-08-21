@@ -8,9 +8,21 @@ services:
     ports:
       - '3861:3861'
     volumes:
-      - ./data:/data
-      # Monta tu música en SOLO LECTURA. Liderarrr nunca escribe en tus ficheros.
-      - /ruta/a/tu/musica:/music:ro
+      # RECOMENDADO (estructura TRaSH Guides): monta tu carpeta «data» —con torrents/ y
+      # media/ dentro— en /data, y MONTA ESA MISMA CARPETA CON EL MISMO PATH (/data) EN
+      # qBittorrent. Así qBittorrent reporta /data/torrents/music/... y Liderarr ve
+      # exactamente esa ruta → los hardlinks funcionan y el auto-import va solo.
+      # La BD de Liderarr vive dentro, en /data/liderarrr.db.
+      #   estructura:  data/torrents/music  (descargas)   +   data/media/music  (biblioteca)
+      #   en Ajustes:  Carpeta de descargas = /data/torrents/music
+      #                Carpeta de biblioteca = /data/media/music
+      #   https://trash-guides.info/File-and-Folder-Structure/
+      - /ruta/a/tu/data:/data
+      #
+      # ALTERNATIVA MÍNIMA (solo catalogar, SIN importar/hardlink): BD aparte y tu música
+      # en solo lectura. Con esto NO funciona el auto-import (necesita torrents+media juntos).
+      #   - ./config:/data
+      #   - /ruta/a/tu/musica:/data/media/music:ro
     environment:
       - TZ=Europe/Madrid
       # Cifra las credenciales en disco (recomendado):

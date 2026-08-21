@@ -21,6 +21,27 @@ const within = (p, root) => {
   return !!np && !!r && (np === r || np.startsWith(r + '/'));
 };
 
+// Remapeo de rutas qBittorrent → contenedor (estilo «remote path mapping» de los *arr).
+// qBittorrent reporta la ruta del contenido tal como la ve ÉL (p. ej. /downloads/music),
+// que puede no coincidir con la que Liderarr tiene montada (p. ej. /library/torrents/music).
+// El ajuste `import_qb_path_map` traduce prefijos, una regla por línea: «rutaQB => rutaLocal».
+function pathMappings() {
+  return String(getSetting('import_qb_path_map') || '')
+    .split(/[\n;]+/)
+    .map((line) => {
+      const parts = line.split(/\s*(?:=>|->|\|)\s*/);
+      return parts.length === 2 && parts[0].trim() && parts[1].trim() ? { from: norm(parts[0]), to: norm(parts[1]) } : null;
+    })
+    .filter(Boolean);
+}
+function remapPath(p, maps) {
+  const np = norm(p);
+  for (const m of maps) {
+    if (np === m.from || np.startsWith(m.from + '/')) return m.to + np.slice(m.from.length);
+  }
+  return np;
+}
+
 export const autoImportStatus = {
   running: false,
   lastRun: null,
@@ -32,6 +53,7 @@ export const autoImportStatus = {
   underSource: 0, // de esos, cuántos cuelgan de tu carpeta de torrents configurada
   alreadyImported: 0, // ya enlazados en una pasada anterior
   source: null, // carpeta de torrents con la que se comparó
+  samplePaths: [], // rutas de ejemplo que qB reporta cuando NADA casa (para el remapeo)
 };
 
 let running = false;
@@ -58,6 +80,7 @@ export async function runAutoImport() {
     underSource: 0,
     alreadyImported: 0,
     source,
+    samplePaths: [],
   });
   try {
     // Primero, cierra los pedidos cuyo álbum ya está en la biblioteca — independiente de
@@ -85,10 +108,15 @@ export async function runAutoImport() {
       return autoImportStatus;
     }
     autoImportStatus.torrents = torrents.length;
+    const maps = pathMappings();
+    const misses = []; // rutas que NO cuelgan de la carpeta (muestra para configurar el remapeo)
     let importedAny = false;
     for (const t of torrents) {
-      const cp = norm(t.contentPath);
-      if (!cp || !within(cp, source)) continue; // solo lo que cuelga de la carpeta de torrents
+      const cp = remapPath(t.contentPath, maps); // aplica el remapeo qB→contenedor
+      if (!cp || !within(cp, source)) {
+        if (t.contentPath && misses.length < 40) misses.push(String(t.contentPath));
+        continue; // solo lo que cuelga de la carpeta de torrents
+      }
       autoImportStatus.underSource++;
       let isDir = false;
       try {
@@ -122,6 +150,12 @@ export async function runAutoImport() {
         if (req) setDownloadStatus(req.id, 'error');
         console.warn(`[autoimport] ✗ ${t.name} — ${msg}`);
       }
+    }
+    // si NADA cayó bajo la carpeta, guarda una muestra de las rutas que reporta qB
+    // (preferiendo las de música) para que el panel te diga qué remapear.
+    if (autoImportStatus.underSource === 0 && misses.length) {
+      const music = misses.filter((p) => /music/i.test(p));
+      autoImportStatus.samplePaths = [...new Set(music.length ? music : misses)].slice(0, 4);
     }
     if (importedAny) {
       try {

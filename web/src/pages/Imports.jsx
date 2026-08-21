@@ -87,7 +87,21 @@ function AutoImportPanel() {
           {st.torrents > 0 && st.underSource === 0 && (
             <div className="text-amber-400/80">
               ⚠ Ninguna cuelga de la carpeta de torrents configurada (<code>{st.source || '—'}</code>). La ruta que ve
-              Liderarr y la que ve qBittorrent deben coincidir (mismo montaje en el contenedor).
+              Liderarr y la que ve qBittorrent deben coincidir (mismo montaje en el contenedor, estilo TRaSH).
+              {st.samplePaths?.length > 0 && (
+                <>
+                  <div className="mt-1 text-neutral-400">qBittorrent reporta rutas como:</div>
+                  {st.samplePaths.map((p, i) => (
+                    <div key={i} className="text-neutral-500">
+                      <code>{p}</code>
+                    </div>
+                  ))}
+                  <div className="mt-1 text-neutral-400">
+                    Arréglalo montando esa carpeta en el mismo path en ambos contenedores, o añade un remapeo en{' '}
+                    <Link to="/ajustes" className="underline">Ajustes → Importar descargas</Link>.
+                  </div>
+                </>
+              )}
             </div>
           )}
           {st.errors?.slice(0, 3).map((e, i) => (
