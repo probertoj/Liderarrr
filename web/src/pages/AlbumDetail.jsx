@@ -1618,7 +1618,7 @@ function ManualSearch({ album, onDone }) {
     setLoading(true);
     setErr(null);
     try {
-      setResults(await api.mbReleaseGroups(q, album.album_artist || ''));
+      setResults(await api.mbReleaseGroups(q, album.album_artist || '', album.artist?.mbid || null));
     } catch (e) {
       setErr(e.message);
     } finally {

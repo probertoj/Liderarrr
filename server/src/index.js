@@ -689,7 +689,7 @@ app.post('/api/albums/:id/match', async (req, reply) => {
 // búsqueda libre de release groups en MusicBrainz para "elegir a mano" (lista)
 app.get('/api/mb/release-groups', async (req, reply) => {
   try {
-    return await searchReleaseGroups(req.query?.q, req.query?.artist || null);
+    return await searchReleaseGroups(req.query?.q, req.query?.artist || null, undefined, req.query?.artist_mbid || null);
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

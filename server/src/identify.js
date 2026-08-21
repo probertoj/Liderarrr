@@ -5,6 +5,7 @@ import * as discogs from './discogs.js';
 import * as lastfm from './lastfm.js';
 import { clearNone } from './covers.js';
 import { syncAlbumCreditsFromMb } from './credits.js';
+import { cleanTitleForMatch } from './matchkey.js';
 
 // La cadena de identificación, en orden de fiabilidad decreciente (es el flujo
 // del segundo diagrama). Cada álbum sin resolver pasa por:
@@ -99,10 +100,50 @@ async function identifyAlbum(album) {
     return 'tags';
   }
 
+  // 1.5 DISCOGRAFÍA CONOCIDA del artista: si el artista ya está identificado (tiene MBID)
+  //     y su discografía está cruzada (release_groups), casa el álbum por título contra
+  //     ella. Es OFFLINE, exacto e inmune a la búsqueda de texto de MB —que falla con
+  //     artistas de caracteres raros («Florence + The Machine»)—; el rg_mbid ya lo
+  //     conocemos, solo hay que escribirlo. Entre coincidencias exactas prefiere el álbum
+  //     de estudio (no un single/EP homónimo).
+  if (album.artist_mbid) {
+    const target = cleanTitleForMatch(album.title);
+    if (target) {
+      const rgs = db
+        .prepare('SELECT rg_mbid, title, primary_type, secondary_types, first_release FROM release_groups WHERE artist_mbid = ?')
+        .all(album.artist_mbid);
+      const secs = (r) => {
+        try {
+          return r.secondary_types ? JSON.parse(r.secondary_types) : [];
+        } catch {
+          return [];
+        }
+      };
+      const isStudio = (r) => r.primary_type === 'Album' && !secs(r).length;
+      const exact = rgs.filter((r) => cleanTitleForMatch(r.title) === target);
+      const hit =
+        exact.find(isStudio) ||
+        exact[0] ||
+        rgs.find((r) => {
+          const t = cleanTitleForMatch(r.title);
+          return t && (t.includes(target) || target.includes(t));
+        });
+      if (hit) {
+        commitMatch(
+          album,
+          { rg_mbid: hit.rg_mbid, primary_type: hit.primary_type, secondary_types: secs(hit), first_release: hit.first_release },
+          'discography',
+          0.95
+        );
+        return 'discography';
+      }
+    }
+  }
+
   // 2. MusicBrainz por texto (BARATO: 1 pet/s y cacheado). Es lo primero porque
   //    resuelve la mayoría de los álbumes bien etiquetados sin tocar el fichero.
   try {
-    const rg = await mb.searchReleaseGroup(album.album_artist, album.title);
+    const rg = await mb.searchReleaseGroup(album.album_artist, album.title, album.artist_mbid || null);
     if (rg && rg.score >= 80) {
       commitMatch(album, rg, 'musicbrainz', rg.score / 100);
       await anchorArtist(album.id, rg.artist_mbid);

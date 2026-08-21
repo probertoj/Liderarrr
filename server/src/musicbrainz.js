@@ -137,13 +137,14 @@ export function cleanAlbumTitle(title, artist) {
 
 // Busca un release group por artista + título. Devuelve el mejor candidato con
 // su score (0-100), tipos y artista, o null.
-export async function searchReleaseGroup(artist, title) {
+export async function searchReleaseGroup(artist, title, artistMbid = null) {
   if (!title) return null;
   const clean = cleanAlbumTitle(title, artist);
-  const q = artist
-    ? `releasegroup:"${lucene(clean)}" AND artist:"${lucene(artist)}"`
-    : `releasegroup:"${lucene(clean)}"`;
-  const data = await mbCached(`rg-search:${artist || ''}:${clean}`.toLowerCase(), `/release-group?query=${enc(q)}&limit=5`);
+  // Si conocemos el MBID del artista, acotamos por `arid:` (preciso e inmune a nombres con
+  // caracteres raros como «Florence + The Machine», que rompen el filtro por nombre).
+  const scope = artistMbid ? `arid:${artistMbid}` : artist ? `artist:"${lucene(artist)}"` : null;
+  const q = scope ? `releasegroup:"${lucene(clean)}" AND ${scope}` : `releasegroup:"${lucene(clean)}"`;
+  const data = await mbCached(`rg-search:${artistMbid || artist || ''}:${clean}`.toLowerCase(), `/release-group?query=${enc(q)}&limit=5`);
   const list = data['release-groups'] || [];
   if (!list.length) return null;
   const nrm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -182,14 +183,17 @@ function mapCredits(rg) {
 // Búsqueda LIBRE de release groups para la resolución manual ("Elegir a mano"):
 // devuelve una LISTA de candidatos (no solo el mejor). El usuario elige, así que
 // no se filtra por score. Si se pasa `artist`, acota a su catálogo (más preciso).
-export async function searchReleaseGroups(query, artist, limit = 8) {
+export async function searchReleaseGroups(query, artist, limit = 8, artistMbid = null) {
   let text = String(query || '').trim();
   if (!text) return [];
   // quita el artista repetido al principio (evita que "Neil Young ..." infle álbumes
   // ajenos); NO quita los años, que aquí ayudan a distinguir Vol. I/II/III.
   text = stripLeadingArtist(text, artist);
-  const q = artist ? `releasegroup:(${lucene(text)}) AND artist:"${lucene(artist)}"` : lucene(text);
-  const data = await mbCached(`rg-list:${artist || ''}:${text}`.toLowerCase(), `/release-group?query=${enc(q)}&limit=${limit}`);
+  // Con MBID del artista, acota por `arid:` (preciso; el filtro por nombre falla con
+  // caracteres raros como «Florence + The Machine»).
+  const scope = artistMbid ? `arid:${artistMbid}` : artist ? `artist:"${lucene(artist)}"` : null;
+  const q = scope ? `releasegroup:(${lucene(text)}) AND ${scope}` : lucene(text);
+  const data = await mbCached(`rg-list:${artistMbid || artist || ''}:${text}`.toLowerCase(), `/release-group?query=${enc(q)}&limit=${limit}`);
   return (data['release-groups'] || []).map((rg) => ({
     rg_mbid: rg.id,
     title: rg.title,

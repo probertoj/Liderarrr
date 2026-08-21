@@ -56,8 +56,12 @@ export const api = {
   combineCandidates: (id) => req(`/albums/${id}/combine-candidates`),
   candidates: (id) => req(`/albums/${id}/candidates`),
   match: (id, rg_mbid) => req(`/albums/${id}/match`, { method: 'POST', body: { rg_mbid } }),
-  mbReleaseGroups: (q, artist) =>
-    req(`/mb/release-groups?q=${encodeURIComponent(q)}${artist ? `&artist=${encodeURIComponent(artist)}` : ''}`),
+  mbReleaseGroups: (q, artist, artistMbid) =>
+    req(
+      `/mb/release-groups?q=${encodeURIComponent(q)}${artist ? `&artist=${encodeURIComponent(artist)}` : ''}${
+        artistMbid ? `&artist_mbid=${encodeURIComponent(artistMbid)}` : ''
+      }`
+    ),
   identifyAlbum: (id) => req(`/albums/${id}/identify`, { method: 'POST' }),
   lidarrReleases: (id) => req(`/albums/${id}/lidarr-releases`),
   lidarrGrab: (guid, indexerId) => req('/lidarr/grab', { method: 'POST', body: { guid, indexerId } }),
