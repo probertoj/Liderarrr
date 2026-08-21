@@ -1,5 +1,14 @@
 import { db } from './db.js';
 import { matchKey } from './matchkey.js';
+import { lidarrConfig } from './lidarr.js';
+import { activeRequestRgs } from './downloads.js';
+
+// «en Lidarr» solo vale si Lidarr sigue conectado (si no, su tabla queda vieja tras
+// «liberar de Lidarr»). El estado nativo «pedido» sale del registro de descargas.
+const lidarrConnected = () => {
+  const { url, key } = lidarrConfig();
+  return !!(url && key);
+};
 
 // Huecos y próximos lanzamientos, ambos leídos de release_groups (que llena
 // discography.js). Excluye lo que ya está en el snapshot de Lidarr ("ya
@@ -39,6 +48,8 @@ export function gaps({ onlyTracked = true } = {}) {
     .all();
   // filtra en vivo los que YA tienes (no el flag guardado is_owned, que envejece)
   const isOwned = ownedMatcher();
+  const lid = lidarrConnected();
+  const reqs = activeRequestRgs();
   // agrupar por artista para la UI
   const byArtist = new Map();
   for (const r of rows) {
@@ -48,7 +59,8 @@ export function gaps({ onlyTracked = true } = {}) {
       rg_mbid: r.rg_mbid,
       title: r.title,
       year: r.first_release ? Number(String(r.first_release).slice(0, 4)) : null,
-      in_lidarr: !!r.in_lidarr,
+      in_lidarr: lid && !!r.in_lidarr,
+      requested: reqs.has(r.rg_mbid),
     });
   }
   const artists = [...byArtist.values()];
@@ -78,7 +90,9 @@ export function upcoming({ onlyTracked = true } = {}) {
     )
     .all();
   const isOwned = ownedMatcher();
-  return rows.map((r) => ({ ...r, in_lidarr: !!r.in_lidarr, tracked: !!r.tracked, is_owned: isOwned(r.rg_mbid, r.artist, r.title) }));
+  const lid = lidarrConnected();
+  const reqs = activeRequestRgs();
+  return rows.map((r) => ({ ...r, in_lidarr: lid && !!r.in_lidarr, requested: reqs.has(r.rg_mbid), tracked: !!r.tracked, is_owned: isOwned(r.rg_mbid, r.artist, r.title) }));
 }
 
 // Estrenados recientemente: álbumes de estudio de tus artistas con fecha ya pasada
@@ -108,7 +122,9 @@ export function recentlyReleased({ since = null, onlyTracked = false } = {}) {
     )
     .all({ cutoff, today });
   const isOwned = ownedMatcher();
-  return rows.map((r) => ({ ...r, in_lidarr: !!r.in_lidarr, tracked: !!r.tracked, is_owned: isOwned(r.rg_mbid, r.artist, r.title) }));
+  const lid = lidarrConnected();
+  const reqs = activeRequestRgs();
+  return rows.map((r) => ({ ...r, in_lidarr: lid && !!r.in_lidarr, requested: reqs.has(r.rg_mbid), tracked: !!r.tracked, is_owned: isOwned(r.rg_mbid, r.artist, r.title) }));
 }
 
 export function dismissGap(rgMbid, title) {

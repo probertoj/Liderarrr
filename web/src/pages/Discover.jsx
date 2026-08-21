@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Compass, Plus, Check, X, RefreshCw, Loader2, ExternalLink } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, Button, SearchModal } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, Button, SearchModal, useLidarrEnabled } from '../components.jsx';
 
 // Huecos: álbumes de estudio que MusicBrainz conoce de tus artistas y que no
 // tienes. Agrupados por artista, con envío a Lidarr (uno o todos) y opción de
@@ -16,6 +16,7 @@ export default function Discover() {
   const [refreshing, setRefreshing] = useState(false);
   const [queue, setQueue] = useState(null);
   const [search, setSearch] = useState(null); // query del modal de búsqueda manual
+  const lidarrOn = useLidarrEnabled();
 
   const load = () => api.gaps(all).then(setData).catch((e) => setErr(e.message));
   useEffect(() => {
@@ -23,13 +24,22 @@ export default function Discover() {
     load();
   }, [all]);
 
-  // Lidarr es lento: el envío se ENCOLA y responde al instante; se sondea el progreso.
-  const add = async (rg, artistMbid) => {
+  // Con Lidarr → envío encolado (Lidarr es lento; se sondea el progreso). Sin Lidarr →
+  // descarga nativa (grabBest agarra la mejor release; el auto-import la coloca).
+  const add = async (rg, group) => {
     setBusy(rg.rg_mbid);
     try {
-      await api.lidarrAdd(rg.rg_mbid, artistMbid);
+      if (lidarrOn) {
+        await api.lidarrAdd(rg.rg_mbid, group.artist_mbid);
+        pollLidarrQueue(setQueue);
+      } else {
+        const res = await api.grabBest(`${group.artist || ''} ${rg.title}`.trim(), { rg_mbid: rg.rg_mbid, artist: group.artist, album: rg.title });
+        if (!res.grabbed) {
+          alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+          return;
+        }
+      }
       setAdded((p) => ({ ...p, [rg.rg_mbid]: true }));
-      pollLidarrQueue(setQueue);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -37,15 +47,24 @@ export default function Discover() {
     }
   };
   const addArtist = async (group) => {
-    const toSend = group.missing.filter((m) => !added[m.rg_mbid] && !m.in_lidarr);
+    const toSend = group.missing.filter((m) => !added[m.rg_mbid] && !m.in_lidarr && !m.requested);
     if (!toSend.length) return;
     setBusy(group.artist_id);
     try {
-      await api.lidarrAddBulk(toSend.map((m) => ({ rg_mbid: m.rg_mbid, artist_mbid: group.artist_mbid })));
-      const next = {};
-      for (const m of toSend) next[m.rg_mbid] = true;
-      setAdded((p) => ({ ...p, ...next }));
-      pollLidarrQueue(setQueue);
+      if (lidarrOn) {
+        await api.lidarrAddBulk(toSend.map((m) => ({ rg_mbid: m.rg_mbid, artist_mbid: group.artist_mbid })));
+        setAdded((p) => ({ ...p, ...Object.fromEntries(toSend.map((m) => [m.rg_mbid, true])) }));
+        pollLidarrQueue(setQueue);
+      } else {
+        for (const m of toSend) {
+          try {
+            const res = await api.grabBest(`${group.artist || ''} ${m.title}`.trim(), { rg_mbid: m.rg_mbid, artist: group.artist, album: m.title });
+            if (res.grabbed) setAdded((p) => ({ ...p, [m.rg_mbid]: true }));
+          } catch {
+            /* uno que falla no corta la tanda */
+          }
+        }
+      }
     } catch (e) {
       alert(e.message);
     } finally {
@@ -123,13 +142,13 @@ export default function Discover() {
               <Button variant="gold" onClick={() => addArtist(group)} disabled={busy === group.artist_id}>
                 <span className="inline-flex items-center gap-1.5">
                   {busy === group.artist_id && <Loader2 size={14} className="animate-spin" />}
-                  {busy === group.artist_id ? 'Enviando…' : 'Enviar todos'}
+                  {busy === group.artist_id ? (lidarrOn ? 'Enviando…' : 'Descargando…') : lidarrOn ? 'Enviar todos' : 'Descargar todos'}
                 </span>
               </Button>
             </div>
             <div className="grid sm:grid-cols-2 gap-1.5">
               {group.missing.map((m) => {
-                const done = added[m.rg_mbid] || m.in_lidarr;
+                const done = added[m.rg_mbid] || m.in_lidarr || m.requested;
                 return (
                   <div key={m.rg_mbid} className="flex items-center justify-between text-sm bg-ink-850/50 rounded px-2.5 py-1.5">
                     <span className="truncate">
@@ -153,17 +172,17 @@ export default function Discover() {
                       </button>
                       {done ? (
                         <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
-                          <Check size={13} /> Lidarr
+                          <Check size={13} /> {m.in_lidarr ? 'Lidarr' : 'pedido'}
                         </span>
                       ) : (
                         <>
                           <button
-                            onClick={() => add(m, group.artist_mbid)}
+                            onClick={() => add(m, group)}
                             disabled={busy === m.rg_mbid}
                             className="text-xs px-1.5 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 disabled:opacity-50"
                           >
                             {busy === m.rg_mbid ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                            {busy === m.rg_mbid ? 'Enviando…' : 'Lidarr'}
+                            {busy === m.rg_mbid ? (lidarrOn ? 'Enviando…' : 'Descargando…') : lidarrOn ? 'Lidarr' : 'Descargar'}
                           </button>
                           <button
                             onClick={() => dismiss(m)}

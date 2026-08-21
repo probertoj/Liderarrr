@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpCircle, Plus, Check, Loader2, ExternalLink } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { PageTitle, Cover, Spinner, ErrorMsg, SearchModal } from '../components.jsx';
+import { PageTitle, Cover, Spinner, ErrorMsg, SearchModal, useLidarrEnabled } from '../components.jsx';
 
 // Cola de upgrades: álbumes que tienes SIN ninguna pista sin pérdida. Por cada uno,
 // las dos vías de siempre: enviarlo a Lidarr (que busque una versión mejor) o
@@ -14,17 +14,28 @@ export default function Upgrades() {
   const [done, setDone] = useState({});
   const [queue, setQueue] = useState(null);
   const [search, setSearch] = useState(null); // query del modal de búsqueda manual
+  const lidarrOn = useLidarrEnabled();
 
   useEffect(() => {
     api.upgrades().then(setRows).catch((e) => setErr(e.message));
   }, []);
 
-  const sendLidarr = async (a) => {
+  // Con Lidarr → que busque una versión mejor. Sin Lidarr → descarga nativa de la mejor
+  // release (agarra un rip sin pérdida; el auto-import la coloca junto a la que tienes).
+  const send = async (a) => {
     setBusy(a.id);
     try {
-      await api.lidarrAdd(a.rg_mbid, a.artist_mbid);
+      if (lidarrOn) {
+        await api.lidarrAdd(a.rg_mbid, a.artist_mbid);
+        pollLidarrQueue(setQueue);
+      } else {
+        const res = await api.grabBest(`${a.album_artist || ''} ${a.title}`.trim(), { rg_mbid: a.rg_mbid, artist: a.album_artist, album: a.title });
+        if (!res.grabbed) {
+          alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+          return;
+        }
+      }
       setDone((p) => ({ ...p, [a.id]: true }));
-      pollLidarrQueue(setQueue);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -97,16 +108,16 @@ export default function Upgrades() {
                 </button>
                 {done[a.id] ? (
                   <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
-                    <Check size={14} /> Lidarr
+                    <Check size={14} /> {lidarrOn ? 'Lidarr' : 'pedido'}
                   </span>
                 ) : a.can_upgrade ? (
                   <button
-                    onClick={() => sendLidarr(a)}
+                    onClick={() => send(a)}
                     disabled={busy === a.id}
                     className="text-xs px-2 py-1 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 disabled:opacity-50"
                   >
                     {busy === a.id ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-                    Lidarr
+                    {busy === a.id ? (lidarrOn ? 'Enviando…' : 'Descargando…') : lidarrOn ? 'Lidarr' : 'Descargar'}
                   </button>
                 ) : null}
               </div>

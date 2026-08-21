@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Building2, ArrowLeft, ExternalLink, Check, Star, Loader2 } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
-import { PageTitle, AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel } from '../components.jsx';
+import { PageTitle, AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, useLidarrEnabled } from '../components.jsx';
 
 // Coincidencia laxa de nombre de sello (acentos/mayúsculas/signos) para saber si un
 // sello de la colección ya está entre los seguidos (que usan el nombre canónico de MB).
@@ -182,6 +182,7 @@ function LabelCompletism({ name }) {
   const [added, setAdded] = useState({});
   const [queue, setQueue] = useState(null);
   const [search, setSearch] = useState(null); // query del modal de búsqueda manual
+  const lidarrOn = useLidarrEnabled();
 
   // Reenganche: la cola de envío corre en el BACKEND, así que al volver a esta página
   // (o entrar con un envío ya en marcha) sondeamos su estado en vez de mostrar "como si
@@ -203,17 +204,30 @@ function LabelCompletism({ name }) {
     }
   };
 
-  const sendLidarr = async (m, all) => {
+  // Con Lidarr → envío encolado. Sin Lidarr → descarga nativa (grabBest por ítem; el
+  // auto-import coloca lo que baje). Marca en verde lo que entra.
+  const send = async (m, all) => {
     const list = all ? data.missing : [m];
-    const mark = {};
-    for (const x of list) mark[x.rg_mbid] = true;
-    setAdded((p) => ({ ...p, ...mark }));
-    try {
-      if (all) await api.lidarrAddBulk(list.map((x) => ({ rg_mbid: x.rg_mbid, artist_mbid: null })));
-      else await api.lidarrAdd(m.rg_mbid, null);
-      pollLidarrQueue(setQueue);
-    } catch (e) {
-      alert(e.message);
+    if (lidarrOn) {
+      const mark = {};
+      for (const x of list) mark[x.rg_mbid] = true;
+      setAdded((p) => ({ ...p, ...mark }));
+      try {
+        if (all) await api.lidarrAddBulk(list.map((x) => ({ rg_mbid: x.rg_mbid, artist_mbid: null })));
+        else await api.lidarrAdd(m.rg_mbid, null);
+        pollLidarrQueue(setQueue);
+      } catch (e) {
+        alert(e.message);
+      }
+    } else {
+      for (const x of list) {
+        try {
+          const res = await api.grabBest(`${x.artist || ''} ${x.title}`.trim(), { rg_mbid: x.rg_mbid, artist: x.artist, album: x.title });
+          if (res.grabbed) setAdded((p) => ({ ...p, [x.rg_mbid]: true }));
+        } catch {
+          /* uno que falla no corta la tanda */
+        }
+      }
     }
   };
 
@@ -264,8 +278,8 @@ function LabelCompletism({ name }) {
             <>
               <div className="flex items-center justify-between mt-3 mb-1">
                 <span className="text-sm text-neutral-400">Te faltan {data.missing.length}</span>
-                <Button variant="gold" onClick={() => sendLidarr(null, true)}>
-                  Enviar todos a Lidarr
+                <Button variant="gold" onClick={() => send(null, true)}>
+                  {lidarrOn ? 'Enviar todos a Lidarr' : 'Descargar todos'}
                 </Button>
               </div>
               {queue &&
@@ -319,14 +333,14 @@ function LabelCompletism({ name }) {
                     </button>
                     {added[m.rg_mbid] ? (
                       <span className="text-emerald-400 text-xs inline-flex items-center gap-1 shrink-0">
-                        <Check size={13} /> en cola
+                        <Check size={13} /> {lidarrOn ? 'en cola' : 'pedido'}
                       </span>
                     ) : (
                       <button
-                        onClick={() => sendLidarr(m, false)}
+                        onClick={() => send(m, false)}
                         className="text-xs px-2 py-1 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 shrink-0"
                       >
-                        Lidarr
+                        {lidarrOn ? 'Lidarr' : 'Descargar'}
                       </button>
                     )}
                   </div>
