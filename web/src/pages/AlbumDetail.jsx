@@ -898,6 +898,7 @@ function OwnedEditionsSection({ albumId }) {
             <span className="truncate flex-1">
               {e.title}
               {e.year ? <span className="text-neutral-600"> · {e.year}</span> : ''}
+              {e.tracks ? <span className="text-neutral-600"> · {e.tracks} pistas</span> : ''}
             </span>
             {e.format && <span className="text-xs text-neutral-600 shrink-0">{e.format}</span>}
           </Link>
