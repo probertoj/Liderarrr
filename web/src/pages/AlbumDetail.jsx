@@ -406,6 +406,8 @@ export default function AlbumDetail() {
 
       <DupCopiesSection albumId={album.id} onChange={load} />
 
+      <OwnedEditionsSection albumId={album.id} />
+
       {/* secciones secundarias: solo si se revelan desde el menú «⋯» */}
       {shownSec.has('disc') && <DiscBox album={album} onDone={load} />}
       {shownSec.has('rematch') && (album.match_state === 'matched' || album.match_state === 'orphan') && (
@@ -865,6 +867,42 @@ function DupCopiesSection({ albumId, onChange }) {
           onChange?.();
         }}
       />
+    </div>
+  );
+}
+
+// Otras EDICIONES del mismo disco que tienes (original + reediciones/expandidas/remasters),
+// cada una con release-group propio. NO son duplicados a limpiar: son ediciones que
+// conservas, y desde aquí saltas a la ficha de cada una. Complementa a «Copias de este
+// disco» (que sí son copias de la MISMA edición).
+function OwnedEditionsSection({ albumId }) {
+  const [eds, setEds] = useState(null);
+  useEffect(() => {
+    setEds(null);
+    api.ownedEditions(albumId).then(setEds).catch(() => setEds(null));
+  }, [albumId]);
+  if (!eds || !eds.length) return null;
+  return (
+    <div className="card p-4 mb-6">
+      <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+        <Layers size={15} className="text-gold-400" /> Otras ediciones que tienes · {eds.length}
+      </h2>
+      <p className="text-xs text-neutral-600 mt-1 mb-3">
+        Otras ediciones de este mismo disco en tu colección (reediciones, expandidas, remasters…). Cada una es un disco
+        aparte con su propia ficha.
+      </p>
+      <div className="divide-y divide-ink-850/60">
+        {eds.map((e) => (
+          <Link key={e.id} to={`/album/${e.id}`} className="flex items-center gap-2 py-2 text-sm hover:text-gold-400">
+            <Disc3 size={14} className="text-neutral-500 shrink-0" />
+            <span className="truncate flex-1">
+              {e.title}
+              {e.year ? <span className="text-neutral-600"> · {e.year}</span> : ''}
+            </span>
+            {e.format && <span className="text-xs text-neutral-600 shrink-0">{e.format}</span>}
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

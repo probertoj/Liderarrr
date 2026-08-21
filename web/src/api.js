@@ -45,6 +45,7 @@ export const api = {
   libraryFilters: () => req('/library/filters'),
   album: (id) => req(`/albums/${id}`),
   dupGroup: (id) => req(`/albums/${id}/dup-group`),
+  ownedEditions: (id) => req(`/albums/${id}/editions-owned`),
   albumState: (id, state) => req(`/albums/${id}/state`, { method: 'POST', body: { state } }),
   dismissed: () => req('/dismissed'),
   restoreAlbum: (id) => req(`/albums/${id}/restore`, { method: 'POST' }),

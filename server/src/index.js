@@ -236,6 +236,8 @@ app.get('/api/albums/:id/dup-group', async (req, reply) => {
   if (!g) return reply.code(404).send({ error: 'No encontrado' });
   return g;
 });
+// otras EDICIONES del mismo disco que tienes (para enlazarlas desde la ficha)
+app.get('/api/albums/:id/editions-owned', async (req) => q.ownedEditions(Number(req.params.id)));
 
 app.get('/api/artists', async (req) => q.artists(req.query || {}));
 app.get('/api/artists/:id', async (req, reply) => {
