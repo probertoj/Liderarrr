@@ -1,4 +1,5 @@
 import { getSetting } from './db.js';
+import { cleanSearchQuery } from './searchquery.js';
 
 // Prowlarr agrega TODOS tus indexers (RED, OPS, lo de Jackett) y expone una API de
 // búsqueda y de "grab" (agarrar) que empuja la release a su cliente de descarga.
@@ -114,7 +115,7 @@ function mapRelease(r) {
 // Busca en todos los indexers (categoría Audio = 3000). Devuelve una lista para que
 // el usuario elija. Consulta los trackers en vivo, así que puede tardar.
 export async function prowlarrSearch(query, { limit = 100 } = {}) {
-  const q = String(query || '').trim();
+  const q = cleanSearchQuery(query);
   if (!q) return [];
   const results = await prowlarrFetch(
     `/search?query=${encodeURIComponent(q)}&type=search&categories=3000&limit=${limit}`

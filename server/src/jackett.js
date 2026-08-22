@@ -1,4 +1,5 @@
 import { getSetting } from './db.js';
+import { cleanSearchQuery } from './searchquery.js';
 
 // Jackett es la ALTERNATIVA a Prowlarr para la busqueda manual (Prowlarr resulta mas
 // inestable). Diferencia clave: Jackett expone Torznab y SOLO BUSCA; no empuja al
@@ -114,7 +115,7 @@ export async function jackettTest() {
 
 // Busca musica (categoria Audio = 3000) en todos los indexers. Consulta en vivo: lento.
 export async function jackettSearch(query, { limit = 100 } = {}) {
-  const q = String(query || '').trim();
+  const q = cleanSearchQuery(query);
   if (!q) return [];
   // Categoría configurable. Por defecto 3000 (Audio). Algunos indexers (p. ej. Orpheus)
   // no declaran esa categoría exacta en sus caps de Jackett y el filtro cat=3000 los
