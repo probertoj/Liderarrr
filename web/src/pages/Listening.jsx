@@ -8,6 +8,7 @@ import { PageTitle, Stat, Spinner, ErrorMsg, Button, SearchModal } from '../comp
 // Ventanas de fecha para la brecha. `since` = ms (o null = todo el tiempo).
 const RANGES = [
   { key: 'all', label: 'Todo el tiempo', since: () => null },
+  { key: 'week', label: 'Última semana', since: () => Date.now() - 7 * 86400000 },
   { key: 'month', label: 'Último mes', since: () => Date.now() - 30 * 86400000 },
   { key: 'q', label: 'Últimos 3 meses', since: () => Date.now() - 90 * 86400000 },
   { key: 'year', label: 'Último año', since: () => Date.now() - 365 * 86400000 },
