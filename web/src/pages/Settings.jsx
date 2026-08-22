@@ -313,6 +313,36 @@ export default function Settings() {
         </div>
       </section>
 
+      {/* Notificaciones */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">Notificaciones <span className="text-xs text-neutral-500">(opcional)</span></h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Recibe un aviso cuando aparezcan novedades de tus artistas o se importen descargas, sin abrir la app. Pega la
+          URL de un webhook de <b>Discord</b>, <b>Slack</b> o un tema de <b>ntfy</b> (u otro que reciba un POST de texto).
+        </p>
+        <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={s.notify_enabled === '1'}
+            onChange={(e) => setS((p) => ({ ...p, notify_enabled: e.target.checked ? '1' : '0' }))}
+          />
+          Enviar notificaciones
+        </label>
+        <Field label="URL del webhook" hint="Discord: URL del webhook del canal. ntfy: https://ntfy.sh/tu-tema. Slack: incoming webhook.">
+          <input value={s.notify_url || ''} onChange={set('notify_url')} className={input} placeholder="https://ntfy.sh/mi-tema  ·  https://discord.com/api/webhooks/…" />
+        </Field>
+        <HowTo title="¿Cómo consigo un webhook?">
+          <Steps>
+            <li><b>ntfy</b> (lo más fácil): elige un nombre de tema único y usa <code>https://ntfy.sh/ese-tema</code>; instala la app de ntfy y suscríbete a ese tema.</li>
+            <li><b>Discord</b>: Editar canal → Integraciones → Webhooks → Nuevo webhook → Copiar URL.</li>
+            <li><b>Slack</b>: crea un «Incoming Webhook» en la configuración de tu espacio y copia la URL.</li>
+          </Steps>
+        </HowTo>
+        <div className="flex flex-wrap gap-2 mt-3">
+          <TestButton service="notify" label="Enviar prueba" beforeTest={save} />
+        </div>
+      </section>
+
       {/* 3. Lidarr — el actuador */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">3 · Lidarr <span className="text-xs text-neutral-500">(opcional)</span></h2>

@@ -7,6 +7,7 @@ import { matchRequest, setDownloadStatus, reconcileAgainstLibrary, pruneDownload
 import { runScan } from './scanner.js';
 import { runIdentify } from './identify.js';
 import { norm, within, pathMappings, remapPath } from './pathmap.js';
+import { sendNotification } from './notify.js';
 
 // AUTO-IMPORT: cierra el bucle de descargas sin Lidarr. Sondea qBittorrent, y por cada
 // torrent COMPLETADO cuyo contenido cuelgue de la carpeta de torrents configurada y no
@@ -148,6 +149,11 @@ export async function runAutoImport() {
         await runIdentify({ force: false });
       } catch (e) {
         console.warn('[autoimport] identify tras importar falló:', String(e.message || e));
+      }
+      // aviso «tu descarga está lista» (best-effort; no notifica si no está configurado)
+      if (autoImportStatus.imported > 0) {
+        const n = autoImportStatus.imported;
+        sendNotification('Liderarr', `${n} ${n === 1 ? 'descarga importada' : 'descargas importadas'} a tu biblioteca`).catch(() => {});
       }
     }
   } finally {

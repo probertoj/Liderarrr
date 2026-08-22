@@ -41,6 +41,7 @@ import { gaps, upcoming, recentlyReleased, dismissGap, undismissGap, dismissedLi
 import { similarSuggestions, refreshArtistSuggestions, dismissSuggestion, followSuggestion } from './suggest.js';
 import { externalNewReleases, refreshExternalReleases, dismissExternalRelease } from './newreleases.js';
 import { spotifyTest, spotifyAlbumUrl } from './spotify.js';
+import { notifyTest } from './notify.js';
 import {
   followLabel,
   followLabelByName,
@@ -135,7 +136,7 @@ app.get('/api/update-check', async () => updateCheck());
 app.get('/api/diag', async () => diagnostics());
 
 // --- ajustes ----------------------------------------------------------------
-const SECRET_KEYS = new Set(['lidarr_key', 'prowlarr_key', 'jackett_key', 'qbittorrent_pass', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token', 'spotify_client_secret']);
+const SECRET_KEYS = new Set(['lidarr_key', 'prowlarr_key', 'jackett_key', 'qbittorrent_pass', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token', 'spotify_client_secret', 'notify_url']);
 app.get('/api/settings', async () => {
   const raw = getAllSettings();
   const out = {};
@@ -168,6 +169,7 @@ app.post('/api/settings/test/:service', async (req, reply) => {
       discogs: discogsTest,
       lastfm: lastfmTest,
       spotify: spotifyTest,
+      notify: notifyTest,
     };
     if (!map[svc]) return reply.code(404).send({ error: 'Servicio desconocido' });
     return await map[svc]();

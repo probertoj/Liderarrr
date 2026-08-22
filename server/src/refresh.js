@@ -12,6 +12,7 @@ import { runAutoGrab, autoGrabConfig, autoGrabStatus } from './autograb.js';
 import { refreshExternalReleases } from './newreleases.js';
 import { refreshArtistSuggestions } from './suggest.js';
 import { lastfmConfigured } from './lastfm.js';
+import { sendNotification } from './notify.js';
 import { db } from './db.js';
 
 // La rutina "poner Liderarrr al día", en orden de dependencias: primero el disco
@@ -119,6 +120,11 @@ function buildSteps() {
       enabled: () => !!db.prepare("SELECT 1 FROM tracked_artists WHERE facet = 'artist' LIMIT 1").get(),
       run: async () => {
         const r = await refreshExternalReleases();
+        // aviso solo en el ciclo nocturno (en el manual el usuario ya está delante)
+        if (r.added > 0 && refreshStatus.trigger === 'nightly') {
+          const n = r.added;
+          sendNotification('Liderarr', `${n} ${n === 1 ? 'novedad nueva' : 'novedades nuevas'} de tus artistas en «Novedades de Spotify»`).catch(() => {});
+        }
         return `${r.count} novedades (${r.added} nuevas) de ${r.seeds} artistas`;
       },
     },
