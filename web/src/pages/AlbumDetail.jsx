@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies } from '../components.jsx';
 
@@ -345,6 +345,7 @@ export default function AlbumDetail() {
             >
               <Trash2 size={14} /> Borrar del disco
             </button>
+            <AddToChallenge artist={album.artist?.name || album.album_artist} title={album.title} />
             <div className="relative">
               <button
                 onClick={() => setSecMenu((v) => !v)}
@@ -1997,6 +1998,85 @@ function SearchSection({ album }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Botón «Añadir a reto»: despliega tus retos activos y añade este disco al que elijas
+// (dedupe por artista+álbum en el servidor; avisa si ya estaba).
+function AddToChallenge({ artist, title }) {
+  const [open, setOpen] = useState(false);
+  const [list, setList] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    setMsg(null);
+    if (next && list === null) {
+      try {
+        setList(await api.challenges());
+      } catch {
+        setList([]);
+      }
+    }
+  };
+  const addTo = async (ch) => {
+    setBusy(true);
+    try {
+      const r = await api.addChallengeItems(ch.id, `${artist} - ${title}`);
+      setMsg(r.added > 0 ? `Añadido a «${ch.name}»` : `Ya estaba en «${ch.name}»`);
+    } catch (e) {
+      setMsg(e.message);
+    } finally {
+      setBusy(false);
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative inline-flex items-center gap-1.5">
+      <button
+        onClick={toggle}
+        title="Añadir este disco a uno de tus retos"
+        className={`text-sm px-3 py-1.5 rounded-lg border inline-flex items-center gap-1.5 ${
+          open ? 'border-gold-500/50 bg-gold-500/15 text-gold-300' : 'border-ink-700 bg-ink-850 hover:bg-ink-800'
+        }`}
+      >
+        <Trophy size={14} /> Añadir a reto
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full mt-1 z-40 w-64 card p-1 shadow-lg border border-ink-700 max-h-72 overflow-y-auto">
+            {list === null ? (
+              <div className="px-2.5 py-2 text-sm text-neutral-500">Cargando…</div>
+            ) : list.length === 0 ? (
+              <div className="px-2.5 py-2 text-sm text-neutral-500">
+                No tienes retos.{' '}
+                <Link to="/retos" className="text-gold-400 hover:underline">
+                  Crear uno →
+                </Link>
+              </div>
+            ) : (
+              list.map((ch) => (
+                <button
+                  key={ch.id}
+                  onClick={() => addTo(ch)}
+                  disabled={busy}
+                  className="w-full text-left px-2.5 py-1.5 rounded text-sm text-neutral-300 hover:bg-ink-800 inline-flex items-center gap-2 disabled:opacity-50"
+                >
+                  <Trophy size={13} className="text-neutral-500 shrink-0" />
+                  <span className="truncate">{ch.name}</span>
+                  <span className="text-xs text-neutral-600 ml-auto shrink-0">{ch.item_count}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      )}
+      {msg && <span className="text-xs text-emerald-400">{msg}</span>}
     </div>
   );
 }
