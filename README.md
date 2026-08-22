@@ -106,7 +106,9 @@ avisa dentro de la app cuando hay una versión nueva.
    - **Carpeta de música** (tu biblioteca organizada, p. ej. `/data/media/music`). Por defecto
      en solo lectura: Liderarrr no toca tu audio.
    - *(Opcional pero recomendado)* claves gratuitas de **AcoustID**, **Discogs** y **Last.fm**
-     para mejor identificación, valoraciones/reseñas y tus escuchas.
+     para mejor identificación, valoraciones/reseñas, tus escuchas y las sugerencias de artistas.
+   - *(Opcional)* credenciales de **Spotify** (client id/secret) para sumar sus novedades a las
+     de **Deezer** (que ya funciona sin ninguna clave).
    - *(Opcional)* **Prowlarr** o **Jackett** + **qBittorrent** para buscar y descargar desde la
      propia app; y las carpetas de **importar descargas** (origen de torrents + destino).
    - *(Opcional)* **Lidarr**, si prefieres delegar en él las descargas.
@@ -129,8 +131,8 @@ Dentro de la app tienes esto mismo en **«¿Cómo funciona todo esto?»**.
 | **2. Identificación** | Cruza cada disco con MusicBrainz (artista, álbum, año, tipo). Escribe en la BD de Liderarr, **nunca en tus ficheros**. Un disco sin identificar existe igual. |
 | **3. Completismo** | De los artistas y sellos que sigues, mira su discografía en MusicBrainz y la cruza con lo que tienes: qué álbumes te faltan y qué está por salir. |
 | **4. Descargas + importación** | Buscas y descargas por Prowlarr/Jackett + qBittorrent (sin el veto de Lidarr). Al terminar un torrent, el **auto-import** lo enlaza (hardlink) a tu biblioteca, sin copiar ni dejar de sembrar. |
-| **5. Radar** | Sigue a curadores y sitios de novedades y te trae sus estrenos, marcando lo que ya tienes. |
-| **6. Escuchas y retos** | Conecta Last.fm para cruzar lo que TIENES con lo que has ESCUCHADO, y monta retos con anillos de progreso. |
+| **5. Radar y novedades** | Sigue a curadores y sitios de novedades; además, para tus artistas seguidos detecta en **Deezer/Spotify** los estrenos que **MusicBrainz aún no lista** (se adelanta a su retraso). Todo marcando lo que ya tienes. |
+| **6. Escuchas y retos** | Conecta Last.fm para cruzar lo que TIENES con lo que has ESCUCHADO, monta retos con anillos de progreso, y recibe **sugerencias de artistas similares** para seguir. |
 
 **¿Cuándo pasa cada cosa?**
 
@@ -164,9 +166,9 @@ El menú está agrupado con guiños musicales; aquí va cada sección con lo que
 
 | Sección | Qué encuentras |
 |---|---|
-| **Seguidos** | Los artistas y sellos que sigues, base del completismo y del radar. |
+| **Seguidos** | Los artistas y sellos que sigues, base del completismo y del radar. Incluye **«Quizá quieras seguir a…»**: artistas similares (Last.fm) que aún no tienes, para seguir de un clic (resuelve a MusicBrainz y calcula su discografía). |
 | **Huecos** | Álbumes que te **faltan** de las discografías de tus artistas seguidos. Descarga nativa a un clic; puedes descartar huecos que no te interesen. |
-| **Lanzamientos** | Calendario de **próximos** estrenos y recién salidos de tus seguidos, más el **radar** de novedades curadas: [buymusic.club](https://www.buymusic.club), **Rosy Overdrive**, **Raven Sings the Blues** e **Hipersónica** (esta, pegando su tier list). Marca lo que ya tienes y lo que no. |
+| **Lanzamientos** | Calendario de **próximos** estrenos y recién salidos de tus seguidos, más el **radar** de novedades curadas: [buymusic.club](https://www.buymusic.club), **Rosy Overdrive**, **Raven Sings the Blues** e **Hipersónica** (esta, pegando su tier list). La pestaña **«⚡ Novedades»** trae los estrenos que **MusicBrainz aún no lista**, detectados en **Deezer/Spotify** para tus artistas seguidos (se adelanta al retraso de MB), con descarga a un clic. Todo marca lo que ya tienes. |
 | **Importar descargas** | El cierre del bucle: enlaza (hardlink) tus descargas a la biblioteca organizada. Ver [sección propia](#-importar-descargas-a-la-biblioteca). |
 
 ### 🎧 Losing My Edge — escuchas y retos
@@ -190,7 +192,7 @@ El menú está agrupado con guiños musicales; aquí va cada sección con lo que
 | Sección | Qué encuentras |
 |---|---|
 | **¿Cómo funciona todo esto?** | El recorrido de la app y cuándo pasa cada cosa, en cristiano. |
-| **Ajustes** | Carpetas, servicios (MusicBrainz/AcoustID/Discogs/Last.fm, Prowlarr/Jackett/qBittorrent, Lidarr), importación (auto-import, intervalo, remapeo de rutas, plantilla de nombres), prioridad de trackers, tema claro/oscuro y más. |
+| **Ajustes** | Carpetas, servicios (MusicBrainz/AcoustID/Discogs/Last.fm/Spotify, Prowlarr/Jackett/qBittorrent, Lidarr), importación (auto-import, intervalo, remapeo de rutas, plantilla de nombres), prioridad de trackers, tema claro/oscuro y más. |
 | **Diagnóstico** | Estado de las conexiones y de los procesos de fondo, para cazar problemas. |
 
 ---
@@ -302,8 +304,9 @@ Gracias en especial:
 - A **Sanpitopato**. Seguimosseguimos.
 
 Datos por cortesía de [MusicBrainz](https://musicbrainz.org), [AcoustID](https://acoustid.org),
-[Discogs](https://discogs.com), [Last.fm](https://last.fm) y [Deezer](https://deezer.com). Gracias
-a [Lidarr](https://lidarr.audio) por su API.
+[Discogs](https://discogs.com), [Last.fm](https://last.fm), [Deezer](https://deezer.com) y
+[Spotify](https://spotify.com). Gracias a [Lidarr](https://lidarr.audio) por su API, y a
+[Cmdarr](https://github.com/DeviantEng/Cmdarr) por la inspiración del descubrimiento de novedades.
 
 Licencia [MIT](LICENSE).
 
