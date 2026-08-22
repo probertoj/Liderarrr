@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { CalendarClock, Plus, Check, Loader2, ExternalLink, Search, Star, Tag, X, RefreshCw, Radio } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, SearchModal, useLidarrEnabled } from '../components.jsx';
+import MonthCalendar from './MonthCalendar.jsx';
 
 // Lanzamientos: cuatro vistas. «Próximos» (release groups por estrenar de tus artistas),
 // «Estrenados recientemente» (ya estrenados dentro de una ventana; por defecto este año),
@@ -732,6 +733,7 @@ export default function Calendar() {
   useEffect(() => {
     setRows(null);
     setErr(null);
+    if (view === 'mes') return; // la vista mes carga sus propias fuentes (MonthCalendar)
     const load =
       view === 'recent'
         ? api.recentReleases(since, all)
@@ -895,7 +897,7 @@ export default function Calendar() {
         icon={CalendarClock}
         title="Lanzamientos"
         sub={
-          rows
+          rows && view !== 'mes'
             ? `${rows.length} ${
                 view === 'upcoming'
                   ? 'por estrenar'
@@ -912,6 +914,7 @@ export default function Calendar() {
       />
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
+        {tab('mes', '📅 Mes')}
         {tab('upcoming', 'Próximos')}
         {tab('recent', 'Estrenados recientemente')}
         {tab('novedades', 'Novedades de Spotify')}
@@ -931,6 +934,10 @@ export default function Calendar() {
         )}
       </div>
 
+      {view === 'mes' && <MonthCalendar onSearch={setSearch} />}
+
+      {view !== 'mes' && (
+        <>
       {view === 'labels' && <LabelManager labels={labels} onChange={loadLabels} />}
       {view === 'radar' && <CuratorManager curators={curators} onChange={reloadRadar} />}
       {view === 'novedades' && (
@@ -1070,6 +1077,8 @@ export default function Calendar() {
             </div>
           ))}
         </div>
+      )}
+        </>
       )}
 
       {search != null && <SearchModal initialQuery={search} onClose={() => setSearch(null)} />}
