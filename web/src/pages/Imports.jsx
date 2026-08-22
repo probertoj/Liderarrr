@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { DownloadCloud, Link2, RefreshCw, Zap } from 'lucide-react';
+import { DownloadCloud, Link2, RefreshCw, Zap, EyeOff, Layers } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button } from '../components.jsx';
 
@@ -161,6 +161,130 @@ function AutoImportPanel() {
 
 const inputCls = 'block mt-0.5 bg-ink-850 border border-ink-800 rounded px-2 py-1 text-sm text-neutral-200 outline-none focus:border-gold-500/60';
 
+// Importador por subcarpetas: para un vertedero multiálbum, lista sus subcarpetas «de
+// álbum» y deja importar cada una como un álbum suelto (a su {artista}/{álbum}), o todas.
+// Reutiliza /imports/run con la ruta de cada subcarpeta (importFolder lee sus etiquetas).
+function SubfolderImporter({ dir }) {
+  const [subs, setSubs] = useState(null);
+  const [err, setErr] = useState(null);
+  const [edits, setEdits] = useState({});
+  const [done, setDone] = useState({});
+  const [busy, setBusy] = useState(null);
+  const [bulk, setBulk] = useState(false);
+
+  useEffect(() => {
+    api
+      .importSubfolders(dir)
+      .then((r) => setSubs(r.subfolders || []))
+      .catch((e) => setErr(e.message));
+  }, [dir]);
+
+  const field = (src, key, fb) => edits[src]?.[key] ?? (fb == null ? '' : String(fb));
+  const setField = (src, key, val) => setEdits((p) => ({ ...p, [src]: { ...p[src], [key]: val } }));
+
+  const importOne = async (s) => {
+    setBusy(s.source_dir);
+    setErr(null);
+    try {
+      const r = await api.importRun(s.source_dir, {
+        artist: field(s.source_dir, 'artist', s.artist),
+        album: field(s.source_dir, 'album', s.album),
+        year: field(s.source_dir, 'year', s.year),
+      });
+      setDone((p) => ({ ...p, [s.source_dir]: r.dest }));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const importAll = async () => {
+    const todo = (subs || []).filter((s) => !done[s.source_dir] && !s.alreadyImported);
+    if (!todo.length) return;
+    setBulk(true);
+    try {
+      for (const s of todo) {
+        // eslint-disable-next-line no-await-in-loop
+        await importOne(s);
+      }
+    } finally {
+      setBulk(false);
+    }
+  };
+
+  if (err) return <p className="text-xs text-red-400 mt-2">{err}</p>;
+  if (!subs) return <p className="text-xs text-neutral-400 mt-2">Leyendo subcarpetas…</p>;
+  if (!subs.length) return <p className="text-xs text-neutral-400 mt-2">No se encontraron subcarpetas de álbum.</p>;
+  const pending = subs.filter((s) => !done[s.source_dir] && !s.alreadyImported).length;
+
+  return (
+    <div className="mt-2 border-t border-ink-800 pt-2 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-neutral-400">{subs.length} álbum(es) dentro de esta carpeta</span>
+        {pending > 0 && (
+          <Button variant="gold" onClick={importAll} disabled={bulk}>
+            <span className="inline-flex items-center gap-1.5">
+              <Link2 size={14} /> {bulk ? 'Importando…' : `Importar todos (${pending})`}
+            </span>
+          </Button>
+        )}
+      </div>
+      {subs.map((s) => (
+        <div key={s.source_dir} className="rounded-lg bg-ink-850/40 p-2">
+          <div className="text-xs text-neutral-400 mb-1 truncate" title={s.source_dir}>
+            {s.name} · {s.tracks} pistas
+            {s.inLibrary && <span className="text-amber-400/90"> · ya en tu biblioteca</span>}
+          </div>
+          {done[s.source_dir] ? (
+            <div className="text-sm text-emerald-400 flex items-center gap-2 min-w-0">
+              <Link2 size={14} className="shrink-0" />
+              <span className="truncate">Enlazado a {done[s.source_dir]}</span>
+            </div>
+          ) : s.alreadyImported ? (
+            <div className="text-xs text-neutral-500">Ya importada.</div>
+          ) : (
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="text-xs text-neutral-500">
+                Artista
+                <input
+                  className={inputCls}
+                  value={field(s.source_dir, 'artist', s.artist)}
+                  onChange={(e) => setField(s.source_dir, 'artist', e.target.value)}
+                  placeholder="Artista"
+                />
+              </label>
+              <label className="text-xs text-neutral-500 flex-1 min-w-[12rem]">
+                Álbum
+                <input
+                  className={`${inputCls} w-full`}
+                  value={field(s.source_dir, 'album', s.album)}
+                  onChange={(e) => setField(s.source_dir, 'album', e.target.value)}
+                  placeholder="Álbum"
+                />
+              </label>
+              <label className="text-xs text-neutral-500">
+                Año
+                <input
+                  className={`${inputCls} w-20`}
+                  value={field(s.source_dir, 'year', s.year)}
+                  onChange={(e) => setField(s.source_dir, 'year', e.target.value)}
+                  placeholder="Año"
+                />
+              </label>
+              <Button variant="gold" disabled={busy === s.source_dir} onClick={() => importOne(s)}>
+                <span className="inline-flex items-center gap-1.5">
+                  <Link2 size={14} /> {busy === s.source_dir ? 'Enlazando…' : 'Importar'}
+                </span>
+              </Button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Importar descargas: enlaza (hardlink) lo que bajas por Prowlarr a tu biblioteca
 // organizada, como hace Lidarr pero SIN su veto. No borra ni copia el origen.
 export default function Imports() {
@@ -171,6 +295,29 @@ export default function Imports() {
   const [edits, setEdits] = useState({}); // source_dir -> { artist, album, year }
   const [done, setDone] = useState({}); // source_dir -> dest
   const [itemErr, setItemErr] = useState({}); // source_dir -> mensaje de error
+  const [hidden, setHidden] = useState({}); // source_dir -> true (ocultadas esta sesión)
+  const [expanded, setExpanded] = useState({}); // source_dir -> true (mostrar subcarpetas)
+
+  const ignore = async (it) => {
+    setHidden((p) => ({ ...p, [it.source_dir]: true }));
+    try {
+      await api.importIgnore(it.source_dir);
+    } catch {
+      setHidden((p) => {
+        const n = { ...p };
+        delete n[it.source_dir];
+        return n;
+      });
+    }
+  };
+  const unignore = async (it) => {
+    setHidden((p) => {
+      const n = { ...p };
+      delete n[it.source_dir];
+      return n;
+    });
+    api.importUnignore(it.source_dir).catch(() => {});
+  };
 
   const load = () => {
     setData(null);
@@ -285,7 +432,21 @@ export default function Imports() {
       )}
 
       <div className="space-y-2">
-        {data.items?.map((it) => (
+        {data.items?.map((it) => {
+          if (hidden[it.source_dir]) {
+            return (
+              <div
+                key={it.source_dir}
+                className="card px-3 py-2 flex items-center justify-between gap-2 text-xs text-neutral-500"
+              >
+                <span className="truncate">Oculta: {it.name}</span>
+                <button onClick={() => unignore(it)} className="shrink-0 underline hover:text-gold-400">
+                  deshacer
+                </button>
+              </div>
+            );
+          }
+          return (
           <div key={it.source_dir} className="card p-3">
             <div className="flex items-center gap-2 mb-1 min-w-0">
               <span className="text-xs text-neutral-600 truncate" title={it.source_dir}>
@@ -352,6 +513,16 @@ export default function Imports() {
                     placeholder="Año"
                   />
                 </label>
+                {it.multiAlbum && (
+                  <Button
+                    variant="gold"
+                    onClick={() => setExpanded((p) => ({ ...p, [it.source_dir]: !p[it.source_dir] }))}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <Layers size={14} /> {expanded[it.source_dir] ? 'Ocultar álbumes' : 'Importar por álbumes'}
+                    </span>
+                  </Button>
+                )}
                 <Button
                   variant={
                     itemErr[it.source_dir] || it.diag?.code === 'multi-album' || it.diag?.code === 'in-library'
@@ -363,16 +534,31 @@ export default function Imports() {
                 >
                   <span className="inline-flex items-center gap-1.5">
                     <Link2 size={14} />{' '}
-                    {busy === it.source_dir ? 'Enlazando…' : itemErr[it.source_dir] ? 'Reintentar' : 'Importar'}
+                    {busy === it.source_dir
+                      ? 'Enlazando…'
+                      : itemErr[it.source_dir]
+                        ? 'Reintentar'
+                        : it.multiAlbum
+                          ? 'Importar como un álbum'
+                          : 'Importar'}
                   </span>
                 </Button>
+                <button
+                  onClick={() => ignore(it)}
+                  className="text-xs px-2.5 py-1.5 rounded-lg border border-ink-800 text-neutral-400 hover:bg-ink-850 inline-flex items-center gap-1.5"
+                  title="Quitar de la lista (no la importa ni la coge el auto-import). Reversible con «deshacer»."
+                >
+                  <EyeOff size={13} /> {it.inLibrary ? 'Ya la tengo' : 'Ocultar'}
+                </button>
               </div>
             )}
             {itemErr[it.source_dir] && !done[it.source_dir] && (
               <p className="text-xs text-red-400 mt-2">{itemErr[it.source_dir]}</p>
             )}
+            {expanded[it.source_dir] && it.multiAlbum && <SubfolderImporter dir={it.source_dir} />}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

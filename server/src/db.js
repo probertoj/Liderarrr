@@ -380,6 +380,13 @@ CREATE TABLE IF NOT EXISTS downloads (
 CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
 CREATE INDEX IF NOT EXISTS idx_downloads_infohash ON downloads(infohash);
 CREATE INDEX IF NOT EXISTS idx_downloads_rg ON downloads(rg_mbid);
+
+-- Carpetas que el usuario oculta de la lista «Importar» («ya la tengo» / no me interesa).
+-- No se importan ni las coge el auto-import; solo dejan de aparecer. Reversible (deshacer).
+CREATE TABLE IF NOT EXISTS import_ignored (
+  source_dir TEXT UNIQUE,
+  ignored_at INTEGER
+);
 `);
 
 // --- migraciones ligeras ----------------------------------------------------

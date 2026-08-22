@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { db, getSetting } from './db.js';
 import { qbCompletedTorrents } from './qbittorrent.js';
-import { importFolder, importConfig } from './importer.js';
+import { importFolder, importConfig, isIgnoredImport } from './importer.js';
 import { matchRequest, setDownloadStatus, reconcileAgainstLibrary, pruneDownloads } from './downloads.js';
 import { runScan } from './scanner.js';
 import { runIdentify } from './identify.js';
@@ -104,6 +104,11 @@ export async function runAutoImport() {
         autoImportStatus.alreadyImported++;
         const done = matchRequest(t);
         if (done && done.status !== 'imported') setDownloadStatus(done.id, 'imported');
+        continue;
+      }
+      if (isIgnoredImport(cp)) {
+        // el usuario la ocultó de la lista («ya la tengo»): no la importamos automáticamente.
+        autoImportStatus.alreadyImported++;
         continue;
       }
       autoImportStatus.checked++;

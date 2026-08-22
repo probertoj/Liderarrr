@@ -29,6 +29,21 @@ export function importConfig() {
 const importedSet = () => new Set(db.prepare('SELECT source_dir FROM imports').all().map((r) => r.source_dir));
 const recordImport = db.prepare('INSERT OR IGNORE INTO imports (source_dir, dest_dir, imported_at) VALUES (?,?,?)');
 
+// Carpetas ocultadas por el usuario («ya la tengo» / no me interesa): ni se listan ni las
+// coge el auto-import. Se guardan y comparan por ruta resuelta (igual que `imports`).
+const ignoredSet = () => new Set(db.prepare('SELECT source_dir FROM import_ignored').all().map((r) => r.source_dir));
+export function isIgnoredImport(sourceDir) {
+  return !!db.prepare('SELECT 1 FROM import_ignored WHERE source_dir = ?').get(path.resolve(sourceDir));
+}
+export function ignoreImport(sourceDir) {
+  db.prepare('INSERT OR IGNORE INTO import_ignored (source_dir, ignored_at) VALUES (?,?)').run(path.resolve(sourceDir), Date.now());
+  return { ignored: true };
+}
+export function unignoreImport(sourceDir) {
+  db.prepare('DELETE FROM import_ignored WHERE source_dir = ?').run(path.resolve(sourceDir));
+  return { ignored: false };
+}
+
 // Construye la ruta de destino desde una plantilla CONFIGURABLE con tokens
 // {artist} {album} {year}. Las '/' de la plantilla son separadores de carpeta; cada
 // segmento se sanea (fuera caracteres ilegales). Si no hay año, se limpian los
@@ -180,6 +195,7 @@ export async function pendingImports() {
     return { configured: true, enabled, error: `No se puede leer ${source}: ${e.message}`, items: [] };
   }
   const done = importedSet();
+  const ignored = ignoredSet();
   // índice de la biblioteca (artista + título normalizado) para avisar de "ya lo
   // tienes" y no crear copias organizadas por descuido.
   const libKey = (artist, title) => `${String(artist || '').toLowerCase().trim()} ${normalizeForDup(title)}`;
@@ -221,6 +237,7 @@ export async function pendingImports() {
     // cotas: no recorrer un pool de seeding enorme entero en una petición
     if (items.length >= 60 || scanned >= 300) break;
     if (done.has(d.full)) continue;
+    if (ignored.has(path.resolve(d.full))) continue; // ocultada por el usuario
     const audio = audioFiles(d.full);
     if (!audio.length) continue; // sin audio: no es una descarga de música
     scanned++;
@@ -253,6 +270,51 @@ export async function pendingImports() {
     });
   }
   return { configured: true, enabled, items };
+}
+
+// Lista las subcarpetas «de álbum» de una carpeta-vertedero (multiálbum) con sus etiquetas,
+// para importarlas UNA A UNA como álbumes sueltos (cada subcarpeta → su {artista}/{álbum}).
+// Es la salida a los vertederos: en vez de colapsar N discos en uno mal etiquetado, el
+// usuario importa cada álbum por separado. Ignora subcarpetas de disco (CD1/CD2) — esas
+// pertenecen a un mismo álbum y las resuelve importFolder al recorrer la subcarpeta padre.
+export async function listAlbumSubfolders(sourceDir) {
+  const { source } = importConfig();
+  if (!source) throw new Error('Configura la carpeta de descargas en Ajustes.');
+  const base = path.resolve(sourceDir);
+  if (!base.startsWith(path.resolve(source))) throw new Error('La carpeta está fuera de la carpeta de descargas.');
+  let entries;
+  try {
+    entries = fs.readdirSync(base, { withFileTypes: true }).filter((e) => e.isDirectory());
+  } catch (e) {
+    throw new Error(`No se puede leer la carpeta: ${e.message}`);
+  }
+  const done = importedSet();
+  const ignored = ignoredSet();
+  const libKey = (artist, title) => `${String(artist || '').toLowerCase().trim()} ${normalizeForDup(title)}`;
+  const libSet = new Set(
+    db
+      .prepare("SELECT album_artist, title FROM albums WHERE match_state != 'dismissed'")
+      .all()
+      .map((r) => libKey(r.album_artist, r.title))
+  );
+  const subfolders = [];
+  for (const e of entries) {
+    if (DISC_RE.test(e.name)) continue; // subcarpeta de disco de un álbum, no un álbum aparte
+    const full = path.join(base, e.name);
+    const audio = audioFiles(full);
+    if (!audio.length) continue;
+    const tags = await readTags(path.join(full, audio[0]));
+    const inLibrary = !!(tags.artist && tags.album && libSet.has(libKey(tags.artist, tags.album)));
+    subfolders.push({
+      source_dir: full,
+      name: e.name,
+      tracks: audio.length,
+      ...tags,
+      inLibrary,
+      alreadyImported: done.has(full) || ignored.has(path.resolve(full)),
+    });
+  }
+  return { subfolders };
 }
 
 // Hardlinkea una descarga a media/music/<Artista>/<Álbum (Año)>. `override` permite

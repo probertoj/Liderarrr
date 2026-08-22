@@ -15,7 +15,7 @@ import { jackettTest, jackettSearch } from './jackett.js';
 import { qbTest, qbAdd } from './qbittorrent.js';
 import { deleteAlbumFromDisk } from './albumdelete.js';
 import { refileAlbum, correctedAlbums, refileAll } from './refile.js';
-import { pendingImports, importFolder } from './importer.js';
+import { pendingImports, importFolder, listAlbumSubfolders, ignoreImport, unignoreImport } from './importer.js';
 import { recordGrab, magnetHash, downloadsList, activeRequestRgs, clearImported } from './downloads.js';
 import { runAutoImport, autoImportStatus, autoImportEnabled } from './autoimport.js';
 import { runAutoGrab, autoGrabConfig, autoGrabStatus, searchAndGrabBest } from './autograb.js';
@@ -824,6 +824,35 @@ app.post('/api/imports/run', async (req, reply) => {
     if (album != null) override.album = album;
     if (year != null && year !== '') override.year = Number(year);
     return await importFolder(sourceDir, override);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// subcarpetas «de álbum» de un vertedero multiálbum, para importarlas una a una
+app.get('/api/imports/subfolders', async (req, reply) => {
+  try {
+    const dir = req.query?.dir;
+    if (!dir) return reply.code(400).send({ error: 'Falta la carpeta (dir).' });
+    return await listAlbumSubfolders(dir);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// ocultar / mostrar una carpeta de la lista de importar («ya la tengo» / deshacer)
+app.post('/api/imports/ignore', async (req, reply) => {
+  try {
+    const { sourceDir } = req.body || {};
+    if (!sourceDir) return reply.code(400).send({ error: 'Falta la carpeta.' });
+    return ignoreImport(sourceDir);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/imports/unignore', async (req, reply) => {
+  try {
+    const { sourceDir } = req.body || {};
+    if (!sourceDir) return reply.code(400).send({ error: 'Falta la carpeta.' });
+    return unignoreImport(sourceDir);
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }
