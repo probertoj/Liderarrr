@@ -151,7 +151,7 @@ function AddForm({ onDone }) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && importUrl()}
-            placeholder="Pega la URL de la lista (AOTY, record.club, Rosy Overdrive…)"
+            placeholder="Pega la URL de la lista (AOTY, record.club, Rosy Overdrive, Hip Hop Golden Age…)"
             className="flex-1 bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
           />
           <Button onClick={importUrl} disabled={busy}>
@@ -161,7 +161,8 @@ function AddForm({ onDone }) {
         <div className="text-[11px] text-neutral-600 mt-1 space-y-0.5">
           <div>
             <span className="text-neutral-500">Reconoce bien:</span> AlbumOfTheYear (listas con ranking, aunque sean
-            largas), record.club (listas públicas de usuario), Rosy Overdrive (posts con «Artista – Álbum»).
+            largas), record.club (listas públicas de usuario), Rosy Overdrive (posts con «Artista – Álbum») y Hip Hop
+            Golden Age (sus listas /list/…).
           </div>
           <div>
             Otras webs se intentan con un lector genérico (busca líneas «Artista - Álbum»). RateYourMusic bloquea a

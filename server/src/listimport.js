@@ -126,16 +126,82 @@ function extractRecordClub(md) {
   return out;
 }
 
+// Decodifica entidades HTML comunes y quita etiquetas: para leer texto de encabezados HTML.
+function decodeEntities(s) {
+  return String(s || '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
+    .replace(/&amp;/g, '&')
+    .replace(/&ndash;/g, '–')
+    .replace(/&mdash;/g, '—')
+    .replace(/&quot;/g, '"')
+    .replace(/&(?:apos|#39);/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// hiphopgoldenage.com (WordPress): cada disco es un encabezado «<h2>/<h3> Artista - Álbum»,
+// y la lista va rankeada por orden de aparición. Se lee DIRECTO (sin r.jina.ai, que a veces
+// da 403), extrayendo esos encabezados en orden. isEntry descarta títulos de sección (sin
+// el separador «Artista - Álbum»).
+async function fetchHhga(url) {
+  let res;
+  try {
+    res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Liderarrr list importer)', Accept: 'text/html' },
+      signal: AbortSignal.timeout(30000),
+    });
+  } catch (err) {
+    const why = err?.name === 'TimeoutError' ? 'tardó demasiado' : String(err?.message || err);
+    throw new Error(`No se pudo leer la URL (${why})`);
+  }
+  if (!res.ok) throw new Error(`hiphopgoldenage devolvió ${res.status} para esa URL`);
+  return res.text();
+}
+function extractHhga(html) {
+  const out = [];
+  const seen = new Set();
+  for (const m of String(html || '').matchAll(/<h[1-4][^>]*>([\s\S]*?)<\/h[1-4]>/gi)) {
+    const tx = decodeEntities(m[1]);
+    if (!isEntry(tx)) continue;
+    const k = tx.toLowerCase();
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push(tx);
+    }
+  }
+  return out;
+}
+function hhgaTitle(html) {
+  const t = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  if (!t) return null;
+  return (
+    decodeEntities(t[1])
+      .replace(/\s*[-|–—]?\s*Hip[ -]?Hop[ -]?Golden[ -]?Age/gi, '') // quita el nombre del sitio (repetido)
+      .replace(/\s*[-|–—]\s*$/, '') // separador colgante
+      .trim() || null
+  );
+}
+
 export async function importListFromUrl(url, name) {
   if (!/^https?:\/\//i.test(String(url || ''))) throw new Error('Pon una URL válida (http/https)');
   url = url.trim();
   const isAoty = /albumoftheyear\.org/i.test(url);
   const isRosy = /rosyoverdrive\.com/i.test(url);
   const isRecordClub = /record\.club/i.test(url);
+  const isHhga = /hiphopgoldenage\.com/i.test(url);
   let lines;
   let listTitle = null;
   let partial = false;
-  if (isRosy) {
+  if (isHhga) {
+    const html = await fetchHhga(url);
+    lines = extractHhga(html);
+    listTitle = hhgaTitle(html);
+  } else if (isRosy) {
     // Rosy Overdrive: parseo directo del HTML (encabezados «Artista – Álbum»), fiable y
     // sin depender del lector. El título del post nombra el reto si no se dio nombre.
     ({ lines, listTitle } = await rosyList(url));
