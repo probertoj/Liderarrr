@@ -112,6 +112,7 @@ export const api = {
   newReleases: () => req('/newreleases'),
   refreshNewReleases: () => req('/newreleases/refresh', { method: 'POST' }),
   dismissNewRelease: (id) => req(`/newreleases/${id}/dismiss`, { method: 'POST' }),
+  spotifyAlbum: (artist, title) => req(`/spotify/album?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`),
   searchArtistMb: (q) => req(`/artists/search-mb?q=${encodeURIComponent(q)}`),
   findLocal: (q) => req(`/find/local?q=${encodeURIComponent(q)}`),
   findExternal: (q) => req(`/find/external?q=${encodeURIComponent(q)}`),

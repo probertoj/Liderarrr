@@ -414,6 +414,7 @@ CREATE TABLE IF NOT EXISTS external_releases (
   record_type TEXT,          -- album | ep | single
   cover TEXT,
   url TEXT,                  -- enlace externo (Deezer/Spotify)
+  ahead INTEGER DEFAULT 1,   -- 1 = MB aún no lo lista («adelantada»); 0 = MB ya lo tiene
   first_seen INTEGER,
   dismissed INTEGER DEFAULT 0,
   UNIQUE(artist_id, match_key)
@@ -430,6 +431,8 @@ function ensureColumn(table, column, decl) {
   }
 }
 // Reservado para cuando el esquema evolucione entre versiones.
+// novedades externas: marca de «adelantada» (MB aún no la lista) para las que ya existían
+ensureColumn('external_releases', 'ahead', 'ahead INTEGER DEFAULT 1');
 ensureColumn('albums', 'disc_count', 'disc_count INTEGER DEFAULT 1');
 // multidiscos: marca qué álbumes son DISCOS de una misma caja, para que las vistas
 // los cuenten como un solo álbum (lo rellena discgroup.js; nullable = álbum normal).

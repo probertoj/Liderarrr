@@ -1,4 +1,5 @@
-import { getSetting } from './db.js';
+import { getSetting, cacheRead, cacheWrite } from './db.js';
+import { matchKey, normName, cleanTitleForMatch } from './matchkey.js';
 
 // Spotify (solo lectura de catálogo: discografías y novedades) con el flujo
 // «client credentials» — NO requiere login de usuario, solo un client id + secret de una
@@ -64,6 +65,32 @@ async function findArtist(name) {
   if (!items.length) return null;
   items.sort((a, b) => (b.followers?.total || 0) - (a.followers?.total || 0));
   return { id: items[0].id, name: items[0].name };
+}
+
+// URL del álbum CONCRETO en Spotify (para enlazar directo desde la ficha, en vez de al
+// buscador). Busca por «artista título», elige la mejor coincidencia (artista + título
+// normalizados) y cachea el resultado —también los fallos— 30 días para no repetir la
+// búsqueda. Devuelve la URL o null (si no está configurado o no hay coincidencia).
+const ALBUM_TTL = 30 * 24 * 3600 * 1000;
+export async function spotifyAlbumUrl(artist, title) {
+  if (!artist || !title || !spotifyConfigured()) return null;
+  const key = `spotify:album:${matchKey(artist, title)}`;
+  const cached = cacheRead(key, ALBUM_TTL);
+  if (cached !== null) return cached.url || null; // incluye fallos cacheados ({url:null})
+  let out = { url: null };
+  try {
+    const data = await spFetch(`/search?q=${encodeURIComponent(`${artist} ${title}`)}&type=album&limit=8`);
+    const items = data.albums?.items || [];
+    const wantArtist = normName(artist);
+    const wantTitle = cleanTitleForMatch(title);
+    const byArtist = (al) => (al.artists || []).some((a) => normName(a.name) === wantArtist);
+    let best = items.find((al) => byArtist(al) && cleanTitleForMatch(al.name) === wantTitle) || items.find(byArtist);
+    if (best) out = { url: best.external_urls?.spotify || null, id: best.id };
+  } catch {
+    out = { url: null };
+  }
+  cacheWrite(key, out);
+  return out.url || null;
 }
 
 // Discografía reciente de un artista (por nombre). Devuelve álbumes/EP/singles con fecha,

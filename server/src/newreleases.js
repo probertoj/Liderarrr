@@ -37,13 +37,24 @@ async function deezerArtistAlbums(artistId) {
 const KEEP_TYPES = new Set(['album', 'ep']); // fuera singles y recopilatorios: buscamos discos
 
 const upsert = db.prepare(
-  `INSERT OR IGNORE INTO external_releases
-     (source, artist_id, artist, title, match_key, release_date, record_type, cover, url, first_seen)
-   VALUES (@source, @artist_id, @artist, @title, @match_key, @release_date, @record_type, @cover, @url, @now)`
+  `INSERT INTO external_releases
+     (source, artist_id, artist, title, match_key, release_date, record_type, cover, url, ahead, first_seen)
+   VALUES (@source, @artist_id, @artist, @title, @match_key, @release_date, @record_type, @cover, @url, @ahead, @now)
+   ON CONFLICT(artist_id, match_key) DO UPDATE SET
+     source = excluded.source,
+     release_date = excluded.release_date,
+     record_type = excluded.record_type,
+     cover = COALESCE(excluded.cover, external_releases.cover),
+     url = COALESCE(excluded.url, external_releases.url),
+     ahead = excluded.ahead
+   WHERE external_releases.dismissed = 0`
 );
 
-// Recalcula las novedades externas. months = ventana hacia atrás (por defecto 18 meses).
-export async function refreshExternalReleases({ months = 18, maxArtists = 500 } = {}) {
+// Recalcula las novedades externas: estrenos RECIENTES de tus artistas seguidos (Deezer +
+// Spotify) que NO tienes, tenga MB constancia o no. Las que MB aún no lista se marcan
+// `ahead = 1` («adelantada»); el resto son recientes normales (feed semanal). months = la
+// ventana hacia atrás (por defecto 6 meses, suficiente para un feed semana a semana).
+export async function refreshExternalReleases({ months = 6, maxArtists = 500 } = {}) {
   const seeds = db
     .prepare(
       `SELECT ar.id, ar.name FROM tracked_artists t JOIN artists ar ON ar.id = t.artist_id
@@ -67,7 +78,6 @@ export async function refreshExternalReleases({ months = 18, maxArtists = 500 } 
       .all()
       .map((r) => matchKey(r.artist, r.title))
   );
-  const seen = (mk) => ownedKeys.has(mk) || mbKeys.has(mk);
 
   const spotifyOn = spotifyConfigured();
   let added = 0;
@@ -104,7 +114,7 @@ export async function refreshExternalReleases({ months = 18, maxArtists = 500 } 
       const date = (c.release_date || '').slice(0, 10);
       if (!date || date < cutoff || date === '0000-00-00') continue;
       const mk = matchKey(s.name, c.title);
-      if (seen(mk)) continue;
+      if (ownedKeys.has(mk)) continue; // solo saltamos lo que YA tienes
       const info = upsert.run({
         source: c.source,
         artist_id: s.id,
@@ -115,18 +125,20 @@ export async function refreshExternalReleases({ months = 18, maxArtists = 500 } 
         record_type: type,
         cover: c.cover || null,
         url: c.url || null,
+        ahead: mbKeys.has(mk) ? 0 : 1, // MB aún no lo lista → adelantada
         now,
       });
       if (info.changes) added++;
     }
   }
 
-  // poda: fuera lo que MB/biblioteca ya alcanzaron, y lo más viejo que la ventana
+  // poda: fuera lo que YA tienes y lo más viejo que la ventana (lo que MB alcanza NO se
+  // borra: solo deja de ser «adelantada», ya lo actualiza el upsert con ahead = 0)
   const stored = db.prepare('SELECT id, match_key, release_date FROM external_releases').all();
   const del = db.prepare('DELETE FROM external_releases WHERE id = ?');
   const prune = db.transaction(() => {
     for (const r of stored) {
-      if (seen(r.match_key) || (r.release_date && r.release_date < cutoff)) del.run(r.id);
+      if (ownedKeys.has(r.match_key) || (r.release_date && r.release_date < cutoff)) del.run(r.id);
     }
   });
   prune();
@@ -135,11 +147,12 @@ export async function refreshExternalReleases({ months = 18, maxArtists = 500 } 
   return { count, added, seeds: seeds.length };
 }
 
-// Novedades para la UI (Lanzamientos). Más recientes primero. Marca el artista local.
-export function externalNewReleases({ limit = 100 } = {}) {
+// Novedades para la UI (Lanzamientos). Más recientes primero; `ahead` marca las que MB
+// aún no lista (para el badge «⚡ MB no lo tiene»). Marca el artista local.
+export function externalNewReleases({ limit = 200 } = {}) {
   return db
     .prepare(
-      `SELECT e.id, e.source, e.artist_id, e.artist, e.title, e.release_date, e.record_type, e.cover, e.url,
+      `SELECT e.id, e.source, e.artist_id, e.artist, e.title, e.release_date, e.record_type, e.cover, e.url, e.ahead,
         (SELECT 1 FROM tracked_artists ta WHERE ta.artist_id = e.artist_id) AS tracked
        FROM external_releases e
        WHERE e.dismissed = 0
@@ -147,7 +160,7 @@ export function externalNewReleases({ limit = 100 } = {}) {
        LIMIT ?`
     )
     .all(limit)
-    .map((r) => ({ ...r, tracked: !!r.tracked }));
+    .map((r) => ({ ...r, tracked: !!r.tracked, ahead: !!r.ahead }));
 }
 
 export function dismissExternalRelease(id) {

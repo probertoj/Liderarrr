@@ -193,15 +193,7 @@ export default function AlbumDetail() {
                   >
                     Record Club <ExternalLink size={11} />
                   </a>
-                  <a
-                    href={`https://open.spotify.com/search/${encodeURIComponent(q)}/albums`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-gold-400 hover:underline inline-flex items-center gap-1"
-                    title="Buscar este disco en Spotify (útil para sincronizar tu biblioteca de Spotify con la local)"
-                  >
-                    Spotify <ExternalLink size={11} />
-                  </a>
+                  <SpotifyLink artist={album.artist?.name || album.album_artist} title={album.title} />
                 </>
               );
             })()}
@@ -2006,5 +1998,37 @@ function SearchSection({ album }) {
         </div>
       )}
     </div>
+  );
+}
+
+// Enlace a Spotify: si hay conexión con Spotify, resuelve el ÁLBUM concreto (enlace
+// directo); si no (o no se encuentra), cae al buscador. La resolución va cacheada 30 días
+// en el servidor, así que es barata.
+function SpotifyLink({ artist, title }) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    let live = true;
+    if (artist && title) {
+      api
+        .spotifyAlbum(artist, title)
+        .then((r) => live && setUrl(r?.url || null))
+        .catch(() => {});
+    }
+    return () => {
+      live = false;
+    };
+  }, [artist, title]);
+  const q = `${artist || ''} ${title || ''}`.trim();
+  const direct = !!url;
+  return (
+    <a
+      href={direct ? url : `https://open.spotify.com/search/${encodeURIComponent(q)}/albums`}
+      target="_blank"
+      rel="noreferrer"
+      className="text-xs text-gold-400 hover:underline inline-flex items-center gap-1"
+      title={direct ? 'Abrir este disco en Spotify' : 'Buscar este disco en Spotify'}
+    >
+      Spotify <ExternalLink size={11} />
+    </a>
   );
 }

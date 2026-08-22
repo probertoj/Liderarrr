@@ -40,7 +40,7 @@ import {
 import { gaps, upcoming, recentlyReleased, dismissGap, undismissGap, dismissedList } from './discover.js';
 import { similarSuggestions, refreshArtistSuggestions, dismissSuggestion, followSuggestion } from './suggest.js';
 import { externalNewReleases, refreshExternalReleases, dismissExternalRelease } from './newreleases.js';
-import { spotifyTest } from './spotify.js';
+import { spotifyTest, spotifyAlbumUrl } from './spotify.js';
 import {
   followLabel,
   followLabelByName,
@@ -399,6 +399,8 @@ app.post('/api/newreleases/refresh', async (req, reply) => {
   }
 });
 app.post('/api/newreleases/:id/dismiss', async (req) => dismissExternalRelease(req.params.id));
+// URL del álbum concreto en Spotify (enlace directo desde la ficha; null si no hay)
+app.get('/api/spotify/album', async (req) => ({ url: await spotifyAlbumUrl(req.query?.artist, req.query?.title) }));
 
 // búsqueda rápida del Dashboard: local (instantáneo) + externo (MusicBrainz)
 app.get('/api/find/local', async (req) => findLocal(req.query?.q));

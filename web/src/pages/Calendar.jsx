@@ -135,7 +135,9 @@ function ExternalReleaseRow({ r, added, busy, onAdd, onSearch, onDismiss }) {
             {r.record_type && r.record_type !== 'album' ? ` · ${r.record_type.toUpperCase()}` : ''}
           </span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-ink-700 text-neutral-500 uppercase">{r.source}</span>
-          <span className="text-amber-400/80" title="MusicBrainz aún no lo lista">⚡ MB no lo tiene</span>
+          {r.ahead && (
+            <span className="text-amber-400/80" title="MusicBrainz aún no lo lista">⚡ MB no lo tiene</span>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -818,10 +820,19 @@ export default function Calendar() {
           .sort((a, b) => (a.release_date || '').localeCompare(b.release_date || ''))
       : [];
 
+  // En «Novedades» agrupamos por SEMANA (feed semana a semana); en el resto, por mes.
+  const weekKey = (dateStr) => {
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return '????';
+    const day = (d.getUTCDay() + 6) % 7; // 0 = lunes
+    d.setUTCDate(d.getUTCDate() - day);
+    return d.toISOString().slice(0, 10);
+  };
   const months = {};
   for (const r of rows || []) {
     if (view === 'radar' && r.is_upcoming) continue; // van en radarUpcoming
-    const key = (r.first_release || r.release_date || '????').slice(0, 7);
+    const key =
+      view === 'novedades' ? weekKey(r.release_date) : (r.first_release || r.release_date || '????').slice(0, 7);
     (months[key] ||= []).push(r);
   }
   const monthKeys = Object.keys(months).sort((a, b) => (view === 'upcoming' ? a.localeCompare(b) : b.localeCompare(a)));
@@ -830,6 +841,11 @@ export default function Calendar() {
     const [y, m] = k.split('-');
     return new Date(y, m - 1).toLocaleDateString('es', { month: 'long', year: 'numeric' });
   };
+  const fmtWeek = (k) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) return 'Fecha por confirmar';
+    return `Semana del ${new Date(k + 'T00:00:00Z').toLocaleDateString('es', { day: 'numeric', month: 'long', timeZone: 'UTC' })}`;
+  };
+  const fmtGroup = (k) => (view === 'novedades' ? fmtWeek(k) : fmtMonth(k));
 
   const tab = (id, label) => (
     <button
@@ -867,7 +883,7 @@ export default function Calendar() {
                     : view === 'radar'
                       ? 'en el radar'
                       : view === 'novedades'
-                        ? 'novedades que MusicBrainz aún no tiene'
+                        ? 'novedades de tus artistas (⚡ = MusicBrainz aún no las tiene)'
                         : 'estrenados en la ventana'
               }`
             : ''
@@ -943,7 +959,7 @@ export default function Calendar() {
               ? 'Aún no sigues ningún curador. Añade uno arriba (p. ej. calltheranger) para empezar.'
               : 'Nada en el radar en esta ventana. Amplía el rango o sigue a más curadores.'
             : view === 'novedades'
-              ? 'Sin novedades adelantadas. Se buscan en Deezer/Spotify para tus artistas seguidos en el refresco: pulsa «Identificar y sincronizar» (o espera al ciclo nocturno). Requiere seguir a algún artista.'
+              ? 'Sin novedades. Se buscan estrenos recientes de tus artistas seguidos en Deezer/Spotify en el refresco: pulsa «Identificar y sincronizar» (o espera al ciclo nocturno). Requiere seguir a algún artista.'
               : view === 'labels'
                 ? labels.length === 0
                   ? 'Aún no sigues ningún sello. Busca uno arriba para empezar.'
@@ -973,7 +989,7 @@ export default function Calendar() {
           )}
           {monthKeys.map((month) => (
             <div key={month}>
-              <h2 className="text-sm text-gold-400/80 mb-2 capitalize">{fmtMonth(month)}</h2>
+              <h2 className="text-sm text-gold-400/80 mb-2 capitalize">{fmtGroup(month)}</h2>
               <div className="space-y-1.5">
                 {view === 'radar'
                   ? months[month].map((r) => (
