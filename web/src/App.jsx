@@ -221,24 +221,48 @@ export default function App() {
     document.documentElement.classList.toggle('light', theme === 'light');
     localStorage.setItem('theme', theme);
   }, [theme]);
+  // Móvil: al abrir el menú, congela el scroll del fondo (si no, se desplaza «por debajo»
+  // del drawer al arrastrar). Se restaura al cerrar o desmontar.
+  useEffect(() => {
+    document.body.style.overflow = open ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+  // Cierra el drawer al navegar (además del onClick de cada enlace): cubre navegación
+  // programática y volver atrás con el menú abierto.
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
 
   return (
-    <div className="min-h-screen md:flex">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="md:hidden fixed top-3 left-3 z-30 p-2 rounded-lg bg-ink-850 border border-ink-800"
-        aria-label="Menú"
-      >
-        {open ? <X size={18} /> : <Menu size={18} />}
-      </button>
+    <div className="min-h-[100dvh] md:flex">
+      {/* Fondo oscuro en móvil: tocar fuera del drawer lo cierra. */}
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          className="md:hidden fixed inset-0 z-10 bg-black/60 backdrop-blur-sm"
+          aria-hidden="true"
+        />
+      )}
 
       <aside
-        className={`fixed md:sticky top-0 z-20 h-screen w-64 shrink-0 bg-ink-900 border-r border-ink-800 flex flex-col
-          transition-transform ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+        className={`drawer fixed md:sticky top-0 z-20 h-[100dvh] w-72 max-w-[85vw] md:w-64 shrink-0 bg-ink-900 border-r border-ink-800 flex flex-col
+          pt-[env(safe-area-inset-top)] ${open ? '' : 'drawer-closed'}`}
       >
-        <div className="px-5 py-5">
-          <Logo />
-          <div className="text-[11px] text-neutral-600 mt-1.5">completismo musical · v{version}</div>
+        <div className="px-5 py-5 flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <Logo />
+            <div className="text-[11px] text-neutral-600 mt-1.5">completismo musical · v{version}</div>
+          </div>
+          {/* Cerrar (solo móvil): además del fondo y de elegir sección. */}
+          <button
+            onClick={() => setOpen(false)}
+            className="md:hidden -mr-1 -mt-1 p-2 rounded-lg text-neutral-500 hover:bg-ink-850 active:bg-ink-800"
+            aria-label="Cerrar menú"
+          >
+            <X size={18} />
+          </button>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 space-y-5">
           {NAV.map((group) => (
@@ -265,7 +289,7 @@ export default function App() {
             </div>
           ))}
         </nav>
-        <div className="p-3 border-t border-ink-800 space-y-2">
+        <div className="p-3 border-t border-ink-800 space-y-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <RefreshButton />
           <button
             onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
@@ -277,7 +301,24 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 px-4 md:px-8 py-6 md:py-8 max-w-[1400px]">
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Barra superior SOLO en móvil: abre el menú y muestra el logo. Sustituye a la
+            hamburguesa flotante (que se solapaba con los títulos de página). Sticky y con
+            hueco para el notch (safe-area-inset-top). */}
+        <header className="md:hidden sticky top-0 z-10 flex items-center gap-2 h-14 px-2 bg-ink-900/90 backdrop-blur border-b border-ink-800 pt-[env(safe-area-inset-top)] box-content">
+          <button
+            onClick={() => setOpen(true)}
+            className="p-2 rounded-lg text-neutral-300 hover:bg-ink-850 active:bg-ink-800"
+            aria-label="Abrir menú"
+          >
+            <Menu size={22} />
+          </button>
+          <div className="w-[84px] shrink-0">
+            <Logo />
+          </div>
+        </header>
+
+        <main className="min-w-0 px-4 md:px-8 py-6 md:py-8 max-w-[1400px] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <UpdateBanner />
         <ErrorBoundary key={location.pathname}>
           <Suspense fallback={<Spinner label="Cargando…" />}>
@@ -307,7 +348,8 @@ export default function App() {
           </Routes>
           </Suspense>
         </ErrorBoundary>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

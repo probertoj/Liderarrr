@@ -56,11 +56,36 @@
   --chart-2: #ca9b52;
 }
 
+html {
+  /* iOS: no reescalar el texto al girar el móvil; no permitir zoom horizontal accidental */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   background: var(--color-ink-950);
   color: var(--text-body);
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* iPhone: nada de rebote elástico que descubre el fondo del navegador; ni scroll lateral */
+  overscroll-behavior-y: none;
+  overflow-x: hidden;
+}
+
+/* iOS: quita el destello gris al tocar (lo sustituye el :active de cada control) */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iPhone/Safari: si un campo tiene menos de 16px, Safari HACE ZOOM al enfocarlo (muy
+   molesto). En móvil forzamos 16px en todos los campos de texto para que no pase.
+   Va con !important porque compite con utilidades de Tailwind (text-sm = 14px). */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 .font-display {
@@ -84,4 +109,20 @@ body {
   background: var(--color-ink-900);
   border: 1px solid var(--color-ink-800);
   border-radius: 12px;
+}
+
+/* Drawer de navegación (móvil): fuera de pantalla por defecto, entra al abrir. En
+   escritorio (md+, ≥768px) NO se traslada: es una columna fija siempre visible. Se hace
+   con CSS plano a propósito — las utilidades translate-x-* de Tailwind v4 no calculaban
+   bien la propiedad `translate` aquí (el panel se quedaba en left:-288 aun abierto). */
+.drawer {
+  transition: transform 0.2s ease;
+}
+/* Cerrado en móvil = empujado fuera a la izquierda. Abierto = sin regla (posición
+   natural, left:0). Una sola clase evita conflictos de especificidad/orden. En md+
+   nunca se añade drawer-closed, así que la columna está siempre visible. */
+@media (max-width: 767px) {
+  .drawer-closed {
+    transform: translateX(-100%);
+  }
 }
