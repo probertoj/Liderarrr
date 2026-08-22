@@ -166,7 +166,12 @@ export const api = {
   albumGap: (since) => req(`/listening/album-gap${since ? `?since=${since}` : ''}`),
   unplayed: () => req('/listening/unplayed'),
   topPlayed: (since, limit) => req(`/listening/top?limit=${limit || 12}${since ? `&since=${since}` : ''}`),
-  wrapped: (year) => req(`/listening/wrapped${year ? `?year=${year}` : ''}`),
+  wrapped: (since, until) => {
+    const p = [];
+    if (since) p.push(`since=${since}`);
+    if (until) p.push(`until=${until}`);
+    return req(`/listening/wrapped${p.length ? `?${p.join('&')}` : ''}`);
+  },
   challenges: () => req('/challenges'),
   nextChallengeListens: () => req('/challenges/next-listens'),
   addChallenge: (name, text) => req('/challenges', { method: 'POST', body: { name, text } }),

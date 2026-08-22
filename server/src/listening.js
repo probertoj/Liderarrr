@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { deezerAlbumCover } from './artistpix.js';
 
 // Análisis de escuchas y la brecha escucha↔propiedad.
 //
@@ -128,18 +129,10 @@ export function topPlayed({ since = null, limit = 12 } = {}) {
   return { artists, albums };
 }
 
-// «Resumen» tipo Wrapped: la foto de un AÑO (o de todo el tiempo). Totales, top artistas
-// y álbumes escuchados, cuántos discos añadiste a la colección y tu evolución por mes.
-export function wrapped({ year = null } = {}) {
-  let since = null;
-  let until = null;
-  let label = 'Todo el tiempo';
-  if (year && String(year) !== 'all') {
-    const y = Number(year);
-    since = Date.UTC(y, 0, 1);
-    until = Date.UTC(y + 1, 0, 1) - 1;
-    label = String(y);
-  }
+// «Resumen» tipo Wrapped: la foto de un periodo (semana/mes/año o todo, vía since/until en
+// ms). Totales, top artistas y álbumes escuchados (con carátula para el mosaico), cuántos
+// discos añadiste a la colección y tu evolución por mes.
+export async function wrapped({ since = null, until = null } = {}) {
   const range = (col = 'ts') => {
     let c = '';
     const a = {};
@@ -164,21 +157,37 @@ export function wrapped({ year = null } = {}) {
 
   const owned = ownedArtistMap();
   const topArtists = db
-    .prepare(`SELECT artist, COUNT(*) AS plays FROM listens WHERE source='lastfm'${rt.c} GROUP BY LOWER(artist) ORDER BY plays DESC LIMIT 10`)
+    .prepare(`SELECT artist, COUNT(*) AS plays FROM listens WHERE source='lastfm'${rt.c} GROUP BY LOWER(artist) ORDER BY plays DESC LIMIT 12`)
     .all(rt.a)
     .map((r) => {
       const o = owned.get(normArtist(r.artist));
       return { artist: r.artist, plays: r.plays, artist_id: o?.id || null, owned_albums: o?.albums || 0 };
     });
 
-  const ownedAlbums = ownedAlbumSet();
+  // mapa clave-álbum → id local (para carátula instantánea de lo que tienes)
+  const ownedAlbumMap = new Map();
+  for (const a of db.prepare("SELECT id, album_artist, title FROM albums WHERE match_state != 'dismissed'").all()) {
+    const k = albumKey(a.album_artist, a.title);
+    if (!ownedAlbumMap.has(k)) ownedAlbumMap.set(k, a.id);
+  }
   const topAlbums = db
     .prepare(
       `SELECT artist, album, COUNT(*) AS plays FROM listens WHERE source='lastfm' AND album<>''${rt.c}
-       GROUP BY LOWER(artist), LOWER(album) ORDER BY plays DESC LIMIT 10`
+       GROUP BY LOWER(artist), LOWER(album) ORDER BY plays DESC LIMIT 24`
     )
     .all(rt.a)
-    .map((r) => ({ artist: r.artist, album: r.album, plays: r.plays, owned: ownedAlbums.has(albumKey(r.artist, r.album)) }));
+    .map((r) => {
+      const id = ownedAlbumMap.get(albumKey(r.artist, r.album)) || null;
+      return { artist: r.artist, album: r.album, plays: r.plays, album_id: id, owned: !!id, cover: null };
+    });
+  // carátula de los que NO tienes: Deezer (cacheado), en paralelo, para el mosaico
+  await Promise.all(
+    topAlbums
+      .filter((a) => !a.album_id)
+      .map(async (a) => {
+        a.cover = await deezerAlbumCover(a.artist, a.album).catch(() => null);
+      })
+  );
 
   // discos añadidos a la colección en el periodo (albums.added_at = mtime de la carpeta)
   const ra = range('added_at');
@@ -204,7 +213,7 @@ export function wrapped({ year = null } = {}) {
     .all()
     .map((r) => r.y);
 
-  return { label, year: year || 'all', totals, topArtists, topAlbums, addedCount, addedTop, byMonth, years };
+  return { totals, topArtists, topAlbums, addedCount, addedTop, byMonth, years };
 }
 
 // La brecha: artistas que escuchas mucho y de los que tienes poco o nada.

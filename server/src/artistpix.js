@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { db, DATA_DIR } from './db.js';
+import { db, DATA_DIR, cacheRead, cacheWrite } from './db.js';
+import { matchKey } from './matchkey.js';
 
 // Fotos de artista, en paralelo a las carátulas (covers.js): resolución automática
 // desde Deezer (por nombre, sin API key) y edición manual (buscar candidatos o subir).
@@ -92,6 +93,33 @@ export async function deezerFindArtist(name) {
   hits.sort((a, b) => (b.nb_fan || 0) - (a.nb_fan || 0));
   const best = hits[0];
   return { id: best.id, name: best.name, image: best.url || best.thumb || null };
+}
+
+// Carátula de un álbum por Deezer (sin API key), para pintar portadas de discos que NO
+// tienes en la biblioteca (p. ej. el mosaico del Resumen). Cacheada 30 días —también los
+// fallos— para no repetir la búsqueda.
+const ALBUM_COVER_TTL = 30 * 24 * 3600 * 1000;
+export async function deezerAlbumCover(artist, title) {
+  if (!artist || !title) return null;
+  const key = `deezer:albumcover:${matchKey(artist, title)}`;
+  const cached = cacheRead(key, ALBUM_COVER_TTL);
+  if (cached !== null) return cached.url || null;
+  let out = { url: null };
+  try {
+    const res = await fetch(
+      `https://api.deezer.com/search/album?q=${encodeURIComponent(`${artist} ${title}`)}&limit=1`,
+      { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(10000) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const al = data.data?.[0];
+      if (al) out = { url: al.cover_medium || al.cover_big || al.cover || null };
+    }
+  } catch {
+    /* sin portada */
+  }
+  cacheWrite(key, out);
+  return out.url || null;
 }
 
 // Resolución RÁPIDA (sin red): foto en caché. 'ok' | 'none' | 'pending' | 'notfound'.

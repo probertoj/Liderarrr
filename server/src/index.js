@@ -600,7 +600,12 @@ app.get('/api/listening/unplayed', async () => ownedUnplayed());
 app.get('/api/listening/top', async (req) =>
   topPlayed({ since: req.query?.since ? Number(req.query.since) : null, limit: Number(req.query?.limit) || 12 })
 );
-app.get('/api/listening/wrapped', async (req) => (hasScrobbles() ? wrapped({ year: req.query?.year || null }) : { empty: true }));
+app.get('/api/listening/wrapped', async (req) => {
+  if (!hasScrobbles()) return { empty: true };
+  const since = req.query?.since ? Number(req.query.since) : null;
+  const until = req.query?.until ? Number(req.query.until) : null;
+  return await wrapped({ since, until });
+});
 
 // --- retos ------------------------------------------------------------------
 app.get('/api/challenges', async () => listChallenges());
