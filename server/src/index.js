@@ -38,6 +38,9 @@ import {
   suggestedArtists,
 } from './tracked.js';
 import { gaps, upcoming, recentlyReleased, dismissGap, undismissGap, dismissedList } from './discover.js';
+import { similarSuggestions, refreshArtistSuggestions, dismissSuggestion, followSuggestion } from './suggest.js';
+import { externalNewReleases, refreshExternalReleases, dismissExternalRelease } from './newreleases.js';
+import { spotifyTest } from './spotify.js';
 import {
   followLabel,
   followLabelByName,
@@ -132,7 +135,7 @@ app.get('/api/update-check', async () => updateCheck());
 app.get('/api/diag', async () => diagnostics());
 
 // --- ajustes ----------------------------------------------------------------
-const SECRET_KEYS = new Set(['lidarr_key', 'prowlarr_key', 'jackett_key', 'qbittorrent_pass', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token']);
+const SECRET_KEYS = new Set(['lidarr_key', 'prowlarr_key', 'jackett_key', 'qbittorrent_pass', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token', 'spotify_client_secret']);
 app.get('/api/settings', async () => {
   const raw = getAllSettings();
   const out = {};
@@ -164,6 +167,7 @@ app.post('/api/settings/test/:service', async (req, reply) => {
       acoustid: acoustidTest,
       discogs: discogsTest,
       lastfm: lastfmTest,
+      spotify: spotifyTest,
     };
     if (!map[svc]) return reply.code(404).send({ error: 'Servicio desconocido' });
     return await map[svc]();
@@ -367,6 +371,35 @@ app.get('/api/artists/search-mb', async (req, reply) => {
     return reply.code(400).send({ error: String(err.message || err) });
   }
 });
+// sugerencias de artistas para seguir (similares de Last.fm)
+app.get('/api/suggestions/artists', async (req) => similarSuggestions(Number(req.query?.limit) || 40));
+app.post('/api/suggestions/refresh', async (req, reply) => {
+  try {
+    return await refreshArtistSuggestions();
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/suggestions/follow', async (req, reply) => {
+  try {
+    return await followSuggestion({ name: req.body?.name, mbid: req.body?.mbid });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/suggestions/dismiss', async (req) => dismissSuggestion(req.body?.name));
+
+// novedades en Deezer/Spotify que MusicBrainz aún no lista
+app.get('/api/newreleases', async (req) => externalNewReleases({ limit: Number(req.query?.limit) || 100 }));
+app.post('/api/newreleases/refresh', async (req, reply) => {
+  try {
+    return await refreshExternalReleases();
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/newreleases/:id/dismiss', async (req) => dismissExternalRelease(req.params.id));
+
 // búsqueda rápida del Dashboard: local (instantáneo) + externo (MusicBrainz)
 app.get('/api/find/local', async (req) => findLocal(req.query?.q));
 app.get('/api/find/external', async (req, reply) => {

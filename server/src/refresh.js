@@ -9,6 +9,9 @@ import { refreshAllLabels } from './followlabels.js';
 import { refreshAllCurators } from './radar.js';
 import { runAutoImport, autoImportEnabled, autoImportStatus } from './autoimport.js';
 import { runAutoGrab, autoGrabConfig, autoGrabStatus } from './autograb.js';
+import { refreshExternalReleases } from './newreleases.js';
+import { refreshArtistSuggestions } from './suggest.js';
+import { lastfmConfigured } from './lastfm.js';
 import { db } from './db.js';
 
 // La rutina "poner Liderarrr al día", en orden de dependencias: primero el disco
@@ -108,6 +111,24 @@ function buildSteps() {
       run: async () => {
         const r = await refreshAllCurators();
         return `${r.done}/${r.total} curadores · ${r.added} novedades`;
+      },
+    },
+    {
+      key: 'newreleases',
+      label: 'Novedades en Deezer/Spotify que MusicBrainz aún no tiene',
+      enabled: () => !!db.prepare("SELECT 1 FROM tracked_artists WHERE facet = 'artist' LIMIT 1").get(),
+      run: async () => {
+        const r = await refreshExternalReleases();
+        return `${r.count} novedades (${r.added} nuevas) de ${r.seeds} artistas`;
+      },
+    },
+    {
+      key: 'suggestions',
+      label: 'Sugerir artistas para seguir (similares de Last.fm)',
+      enabled: () => lastfmConfigured(),
+      run: async () => {
+        const r = await refreshArtistSuggestions();
+        return r.skipped ? r.skipped : `${r.count} sugerencias de ${r.seeds} semillas`;
       },
     },
     {

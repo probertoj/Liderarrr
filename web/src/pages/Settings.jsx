@@ -285,11 +285,31 @@ export default function Settings() {
           </Steps>
           <p className="mt-1">Pon también tu usuario de Last.fm arriba para importar tus escuchas.</p>
         </HowTo>
+
+        <Field
+          label="Spotify · Client ID"
+          hint="Opcional. Suma Spotify como fuente de novedades adelantadas (además de Deezer, que ya funciona sin clave)."
+        >
+          <input value={s.spotify_client_id || ''} onChange={set('spotify_client_id')} className={input} placeholder="client id" />
+        </Field>
+        <Field label="Spotify · Client Secret">
+          <input value={s.spotify_client_secret || ''} onChange={set('spotify_client_secret')} className={input} placeholder="••••••••" />
+        </Field>
+        <HowTo title="¿Cómo consigo las credenciales de Spotify?">
+          <Steps>
+            <li>Entra en <code>developer.spotify.com/dashboard</code> e inicia sesión.</li>
+            <li>«Create app» (nombre y descripción cualesquiera; el Redirect URI puede ser <code>http://localhost</code>).</li>
+            <li>En la app, copia el «Client ID» y el «Client secret».</li>
+          </Steps>
+          <p className="mt-1">Solo se usa para leer catálogo (client credentials): no requiere tu cuenta ni login de usuario.</p>
+        </HowTo>
+
         <div className="flex flex-wrap gap-2 mt-3">
           <TestButton service="musicbrainz" label="MusicBrainz" beforeTest={save} />
           <TestButton service="acoustid" label="AcoustID" beforeTest={save} />
           <TestButton service="discogs" label="Discogs" beforeTest={save} />
           <TestButton service="lastfm" label="Last.fm" beforeTest={save} />
+          <TestButton service="spotify" label="Spotify" beforeTest={save} />
         </div>
       </section>
 

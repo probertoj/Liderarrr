@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, Search, Plus } from 'lucide-react';
+import { Star, Search, Plus, Sparkles, X, RefreshCw } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button, ProgressBar } from '../components.jsx';
 
@@ -71,7 +71,7 @@ export default function Tracked() {
       )}
 
       {suggestions.length > 0 && (
-        <div>
+        <div className="mb-8">
           <h2 className="text-sm text-neutral-400 mb-2">Sugerencias (de tu biblioteca)</h2>
           <div className="flex flex-wrap gap-2">
             {suggestions.map((s) => (
@@ -84,6 +84,108 @@ export default function Tracked() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      <SimilarSuggestions onFollowed={load} />
+    </div>
+  );
+}
+
+// «Quizá quieras seguir a…»: artistas que NO tienes ni sigues, similares (Last.fm) a los
+// que ya sigues. Seguir uno lo resuelve a MusicBrainz y calcula su discografía.
+function SimilarSuggestions({ onFollowed }) {
+  const [items, setItems] = useState(null);
+  const [busy, setBusy] = useState(null); // name en curso
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = () => api.artistSuggestions(40).then(setItems).catch(() => setItems([]));
+  useEffect(() => {
+    load();
+  }, []);
+
+  const follow = async (s) => {
+    setBusy(s.name);
+    try {
+      await api.followSuggestion(s.name, s.mbid);
+      setItems((p) => p.filter((x) => x.name !== s.name));
+      onFollowed?.();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const dismiss = async (s) => {
+    setItems((p) => p.filter((x) => x.name !== s.name));
+    api.dismissSuggestion(s.name).catch(() => {});
+  };
+  const recompute = async () => {
+    setRefreshing(true);
+    try {
+      await api.refreshSuggestions();
+      await load();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  if (!items) return null;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <h2 className="text-sm text-neutral-400 inline-flex items-center gap-1.5">
+          <Sparkles size={14} className="text-gold-400" /> Quizá quieras seguir a…
+        </h2>
+        <button
+          onClick={recompute}
+          disabled={refreshing}
+          className="text-xs text-neutral-500 hover:text-gold-400 inline-flex items-center gap-1 disabled:opacity-60"
+        >
+          <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} /> {refreshing ? 'Calculando…' : 'Recalcular'}
+        </button>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-xs text-neutral-600">
+          Sin sugerencias todavía. Sigue a algún artista y pulsa «Recalcular» (necesita Last.fm configurado).
+        </p>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {items.map((s) => (
+            <div key={s.name} className="card p-3 flex gap-3">
+              <div className="shrink-0 w-12 h-12 rounded-full overflow-hidden bg-ink-800 border border-ink-700 flex items-center justify-center text-neutral-500 text-sm">
+                {s.image ? (
+                  <img src={s.image} alt="" className="w-full h-full object-cover" loading="lazy" />
+                ) : (
+                  (s.name || '?').slice(0, 2).toUpperCase()
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-sm truncate">{s.name}</div>
+                  <button onClick={() => dismiss(s)} className="text-neutral-600 hover:text-neutral-300 shrink-0" aria-label="Descartar">
+                    <X size={14} />
+                  </button>
+                </div>
+                {s.reasons?.length > 0 && (
+                  <div className="text-[11px] text-neutral-500 truncate" title={s.reasons.join(', ')}>
+                    porque sigues a {s.reasons.slice(0, 2).join(', ')}
+                    {s.reasons.length > 2 ? '…' : ''}
+                  </div>
+                )}
+                <button
+                  onClick={() => follow(s)}
+                  disabled={busy === s.name}
+                  className="mt-1.5 text-xs px-2 py-1 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 disabled:opacity-60 inline-flex items-center gap-1"
+                >
+                  <Plus size={13} /> {busy === s.name ? 'Siguiendo…' : 'Seguir'}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

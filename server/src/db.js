@@ -387,6 +387,38 @@ CREATE TABLE IF NOT EXISTS import_ignored (
   source_dir TEXT UNIQUE,
   ignored_at INTEGER
 );
+
+-- Sugerencias de artistas para SEGUIR (Last.fm artist.getSimilar sobre tus seeds), que
+-- aún no tienes ni sigues. Se recalculan en el refresco; las descartadas no vuelven.
+CREATE TABLE IF NOT EXISTS artist_suggestions (
+  key TEXT PRIMARY KEY,      -- normName(name), para dedup y descarte estable
+  name TEXT,
+  mbid TEXT,
+  score REAL,
+  reasons TEXT,              -- JSON: nombres de seeds que lo recomiendan
+  image TEXT,                -- foto Deezer (URL), opcional
+  updated_at INTEGER,
+  dismissed INTEGER DEFAULT 0
+);
+
+-- Novedades detectadas en Deezer/Spotify que MusicBrainz AÚN no lista (se adelanta al
+-- retraso de MB). Por artista seguido, álbumes recientes que no tienes ni MB conoce.
+CREATE TABLE IF NOT EXISTS external_releases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source TEXT,               -- deezer | spotify
+  artist_id INTEGER,         -- artista local seguido
+  artist TEXT,
+  title TEXT,
+  match_key TEXT,            -- matchKey(artist,title): dedup y cruce con MB/biblioteca
+  release_date TEXT,         -- YYYY-MM-DD
+  record_type TEXT,          -- album | ep | single
+  cover TEXT,
+  url TEXT,                  -- enlace externo (Deezer/Spotify)
+  first_seen INTEGER,
+  dismissed INTEGER DEFAULT 0,
+  UNIQUE(artist_id, match_key)
+);
+CREATE INDEX IF NOT EXISTS idx_extrel_artist ON external_releases(artist_id);
 `);
 
 // --- migraciones ligeras ----------------------------------------------------
@@ -486,6 +518,7 @@ const SECRET_SETTING_KEYS = new Set([
   'prowlarr_key',
   'jackett_key',
   'qbittorrent_pass',
+  'spotify_client_secret',
 ]);
 const secretKey = process.env.LIDERARRR_SECRET
   ? crypto.createHash('sha256').update(process.env.LIDERARRR_SECRET).digest()

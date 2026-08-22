@@ -71,6 +71,7 @@ async function deezerSearch(term, limit = 12) {
     return (data.data || [])
       .map((a) => ({
         source: 'deezer',
+        id: a.id,
         name: a.name,
         url: a.picture_xl || a.picture_big || '',
         thumb: a.picture_medium || a.picture_small || a.picture_big || '',
@@ -81,6 +82,16 @@ async function deezerSearch(term, limit = 12) {
   } catch {
     return [];
   }
+}
+
+// Mejor artista de Deezer para un nombre (por nº de fans): { id, name, image }. Útil para
+// resolver la discografía (deezer.js) y la foto de una sugerencia externa (suggest.js).
+export async function deezerFindArtist(name) {
+  const hits = await deezerSearch(name, 5);
+  if (!hits.length) return null;
+  hits.sort((a, b) => (b.nb_fan || 0) - (a.nb_fan || 0));
+  const best = hits[0];
+  return { id: best.id, name: best.name, image: best.url || best.thumb || null };
 }
 
 // Resolución RÁPIDA (sin red): foto en caché. 'ok' | 'none' | 'pending' | 'notfound'.

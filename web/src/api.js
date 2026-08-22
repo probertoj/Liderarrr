@@ -103,6 +103,15 @@ export const api = {
   follow: (id, facet) => req(`/tracked/${id}`, { method: 'POST', body: { facet } }),
   unfollow: (id, facet = 'artist') => req(`/tracked/${id}?facet=${facet}`, { method: 'DELETE' }),
   followMbid: (mbid, facet) => req('/tracked/by-mbid', { method: 'POST', body: { mbid, facet } }),
+  // sugerencias de artistas para seguir (similares de Last.fm)
+  artistSuggestions: (limit) => req(`/suggestions/artists${limit ? `?limit=${limit}` : ''}`),
+  refreshSuggestions: () => req('/suggestions/refresh', { method: 'POST' }),
+  followSuggestion: (name, mbid) => req('/suggestions/follow', { method: 'POST', body: { name, mbid } }),
+  dismissSuggestion: (name) => req('/suggestions/dismiss', { method: 'POST', body: { name } }),
+  // novedades externas (Deezer/Spotify que MB aún no tiene)
+  newReleases: () => req('/newreleases'),
+  refreshNewReleases: () => req('/newreleases/refresh', { method: 'POST' }),
+  dismissNewRelease: (id) => req(`/newreleases/${id}/dismiss`, { method: 'POST' }),
   searchArtistMb: (q) => req(`/artists/search-mb?q=${encodeURIComponent(q)}`),
   findLocal: (q) => req(`/find/local?q=${encodeURIComponent(q)}`),
   findExternal: (q) => req(`/find/external?q=${encodeURIComponent(q)}`),

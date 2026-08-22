@@ -102,6 +102,75 @@ function ReleaseRow({ r, added, busy, followed, onAdd, onFollow, onSearch, lidar
   );
 }
 
+// Fila de NOVEDAD externa (Deezer/Spotify que MusicBrainz aún no lista). Distinta de
+// ReleaseRow: no hay rg_mbid (ni carátula de MB ni «enviar a Lidarr» por rg), así que la
+// carátula viene de la fuente y la descarga es siempre nativa (grabBest por texto).
+function ExternalReleaseRow({ r, added, busy, onAdd, onSearch, onDismiss }) {
+  const done = added[`ext${r.id}`];
+  return (
+    <div className="card px-3 py-2 flex items-center gap-3 text-sm">
+      <img
+        src={r.cover || ''}
+        alt=""
+        loading="lazy"
+        onError={(e) => {
+          e.currentTarget.style.visibility = 'hidden';
+        }}
+        className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="truncate">
+          {r.artist_id ? (
+            <Link to={`/artista/${r.artist_id}`} className="hover:text-gold-400">
+              {r.artist}
+            </Link>
+          ) : (
+            <span>{r.artist}</span>
+          )}
+          <span className="text-neutral-500"> — {r.title}</span>
+        </div>
+        <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
+          <span>
+            {r.release_date}
+            {r.record_type && r.record_type !== 'album' ? ` · ${r.record_type.toUpperCase()}` : ''}
+          </span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-ink-700 text-neutral-500 uppercase">{r.source}</span>
+          <span className="text-amber-400/80" title="MusicBrainz aún no lo lista">⚡ MB no lo tiene</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={() => onSearch(`${r.artist} ${r.title}`)}
+          className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1"
+        >
+          <Search size={12} /> Buscar
+        </button>
+        {done ? (
+          <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
+            <Check size={13} /> pedido
+          </span>
+        ) : (
+          <button
+            onClick={() => onAdd(r)}
+            disabled={busy === `ext${r.id}`}
+            className="text-xs px-1.5 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 disabled:opacity-50"
+          >
+            {busy === `ext${r.id}` ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Descargar
+          </button>
+        )}
+        {r.url && (
+          <a href={r.url} target="_blank" rel="noreferrer" className="text-xs text-gold-400 hover:underline inline-flex items-center gap-0.5">
+            <ExternalLink size={12} />
+          </a>
+        )}
+        <button onClick={() => onDismiss(r)} className="text-neutral-600 hover:text-neutral-300" aria-label="Descartar">
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Barra de gestión de sellos seguidos: buscar en MusicBrainz y seguir, listar los
 // seguidos con su catálogo, refrescar o dejar de seguir.
 function LabelManager({ labels, onChange }) {
@@ -668,7 +737,9 @@ export default function Calendar() {
           ? api.labelReleases(since)
           : view === 'radar'
             ? api.radar(since, unowned)
-            : api.upcoming(all);
+            : view === 'novedades'
+              ? api.newReleases()
+              : api.upcoming(all);
     load.then(setRows).catch((e) => setErr(e.message));
     if (view === 'labels') loadLabels();
     if (view === 'radar') loadCurators();
@@ -708,6 +779,26 @@ export default function Calendar() {
     } catch (e) {
       alert(e.message);
     }
+  };
+  // Novedad externa (sin rg_mbid): descarga SIEMPRE nativa (grabBest por texto).
+  const addExternal = async (r) => {
+    setBusy(`ext${r.id}`);
+    try {
+      const res = await api.grabBest(`${r.artist} ${r.title}`, { artist: r.artist, album: r.title });
+      if (!res.grabbed) {
+        alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+        return;
+      }
+      setAdded((p) => ({ ...p, [`ext${r.id}`]: true }));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const dismissExternal = async (r) => {
+    setRows((p) => (p || []).filter((x) => x.id !== r.id));
+    api.dismissNewRelease(r.id).catch(() => {});
   };
 
   const SINCE_PRESETS = [
@@ -775,7 +866,9 @@ export default function Calendar() {
                     ? 'de tus sellos'
                     : view === 'radar'
                       ? 'en el radar'
-                      : 'estrenados en la ventana'
+                      : view === 'novedades'
+                        ? 'novedades que MusicBrainz aún no tiene'
+                        : 'estrenados en la ventana'
               }`
             : ''
         }
@@ -784,6 +877,7 @@ export default function Calendar() {
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {tab('upcoming', 'Próximos')}
         {tab('recent', 'Estrenados recientemente')}
+        {tab('novedades', '⚡ Novedades')}
         {tab('labels', 'De tus sellos')}
         {tab('radar', 'Radar')}
         {(view === 'upcoming' || view === 'recent') && (
@@ -848,11 +942,13 @@ export default function Calendar() {
             ? curators.length === 0
               ? 'Aún no sigues ningún curador. Añade uno arriba (p. ej. calltheranger) para empezar.'
               : 'Nada en el radar en esta ventana. Amplía el rango o sigue a más curadores.'
-            : view === 'labels'
-              ? labels.length === 0
-                ? 'Aún no sigues ningún sello. Busca uno arriba para empezar.'
-                : 'Ningún estreno de tus sellos en esta ventana. Amplía el rango o sigue a más sellos.'
-              : view === 'recent'
+            : view === 'novedades'
+              ? 'Sin novedades adelantadas. Se buscan en Deezer/Spotify para tus artistas seguidos en el refresco: pulsa «Identificar y sincronizar» (o espera al ciclo nocturno). Requiere seguir a algún artista.'
+              : view === 'labels'
+                ? labels.length === 0
+                  ? 'Aún no sigues ningún sello. Busca uno arriba para empezar.'
+                  : 'Ningún estreno de tus sellos en esta ventana. Amplía el rango o sigue a más sellos.'
+                : view === 'recent'
                 ? 'Nada estrenado en esa ventana entre tus artistas. Amplía el rango o sigue a más artistas.'
                 : 'Nada anunciado por ahora. Sigue a más artistas o recalcula discografías en «Huecos».'}
         </div>
@@ -890,19 +986,31 @@ export default function Calendar() {
                         onQueue={() => pollLidarrQueue(setQueue)}
                       />
                     ))
-                  : months[month].map((r) => (
-                      <ReleaseRow
-                        key={r.rg_mbid}
-                        r={r}
-                        added={added}
-                        busy={busy}
-                        followed={followed}
-                        onAdd={add}
-                        onFollow={follow}
-                        onSearch={setSearch}
-                        lidarrOn={lidarrOn}
-                      />
-                    ))}
+                  : view === 'novedades'
+                    ? months[month].map((r) => (
+                        <ExternalReleaseRow
+                          key={r.id}
+                          r={r}
+                          added={added}
+                          busy={busy}
+                          onAdd={addExternal}
+                          onSearch={setSearch}
+                          onDismiss={dismissExternal}
+                        />
+                      ))
+                    : months[month].map((r) => (
+                        <ReleaseRow
+                          key={r.rg_mbid}
+                          r={r}
+                          added={added}
+                          busy={busy}
+                          followed={followed}
+                          onAdd={add}
+                          onFollow={follow}
+                          onSearch={setSearch}
+                          lidarrOn={lidarrOn}
+                        />
+                      ))}
               </div>
             </div>
           ))}
