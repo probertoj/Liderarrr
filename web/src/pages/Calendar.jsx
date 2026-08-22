@@ -867,6 +867,27 @@ export default function Calendar() {
       setErr(e.message);
     }
   };
+  // Novedades de Spotify: se llenan en el refresco, pero se pueden buscar al momento aquí,
+  // con feedback (cuántas y de cuántos artistas), para no tener que lanzar el ciclo entero.
+  const [novBusy, setNovBusy] = useState(false);
+  const [novMsg, setNovMsg] = useState(null);
+  const refreshNov = async () => {
+    setNovBusy(true);
+    setNovMsg(null);
+    try {
+      const r = await api.refreshNewReleases();
+      setRows(await api.newReleases());
+      setNovMsg(
+        r.seeds === 0
+          ? 'No sigues a ningún artista todavía: sigue a alguien para ver sus novedades.'
+          : `${r.count} novedades de ${r.seeds} artistas seguidos${r.count === 0 ? ' (nada reciente que no tengas ya)' : ''}.`
+      );
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setNovBusy(false);
+    }
+  };
 
   return (
     <div>
@@ -912,6 +933,24 @@ export default function Calendar() {
 
       {view === 'labels' && <LabelManager labels={labels} onChange={loadLabels} />}
       {view === 'radar' && <CuratorManager curators={curators} onChange={reloadRadar} />}
+      {view === 'novedades' && (
+        <div className="card p-3 mb-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-xs text-neutral-500 min-w-0 flex-1">
+              Estrenos recientes (últimos ~6 meses) de tus artistas seguidos en Deezer/Spotify que no tienes, semana a
+              semana. Se llenan solos en el refresco; búscalos ahora si quieres.
+            </p>
+            <button
+              onClick={refreshNov}
+              disabled={novBusy}
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+            >
+              <RefreshCw size={13} className={novBusy ? 'animate-spin' : ''} /> {novBusy ? 'Buscando…' : 'Buscar novedades ahora'}
+            </button>
+          </div>
+          {novMsg && <p className="text-xs text-gold-300/90 mt-2">{novMsg}</p>}
+        </div>
+      )}
 
       {showSince && (
         <div className="flex flex-wrap gap-2 mb-4">
