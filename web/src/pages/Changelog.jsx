@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.5',
+    title: 'Retos por todas partes',
+    items: [
+      'Ficha de disco: botón «Añadir a reto» para meterlo en uno de tus retos activos.',
+      'Discoteca (y demás rejillas): clic derecho en una tarjeta → añadir a reto.',
+      'Retos: importar listas de Hip Hop Golden Age por URL (sus páginas /list/…).',
+    ],
+  },
+  {
     version: '0.9.4',
     title: 'Calendario mensual',
     items: [
