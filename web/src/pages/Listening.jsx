@@ -180,38 +180,17 @@ export default function Listening() {
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-4 mb-6">
-        <div className="card p-4">
-          <h2 className="text-sm text-neutral-400 mb-3">Más escuchados</h2>
-          <div className="space-y-1">
-            {ov.topArtists.slice(0, 12).map((a) => (
-              <div key={a.artist} className="flex items-center justify-between text-sm px-1 py-0.5">
-                {a.artist_id ? (
-                  <Link to={`/artista/${a.artist_id}`} className="hover:text-gold-400 truncate">
-                    {a.artist}
-                  </Link>
-                ) : (
-                  <span className="truncate text-neutral-300">{a.artist}</span>
-                )}
-                <span className="text-neutral-500 shrink-0 ml-2">
-                  {a.plays}
-                  {a.owned_albums === 0 && <span className="text-amber-500/80"> · 0 en disco</span>}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+      <TopPlayed />
 
-        <div className="card p-4">
-          <h2 className="text-sm text-neutral-400 mb-3">Escuchas por año</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={ov.byYear}>
-              <XAxis dataKey="year" tick={{ fill: '#888', fontSize: 12 }} />
-              <Tooltip contentStyle={{ background: '#191921', border: '1px solid #2c2c39', borderRadius: 8 }} />
-              <Bar dataKey="plays" fill="#d4a24a" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="card p-4 mb-6">
+        <h2 className="text-sm text-neutral-400 mb-3">Escuchas por año</h2>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={ov.byYear}>
+            <XAxis dataKey="year" tick={{ fill: '#888', fontSize: 12 }} />
+            <Tooltip contentStyle={{ background: '#191921', border: '1px solid #2c2c39', borderRadius: 8 }} />
+            <Bar dataKey="plays" fill="#d4a24a" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       {unplayed && unplayed.length > 0 && (
@@ -234,6 +213,83 @@ export default function Listening() {
       )}
 
       {search != null && <SearchModal initialQuery={search} onClose={() => setSearch(null)} />}
+    </div>
+  );
+}
+
+// «Los más escuchados de [rango]»: artistas y álbumes que más has oído en la ventana
+// elegida (semana, mes, 3 meses, año o todo), marcando lo que no tienes en disco.
+function TopPlayed() {
+  const [range, setRange] = useState('all');
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    const since = RANGES.find((r) => r.key === range)?.since() || null;
+    setData(null);
+    api.topPlayed(since, 12).then(setData).catch(() => setData({ artists: [], albums: [] }));
+  }, [range]);
+  const rangeLabel = RANGES.find((r) => r.key === range)?.label;
+
+  return (
+    <div className="card p-4 mb-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+        <h2 className="font-display text-lg">Los más escuchados</h2>
+        <select
+          value={range}
+          onChange={(e) => setRange(e.target.value)}
+          className="bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
+          title="Acota a lo que has escuchado en esta ventana de tiempo"
+        >
+          {RANGES.map((r) => (
+            <option key={r.key} value={r.key}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {!data ? (
+        <Spinner />
+      ) : data.artists.length === 0 && data.albums.length === 0 ? (
+        <p className="text-sm text-neutral-600">Nada escuchado en «{rangeLabel}».</p>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-x-6 gap-y-4">
+          <div>
+            <h3 className="text-xs uppercase tracking-wide text-neutral-600 mb-2">Artistas</h3>
+            <div className="space-y-1">
+              {data.artists.map((a) => (
+                <div key={a.artist} className="flex items-center justify-between text-sm px-1 py-0.5">
+                  {a.artist_id ? (
+                    <Link to={`/artista/${a.artist_id}`} className="hover:text-gold-400 truncate">
+                      {a.artist}
+                    </Link>
+                  ) : (
+                    <span className="truncate text-neutral-300">{a.artist}</span>
+                  )}
+                  <span className="text-neutral-500 shrink-0 ml-2">
+                    {a.plays}
+                    {a.owned_albums === 0 && <span className="text-amber-500/80"> · 0 en disco</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-xs uppercase tracking-wide text-neutral-600 mb-2">Álbumes</h3>
+            <div className="space-y-1">
+              {data.albums.map((a, i) => (
+                <div key={i} className="flex items-center justify-between text-sm px-1 py-0.5">
+                  <span className="truncate text-neutral-300">
+                    {a.artist} <span className="text-neutral-500">— {a.album}</span>
+                  </span>
+                  <span className="text-neutral-500 shrink-0 ml-2">
+                    {a.plays}
+                    {!a.owned && <span className="text-amber-500/80"> · no lo tienes</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

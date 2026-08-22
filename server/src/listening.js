@@ -96,6 +96,38 @@ export function listeningOverview() {
   return { totals, topArtists, topAlbums, byYear };
 }
 
+// Los más escuchados en una ventana de fecha (since = ms, o null = todo). Devuelve
+// artistas y álbumes, cada uno marcando lo que ya tienes. Es «Más escuchados» pero
+// acotable: «lo que más he oído este mes / esta semana / este año».
+export function topPlayed({ since = null, limit = 12 } = {}) {
+  const owned = ownedArtistMap();
+  const ownedAlbums = ownedAlbumSet();
+  const args = { limit };
+  let sinceClause = '';
+  if (since) {
+    sinceClause = ' AND ts >= @since';
+    args.since = Number(since);
+  }
+  const artists = db
+    .prepare(
+      `SELECT artist, COUNT(*) AS plays FROM listens WHERE source='lastfm'${sinceClause}
+       GROUP BY LOWER(artist) ORDER BY plays DESC LIMIT @limit`
+    )
+    .all(args)
+    .map((r) => {
+      const o = owned.get(normArtist(r.artist));
+      return { artist: r.artist, plays: r.plays, artist_id: o?.id || null, owned_albums: o?.albums || 0 };
+    });
+  const albums = db
+    .prepare(
+      `SELECT artist, album, COUNT(*) AS plays FROM listens WHERE source='lastfm' AND album<>''${sinceClause}
+       GROUP BY LOWER(artist), LOWER(album) ORDER BY plays DESC LIMIT @limit`
+    )
+    .all(args)
+    .map((r) => ({ artist: r.artist, album: r.album, plays: r.plays, owned: ownedAlbums.has(albumKey(r.artist, r.album)) }));
+  return { artists, albums };
+}
+
 // La brecha: artistas que escuchas mucho y de los que tienes poco o nada.
 // El mejor candidato a seguir/encargar, porque es tu gusto real, no un algoritmo.
 export function ownershipGap({ minPlays = 15, since = null } = {}) {
