@@ -1,7 +1,31 @@
 import { db } from './db.js';
-import { matchKey, normName } from './matchkey.js';
+import { matchKey, normName, cleanTitleForMatch } from './matchkey.js';
 import { deezerFindArtist } from './artistpix.js';
 import { spotifyArtistAlbums, spotifyConfigured } from './spotify.js';
+
+// ¿YA lo tienes? Cruce robusto contra la biblioteca, con DOS señales para no mostrar como
+// «novedad» algo que ya está en tu disco: (1) matchKey(artista, título) global —casa por
+// nombre— y (2) por artist_id + título limpio —casa aunque el album_artist guardado
+// difiera del nombre del artista seguido, que es lo que se colaba—. Se calcula en vivo
+// (no un flag guardado, que envejece), igual que ownedMatcher del calendario.
+function buildOwnedCheck() {
+  const rows = db.prepare("SELECT artist_id, album_artist, title FROM albums WHERE match_state != 'dismissed'").all();
+  const byKey = new Set();
+  const byArtist = new Map(); // artist_id -> Set(cleanTitleForMatch(title))
+  for (const r of rows) {
+    byKey.add(matchKey(r.album_artist, r.title));
+    if (r.artist_id != null) {
+      let s = byArtist.get(r.artist_id);
+      if (!s) byArtist.set(r.artist_id, (s = new Set()));
+      s.add(cleanTitleForMatch(r.title));
+    }
+  }
+  return (artistId, artist, title) => {
+    if (byKey.has(matchKey(artist, title))) return true;
+    const s = artistId != null ? byArtist.get(artistId) : null;
+    return !!(s && s.has(cleanTitleForMatch(title)));
+  };
+}
 
 // NOVEDADES ADELANTADAS: MusicBrainz va con retraso en estrenos recientes, así que sus
 // discografías (release_groups) no traen lo que salió ayer. Deezer y Spotify sí lo tienen
@@ -65,13 +89,8 @@ export async function refreshExternalReleases({ months = 6, maxArtists = 500 } =
 
   const cutoff = new Date(Date.now() - months * 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
 
-  // lo que YA tienes (biblioteca) y lo que MB YA conoce (release_groups): para no repetir
-  const ownedKeys = new Set(
-    db
-      .prepare("SELECT album_artist, title FROM albums WHERE match_state != 'dismissed'")
-      .all()
-      .map((r) => matchKey(r.album_artist, r.title))
-  );
+  // lo que YA tienes (cruce robusto) y lo que MB YA conoce (release_groups): para no repetir
+  const owned = buildOwnedCheck();
   const mbKeys = new Set(
     db
       .prepare('SELECT ar.name AS artist, rg.title FROM release_groups rg JOIN artists ar ON ar.id = rg.artist_id')
@@ -114,7 +133,7 @@ export async function refreshExternalReleases({ months = 6, maxArtists = 500 } =
       const date = (c.release_date || '').slice(0, 10);
       if (!date || date < cutoff || date === '0000-00-00') continue;
       const mk = matchKey(s.name, c.title);
-      if (ownedKeys.has(mk)) continue; // solo saltamos lo que YA tienes
+      if (owned(s.id, s.name, c.title)) continue; // solo saltamos lo que YA tienes
       const info = upsert.run({
         source: c.source,
         artist_id: s.id,
@@ -134,11 +153,11 @@ export async function refreshExternalReleases({ months = 6, maxArtists = 500 } =
 
   // poda: fuera lo que YA tienes y lo más viejo que la ventana (lo que MB alcanza NO se
   // borra: solo deja de ser «adelantada», ya lo actualiza el upsert con ahead = 0)
-  const stored = db.prepare('SELECT id, match_key, release_date FROM external_releases').all();
+  const stored = db.prepare('SELECT id, artist_id, artist, title, release_date FROM external_releases').all();
   const del = db.prepare('DELETE FROM external_releases WHERE id = ?');
   const prune = db.transaction(() => {
     for (const r of stored) {
-      if (ownedKeys.has(r.match_key) || (r.release_date && r.release_date < cutoff)) del.run(r.id);
+      if (owned(r.artist_id, r.artist, r.title) || (r.release_date && r.release_date < cutoff)) del.run(r.id);
     }
   });
   prune();
@@ -150,16 +169,21 @@ export async function refreshExternalReleases({ months = 6, maxArtists = 500 } =
 // Novedades para la UI (Lanzamientos). Más recientes primero; `ahead` marca las que MB
 // aún no lista (para el badge «⚡ MB no lo tiene»). Marca el artista local.
 export function externalNewReleases({ limit = 200 } = {}) {
+  // Filtro EN VIVO de lo que ya tienes (no un flag guardado): así, aunque una novedad se
+  // guardara antes de que tuvieras el disco —o el cruce al guardar fallara—, nunca se
+  // muestra algo que ya está en tu biblioteca. Es la red de seguridad definitiva.
+  const owned = buildOwnedCheck();
   return db
     .prepare(
       `SELECT e.id, e.source, e.artist_id, e.artist, e.title, e.release_date, e.record_type, e.cover, e.url, e.ahead,
         (SELECT 1 FROM tracked_artists ta WHERE ta.artist_id = e.artist_id) AS tracked
        FROM external_releases e
        WHERE e.dismissed = 0
-       ORDER BY e.release_date DESC, e.artist COLLATE NOCASE
-       LIMIT ?`
+       ORDER BY e.release_date DESC, e.artist COLLATE NOCASE`
     )
-    .all(limit)
+    .all()
+    .filter((r) => !owned(r.artist_id, r.artist, r.title))
+    .slice(0, limit)
     .map((r) => ({ ...r, tracked: !!r.tracked, ahead: !!r.ahead }));
 }
 
