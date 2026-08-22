@@ -893,7 +893,7 @@ export default function Calendar() {
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {tab('upcoming', 'Próximos')}
         {tab('recent', 'Estrenados recientemente')}
-        {tab('novedades', '⚡ Novedades')}
+        {tab('novedades', 'Novedades de Spotify')}
         {tab('labels', 'De tus sellos')}
         {tab('radar', 'Radar')}
         {(view === 'upcoming' || view === 'recent') && (
