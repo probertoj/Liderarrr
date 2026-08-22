@@ -1152,7 +1152,10 @@ function Recommendations({ albumId, artistName }) {
           </Button>
         )}
       </div>
-      <p className="text-xs text-neutral-600 mt-1">Más de este artista (tu biblioteca) y artistas afines (Last.fm).</p>
+      <p className="text-xs text-neutral-600 mt-1">
+        Más de este artista (tu biblioteca), artistas afines y <b className="font-normal text-neutral-500">discos que aún no
+        tienes</b> de ellos, para seguir o descargar (Last.fm).
+      </p>
 
       {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
 
@@ -1207,13 +1210,107 @@ function Recommendations({ albumId, artistName }) {
             </div>
           )}
 
-          {!data.moreFromArtist?.length && !data.similar?.length && (
+          {data.recommendedAlbums?.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-xs uppercase tracking-wider text-neutral-600 mb-1">Discos que quizá te gusten</h3>
+              <p className="text-[11px] text-neutral-600 mb-2">Top de artistas afines que aún no tienes.</p>
+              <div className="space-y-1.5">
+                {data.recommendedAlbums.map((r, i) => (
+                  <RecAlbumRow key={i} r={r} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!data.moreFromArtist?.length && !data.similar?.length && !data.recommendedAlbums?.length && (
             <p className="text-sm text-neutral-600 mt-3">
               {data.lastfm ? 'Sin recomendaciones por ahora.' : 'Configura Last.fm en Ajustes para ver artistas afines.'}
             </p>
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// Fila de disco recomendado (de un artista afín que no tienes): seguir al artista y/o
+// descargar el disco (grabBest nativo).
+function RecAlbumRow({ r }) {
+  const [grabState, setGrabState] = useState(null); // busy | done
+  const [followed, setFollowed] = useState(r.tracked);
+  const [fbusy, setFbusy] = useState(false);
+  const grab = async () => {
+    setGrabState('busy');
+    try {
+      const res = await api.grabBest(`${r.artist} ${r.album}`, { artist: r.artist, album: r.album });
+      if (!res.grabbed) {
+        alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+        setGrabState(null);
+        return;
+      }
+      setGrabState('done');
+    } catch (e) {
+      alert(e.message);
+      setGrabState(null);
+    }
+  };
+  const follow = async () => {
+    setFbusy(true);
+    try {
+      if (r.artist_id) await api.follow(r.artist_id);
+      else if (r.artist_mbid) await api.followMbid(r.artist_mbid);
+      else {
+        const hits = await api.searchArtistMb(r.artist);
+        if (!hits?.[0]?.mbid) throw new Error('MusicBrainz no encuentra a este artista.');
+        await api.followMbid(hits[0].mbid);
+      }
+      setFollowed(true);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setFbusy(false);
+    }
+  };
+  return (
+    <div className="flex items-center gap-3 text-sm bg-ink-850/40 rounded px-2.5 py-1.5">
+      <div className="min-w-0 flex-1 truncate">
+        {r.artist_id ? (
+          <Link to={`/artista/${r.artist_id}`} className="hover:text-gold-400">
+            {r.artist}
+          </Link>
+        ) : (
+          <span>{r.artist}</span>
+        )}
+        <span className="text-neutral-500"> — {r.album}</span>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {followed ? (
+          <span className="text-xs text-gold-400/80 inline-flex items-center gap-1">
+            <Star size={12} className="fill-current" /> sigues
+          </span>
+        ) : (
+          <button
+            onClick={follow}
+            disabled={fbusy}
+            className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1 disabled:opacity-50"
+          >
+            <Star size={12} /> Seguir
+          </button>
+        )}
+        {grabState === 'done' ? (
+          <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
+            <Check size={13} /> pedido
+          </span>
+        ) : (
+          <button
+            onClick={grab}
+            disabled={grabState === 'busy'}
+            className="text-xs px-1.5 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 disabled:opacity-50"
+          >
+            {grabState === 'busy' ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Descargar
+          </button>
+        )}
+      </div>
     </div>
   );
 }

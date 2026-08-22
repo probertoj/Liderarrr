@@ -120,6 +120,26 @@ export async function similarArtists(name, limit = 14) {
   }
 }
 
+// Álbumes más populares de un artista (Last.fm), para recomendar discos concretos de
+// artistas afines que aún no tienes. Devuelve [{ name, mbid, playcount }].
+export async function topAlbums(name, limit = 3) {
+  if (!lastfmConfigured() || !name) return [];
+  try {
+    const data = await lfCached(`topalbums:${name}`.toLowerCase(), {
+      method: 'artist.getTopAlbums',
+      artist: name,
+      autocorrect: '1',
+      limit: String(limit),
+    });
+    const arr = data.topalbums?.album || [];
+    return (Array.isArray(arr) ? arr : [arr])
+      .filter((a) => a?.name && !/^\(?null\)?$/i.test(a.name))
+      .map((a) => ({ name: a.name, mbid: a.mbid || null, playcount: Number(a.playcount) || 0 }));
+  } catch {
+    return [];
+  }
+}
+
 // Scrobbles recientes de un usuario. NO se cachea: es historial vivo. Devuelve
 // una página cruda de user.getRecentTracks (200 por página, más nuevos primero).
 export async function recentTracks(user, { from = 0, page = 1, limit = 200 } = {}) {

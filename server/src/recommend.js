@@ -1,6 +1,6 @@
 import { db } from './db.js';
 import * as lastfm from './lastfm.js';
-import { normName } from './matchkey.js';
+import { normName, matchKey } from './matchkey.js';
 
 // Recomendaciones desde la ficha del álbum (estilo «Valence Recommendations» de Roon):
 //  - «Más de este artista»: otros álbumes del artista (principal o co-acreditado) que
@@ -43,10 +43,39 @@ export async function albumRecommendations(albumId) {
     return { name: s.name, mbid: s.mbid, url: s.url, artist_id: localId, owned: !!localId, tracked: localId ? tracked.has(localId) : false };
   });
 
+  // DISCOS que quizá te gusten: el top álbum de artistas afines que AÚN NO TIENES, para
+  // descubrir discos concretos (no solo nombres) y poder seguir/descargar. Uno por artista,
+  // priorizando los afines que aún no tienes. Cada consulta a Last.fm va cacheada.
+  const ownedAlbumKeys = new Set(
+    db.prepare("SELECT album_artist, title FROM albums WHERE match_state != 'dismissed'").all().map((r) => matchKey(r.album_artist, r.title))
+  );
+  const recommendedAlbums = [];
+  if (lastfm.lastfmConfigured()) {
+    const pool = [...similar].sort((x, y) => (x.owned === y.owned ? 0 : x.owned ? 1 : -1)).slice(0, 8);
+    for (const s of pool) {
+      if (recommendedAlbums.length >= 8) break;
+      // eslint-disable-next-line no-await-in-loop
+      const albums = await lastfm.topAlbums(s.name, 3).catch(() => []);
+      const pick = albums.find((al) => !ownedAlbumKeys.has(matchKey(s.name, al.name)));
+      if (pick) {
+        recommendedAlbums.push({
+          artist: s.name,
+          album: pick.name,
+          mbid: pick.mbid,
+          artist_mbid: s.mbid,
+          artist_id: s.artist_id,
+          owned_artist: s.owned,
+          tracked: s.tracked,
+        });
+      }
+    }
+  }
+
   return {
     artist: { id: a.artist_id, name: artistName },
     moreFromArtist,
     similar,
+    recommendedAlbums,
     lastfm: lastfm.lastfmConfigured(),
   };
 }
