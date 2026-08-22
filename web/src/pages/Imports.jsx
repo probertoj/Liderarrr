@@ -293,7 +293,7 @@ export default function Imports() {
               </span>
               {it.diag && (
                 <span
-                  className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border ${DIAG_CLS[it.diag.code] || DIAG_CLS.ready}`}
+                  className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full border ${DIAG_CLS[it.diag.code] || DIAG_CLS.ready}`}
                   title={it.diag.hint}
                 >
                   {it.diag.label}
@@ -301,7 +301,7 @@ export default function Imports() {
               )}
             </div>
             {it.diag && it.diag.code !== 'ready' && (
-              <p className="text-[11px] text-neutral-500 mb-2">{it.diag.hint}</p>
+              <p className="text-xs text-neutral-300 leading-relaxed mb-2">{it.diag.hint}</p>
             )}
             {done[it.source_dir] ? (
               <div className="text-sm text-emerald-400 flex items-center gap-2 min-w-0">
