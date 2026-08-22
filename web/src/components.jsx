@@ -524,6 +524,7 @@ export function SearchModal({ initialQuery, onClose }) {
   const [grabbed, setGrabbed] = useState({});
   const [msg, setMsg] = useState(null);
   const [engine, setEngine] = useState(null);
+  const [broadened, setBroadened] = useState(null); // consulta que sí dio resultados si se amplió
 
   const search = async () => {
     if (!q.trim()) return;
@@ -531,10 +532,13 @@ export function SearchModal({ initialQuery, onClose }) {
     setErr(null);
     setMsg(null);
     setResults(null);
+    setBroadened(null);
     try {
       const r = await api.search(q);
       setEngine(r.engine);
       setResults(r.results);
+      // el servidor amplía la búsqueda (suelta el artista) si la cadena entera no da nada
+      if (r.query && r.query.trim() !== q.trim() && r.results?.length) setBroadened(r.query);
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -604,6 +608,11 @@ export function SearchModal({ initialQuery, onClose }) {
         {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
         {results && results.length === 0 && !loading && (
           <p className="text-sm text-neutral-600 mt-3">Sin resultados en tus indexers.</p>
+        )}
+        {broadened && (
+          <p className="text-xs text-neutral-500 mt-3">
+            Sin resultados para la búsqueda completa; mostrando los de <span className="text-neutral-300">«{broadened}»</span>.
+          </p>
         )}
         {results && results.length > 0 && (
           <div className="mt-3 divide-y divide-ink-850/60">

@@ -822,8 +822,28 @@ app.post('/api/prowlarr/grab', async (req, reply) => {
 app.get('/api/search', async (req, reply) => {
   try {
     const engine = getSetting('search_engine') || 'prowlarr';
-    const results = engine === 'jackett' ? await jackettSearch(req.query?.q) : await prowlarrSearch(req.query?.q);
-    return { engine, results };
+    const run = (q) => (engine === 'jackett' ? jackettSearch(q) : prowlarrSearch(q));
+    const q0 = String(req.query?.q || '');
+    let results = await run(q0);
+    let usedQuery = q0;
+    // Fallback (solo en la búsqueda MANUAL, donde el usuario revisa los resultados): si la
+    // cadena entera «artista título» no da nada, suelta palabras iniciales —el artista suele
+    // ir delante y el título detrás— y reintenta hasta encontrar algo. Cubre los discos donde
+    // el tracker no casa el conjunto pero sí el título (p. ej. artistas colaborativos).
+    if (!results.length) {
+      const words = q0.replace(/\s*[&/\\]+\s*/g, ' ').split(/\s+/).filter(Boolean);
+      for (let drop = 1; drop <= 4 && words.length - drop >= 2; drop++) {
+        const q = words.slice(drop).join(' ');
+        // eslint-disable-next-line no-await-in-loop
+        const r = await run(q);
+        if (r.length) {
+          results = r;
+          usedQuery = q;
+          break;
+        }
+      }
+    }
+    return { engine, results, query: usedQuery };
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }
