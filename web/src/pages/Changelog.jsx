@@ -9,6 +9,14 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.4',
+    title: 'Calendario mensual',
+    items: [
+      'Lanzamientos: nueva vista «📅 Mes», una rejilla mensual estilo Google Calendar que junta en su día TODAS las fuentes: Próximos, Estrenados recientemente, De tus sellos, Radar y Novedades de Spotify.',
+      'Novedades de Spotify: cruce robusto con tu biblioteca — ya no aparecen discos que ya tienes (casa por artist_id además de por nombre, y filtra en vivo al mostrar).',
+    ],
+  },
+  {
     version: '0.9.3',
     title: 'Spotify a fondo y esta página',
     items: [
