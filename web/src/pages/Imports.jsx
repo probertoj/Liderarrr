@@ -303,6 +303,19 @@ export default function Imports() {
             {it.diag && it.diag.code !== 'ready' && (
               <p className="text-xs text-neutral-300 leading-relaxed mb-2">{it.diag.hint}</p>
             )}
+            {it.multiAlbum && it.folders?.length > 0 && (
+              <p className="text-xs text-neutral-400 mb-2">
+                <span className="text-neutral-500">Subcarpetas: </span>
+                {it.folders.slice(0, 8).map((f, i) => (
+                  <span key={f.name}>
+                    {i > 0 && ' · '}
+                    {f.name} <span className="text-neutral-500">({f.tracks})</span>
+                  </span>
+                ))}
+                {it.folders.length > 8 && <span className="text-neutral-500"> · +{it.folders.length - 8} más</span>}
+              </p>
+            )}
+            <p className="text-[11px] text-neutral-400 break-all mb-2 font-mono select-all">{it.source_dir}</p>
             {done[it.source_dir] ? (
               <div className="text-sm text-emerald-400 flex items-center gap-2 min-w-0">
                 <Link2 size={14} className="shrink-0" />
