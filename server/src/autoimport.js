@@ -6,6 +6,7 @@ import { importFolder, importConfig } from './importer.js';
 import { matchRequest, setDownloadStatus, reconcileAgainstLibrary, pruneDownloads } from './downloads.js';
 import { runScan } from './scanner.js';
 import { runIdentify } from './identify.js';
+import { norm, within, pathMappings, remapPath } from './pathmap.js';
 
 // AUTO-IMPORT: cierra el bucle de descargas sin Lidarr. Sondea qBittorrent, y por cada
 // torrent COMPLETADO cuyo contenido cuelgue de la carpeta de torrents configurada y no
@@ -13,34 +14,6 @@ import { runIdentify } from './identify.js';
 // (reusa importFolder, que NUNCA borra ni copia el origen: sigues sembrando). Si casa con
 // una petición del registro de descargas, usa su artista/álbum para el destino; si no,
 // lee las etiquetas. Al terminar, relanza el escaneo para que el álbum aparezca.
-
-const norm = (p) => String(p || '').replace(/\\/g, '/').replace(/\/+$/, '');
-const within = (p, root) => {
-  const np = norm(p);
-  const r = norm(root);
-  return !!np && !!r && (np === r || np.startsWith(r + '/'));
-};
-
-// Remapeo de rutas qBittorrent → contenedor (estilo «remote path mapping» de los *arr).
-// qBittorrent reporta la ruta del contenido tal como la ve ÉL (p. ej. /downloads/music),
-// que puede no coincidir con la que Liderarr tiene montada (p. ej. /library/torrents/music).
-// El ajuste `import_qb_path_map` traduce prefijos, una regla por línea: «rutaQB => rutaLocal».
-function pathMappings() {
-  return String(getSetting('import_qb_path_map') || '')
-    .split(/[\n;]+/)
-    .map((line) => {
-      const parts = line.split(/\s*(?:=>|->|\|)\s*/);
-      return parts.length === 2 && parts[0].trim() && parts[1].trim() ? { from: norm(parts[0]), to: norm(parts[1]) } : null;
-    })
-    .filter(Boolean);
-}
-function remapPath(p, maps) {
-  const np = norm(p);
-  for (const m of maps) {
-    if (np === m.from || np.startsWith(m.from + '/')) return m.to + np.slice(m.from.length);
-  }
-  return np;
-}
 
 export const autoImportStatus = {
   running: false,

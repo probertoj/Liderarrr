@@ -4,6 +4,16 @@ import { DownloadCloud, Link2, RefreshCw, Zap } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button } from '../components.jsx';
 
+// Estilo del badge de diagnóstico por ítem (por qué no se auto-importa). Los códigos los
+// fija el servidor en importer.js classifyPending().
+const DIAG_CLS = {
+  'multi-album': 'bg-amber-900/40 text-amber-300 border-amber-800/60',
+  'in-library': 'bg-amber-900/30 text-amber-300/90 border-amber-800/50',
+  'not-torrent': 'bg-sky-900/40 text-sky-300 border-sky-800/60',
+  'torrent-pending': 'bg-neutral-800 text-neutral-300 border-neutral-700',
+  ready: 'bg-emerald-900/40 text-emerald-300 border-emerald-800/60',
+};
+
 // «hace Ns / Nm / Nh» a partir de un timestamp (para ver si el auto-import se dispara solo).
 function fmtAgo(ts) {
   if (!ts) return 'nunca';
@@ -277,10 +287,22 @@ export default function Imports() {
       <div className="space-y-2">
         {data.items?.map((it) => (
           <div key={it.source_dir} className="card p-3">
-            <div className="text-xs text-neutral-600 truncate mb-2" title={it.source_dir}>
-              {it.name} · {it.tracks} pistas
-              {it.inLibrary && <span className="text-amber-400/80"> · ⚠ ya en tu biblioteca</span>}
+            <div className="flex items-center gap-2 mb-1 min-w-0">
+              <span className="text-xs text-neutral-600 truncate" title={it.source_dir}>
+                {it.name} · {it.tracks} pistas
+              </span>
+              {it.diag && (
+                <span
+                  className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border ${DIAG_CLS[it.diag.code] || DIAG_CLS.ready}`}
+                  title={it.diag.hint}
+                >
+                  {it.diag.label}
+                </span>
+              )}
             </div>
+            {it.diag && it.diag.code !== 'ready' && (
+              <p className="text-[11px] text-neutral-500 mb-2">{it.diag.hint}</p>
+            )}
             {done[it.source_dir] ? (
               <div className="text-sm text-emerald-400 flex items-center gap-2 min-w-0">
                 <Link2 size={14} className="shrink-0" />
@@ -318,7 +340,11 @@ export default function Imports() {
                   />
                 </label>
                 <Button
-                  variant={itemErr[it.source_dir] ? 'default' : it.inLibrary ? 'default' : 'gold'}
+                  variant={
+                    itemErr[it.source_dir] || it.diag?.code === 'multi-album' || it.diag?.code === 'in-library'
+                      ? 'default'
+                      : 'gold'
+                  }
                   disabled={busy === it.source_dir}
                   onClick={() => runWithWarn(it)}
                 >
