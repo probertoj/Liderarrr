@@ -9,6 +9,14 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.7',
+    title: 'Resumen con portadas',
+    items: [
+      'Resumen: crea el de la semana, el mes, 3 meses, un año concreto o todo — con un mosaico de las portadas de tus discos más escuchados (locales o de Deezer si no los tienes).',
+      'Resumen: botón «Descargar imagen» para compartir tu mosaico como PNG.',
+    ],
+  },
+  {
     version: '0.9.6',
     title: 'Avisos, resumen y recomendaciones',
     items: [
