@@ -166,6 +166,7 @@ export const api = {
   albumGap: (since) => req(`/listening/album-gap${since ? `?since=${since}` : ''}`),
   unplayed: () => req('/listening/unplayed'),
   topPlayed: (since, limit) => req(`/listening/top?limit=${limit || 12}${since ? `&since=${since}` : ''}`),
+  wrapped: (year) => req(`/listening/wrapped${year ? `?year=${year}` : ''}`),
   challenges: () => req('/challenges'),
   nextChallengeListens: () => req('/challenges/next-listens'),
   addChallenge: (name, text) => req('/challenges', { method: 'POST', body: { name, text } }),

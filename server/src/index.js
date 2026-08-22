@@ -62,7 +62,7 @@ import {
 } from './radar.js';
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
 import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
-import { listeningOverview, ownershipGap, ownedUnplayed, unownedScrobbledAlbums, hasScrobbles, topPlayed } from './listening.js';
+import { listeningOverview, ownershipGap, ownedUnplayed, unownedScrobbledAlbums, hasScrobbles, topPlayed, wrapped } from './listening.js';
 import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing, nextChallengeListens, createChallenge, addItemsToChallenge, removeChallengeItem } from './challenges.js';
 import { importListFromUrl } from './listimport.js';
 import { artistRelations } from './relations.js';
@@ -600,6 +600,7 @@ app.get('/api/listening/unplayed', async () => ownedUnplayed());
 app.get('/api/listening/top', async (req) =>
   topPlayed({ since: req.query?.since ? Number(req.query.since) : null, limit: Number(req.query?.limit) || 12 })
 );
+app.get('/api/listening/wrapped', async (req) => (hasScrobbles() ? wrapped({ year: req.query?.year || null }) : { empty: true }));
 
 // --- retos ------------------------------------------------------------------
 app.get('/api/challenges', async () => listChallenges());

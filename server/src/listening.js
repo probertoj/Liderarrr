@@ -128,6 +128,85 @@ export function topPlayed({ since = null, limit = 12 } = {}) {
   return { artists, albums };
 }
 
+// «Resumen» tipo Wrapped: la foto de un AÑO (o de todo el tiempo). Totales, top artistas
+// y álbumes escuchados, cuántos discos añadiste a la colección y tu evolución por mes.
+export function wrapped({ year = null } = {}) {
+  let since = null;
+  let until = null;
+  let label = 'Todo el tiempo';
+  if (year && String(year) !== 'all') {
+    const y = Number(year);
+    since = Date.UTC(y, 0, 1);
+    until = Date.UTC(y + 1, 0, 1) - 1;
+    label = String(y);
+  }
+  const range = (col = 'ts') => {
+    let c = '';
+    const a = {};
+    if (since != null) {
+      c += ` AND ${col} >= @since`;
+      a.since = since;
+    }
+    if (until != null) {
+      c += ` AND ${col} <= @until`;
+      a.until = until;
+    }
+    return { c, a };
+  };
+  const rt = range();
+  const totals = db
+    .prepare(
+      `SELECT COUNT(*) AS scrobbles, COUNT(DISTINCT LOWER(artist)) AS artists,
+        COUNT(DISTINCT LOWER(artist) || '|' || LOWER(album)) AS albums
+       FROM listens WHERE source='lastfm'${rt.c}`
+    )
+    .get(rt.a);
+
+  const owned = ownedArtistMap();
+  const topArtists = db
+    .prepare(`SELECT artist, COUNT(*) AS plays FROM listens WHERE source='lastfm'${rt.c} GROUP BY LOWER(artist) ORDER BY plays DESC LIMIT 10`)
+    .all(rt.a)
+    .map((r) => {
+      const o = owned.get(normArtist(r.artist));
+      return { artist: r.artist, plays: r.plays, artist_id: o?.id || null, owned_albums: o?.albums || 0 };
+    });
+
+  const ownedAlbums = ownedAlbumSet();
+  const topAlbums = db
+    .prepare(
+      `SELECT artist, album, COUNT(*) AS plays FROM listens WHERE source='lastfm' AND album<>''${rt.c}
+       GROUP BY LOWER(artist), LOWER(album) ORDER BY plays DESC LIMIT 10`
+    )
+    .all(rt.a)
+    .map((r) => ({ artist: r.artist, album: r.album, plays: r.plays, owned: ownedAlbums.has(albumKey(r.artist, r.album)) }));
+
+  // discos añadidos a la colección en el periodo (albums.added_at = mtime de la carpeta)
+  const ra = range('added_at');
+  const addedCount = db
+    .prepare(`SELECT COUNT(*) AS n FROM albums WHERE match_state != 'dismissed' AND added_at IS NOT NULL${ra.c}`)
+    .get(ra.a).n;
+  const addedTop = db
+    .prepare(
+      `SELECT id, album_artist, title, year FROM albums
+       WHERE match_state != 'dismissed' AND added_at IS NOT NULL${ra.c} ORDER BY added_at DESC LIMIT 12`
+    )
+    .all(ra.a);
+
+  const byMonth = db
+    .prepare(
+      `SELECT strftime('%Y-%m', ts/1000, 'unixepoch') AS month, COUNT(*) AS plays
+       FROM listens WHERE source='lastfm'${rt.c} GROUP BY month ORDER BY month`
+    )
+    .all(rt.a);
+
+  const years = db
+    .prepare("SELECT DISTINCT CAST(strftime('%Y', ts/1000, 'unixepoch') AS INTEGER) AS y FROM listens WHERE source='lastfm' ORDER BY y DESC")
+    .all()
+    .map((r) => r.y);
+
+  return { label, year: year || 'all', totals, topArtists, topAlbums, addedCount, addedTop, byMonth, years };
+}
+
 // La brecha: artistas que escuchas mucho y de los que tienes poco o nada.
 // El mejor candidato a seguir/encargar, porque es tu gusto real, no un algoritmo.
 export function ownershipGap({ minPlays = 15, since = null } = {}) {

@@ -3,7 +3,7 @@ import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle,
   Sparkles, Settings as SettingsIcon, Menu, X, RefreshCw, Star, Compass, CalendarClock,
-  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud, ExternalLink, Wrench, Rocket,
+  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud, ExternalLink, Wrench, Rocket, PartyPopper,
 } from 'lucide-react';
 import { api } from './api.js';
 import { Spinner, ErrorBoundary } from './components.jsx';
@@ -29,6 +29,7 @@ const Imports = lazy(() => import('./pages/Imports.jsx'));
 const HowItWorks = lazy(() => import('./pages/HowItWorks.jsx'));
 const Corrections = lazy(() => import('./pages/Corrections.jsx'));
 const Changelog = lazy(() => import('./pages/Changelog.jsx'));
+const Wrapped = lazy(() => import('./pages/Wrapped.jsx'));
 const Trash = lazy(() => import('./pages/Trash.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
@@ -58,6 +59,7 @@ const NAV = [
     label: 'Losing My Edge',
     items: [
       { to: '/escuchas', label: 'Escuchas', Icon: Headphones },
+      { to: '/resumen', label: 'Resumen', Icon: PartyPopper },
       { to: '/retos', label: 'Retos', Icon: Trophy },
     ],
   },
@@ -338,6 +340,7 @@ export default function App() {
             <Route path="/importar" element={<Imports />} />
             <Route path="/correcciones" element={<Corrections />} />
             <Route path="/escuchas" element={<Listening />} />
+            <Route path="/resumen" element={<Wrapped />} />
             <Route path="/retos" element={<Challenges />} />
             <Route path="/upgrades" element={<Upgrades />} />
             <Route path="/sellos" element={<Labels />} />
