@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Component } from 'react';
 import { Link } from 'react-router-dom';
-import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2 } from 'lucide-react';
+import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy } from 'lucide-react';
 import { api, coverUrl, artistPhotoUrl, fmtBytes } from './api.js';
 
 // ¿Lidarr configurado? La UI oculta sus caminos cuando no lo está (Lidarr es opcional:
@@ -233,6 +233,7 @@ export function ArtistPhoto({ id, name, size = 40, className = '', bust, retry =
 //   el panel de copias (borrado rápido); el resto de la tarjeta sigue yendo a la ficha.
 export function AlbumCard({ album, onClick, selectable = false, selected = false, onSelectToggle }) {
   const incomplete = album.track_file_count < album.track_count;
+  const [menu, setMenu] = useState(null); // menú contextual (clic derecho) → añadir a reto
   const coverInner = (
     <div className={`relative rounded-lg overflow-hidden card ${selected ? 'ring-2 ring-gold-500' : ''}`}>
       <Cover id={album.id} />
@@ -303,7 +304,13 @@ export function AlbumCard({ album, onClick, selectable = false, selected = false
   }
 
   return (
-    <div className="group block">
+    <div
+      className="group block"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setMenu({ x: e.clientX, y: e.clientY });
+      }}
+    >
       <Link to={`/album/${album.id}`} className="block">
         {coverInner}
       </Link>
@@ -322,7 +329,86 @@ export function AlbumCard({ album, onClick, selectable = false, selected = false
           {album.year ? ` · ${album.year}` : ''}
         </div>
       </div>
+      {menu && (
+        <ChallengeContextMenu
+          x={menu.x}
+          y={menu.y}
+          artist={album.album_artist}
+          title={album.title}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// Menú contextual (clic derecho en una tarjeta) para añadir el disco a un reto. Anclado en
+// el cursor, con un fondo invisible que lo cierra. Carga tus retos al abrir y añade
+// «Artista - Álbum» al que elijas (el servidor deduplica y avisa si ya estaba).
+export function ChallengeContextMenu({ x, y, artist, title, onClose }) {
+  const [list, setList] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api.challenges().then(setList).catch(() => setList([]));
+  }, []);
+  const add = async (ch) => {
+    setBusy(true);
+    try {
+      const r = await api.addChallengeItems(ch.id, `${artist} - ${title}`);
+      setMsg(r.added > 0 ? `Añadido a «${ch.name}»` : `Ya estaba en «${ch.name}»`);
+      setTimeout(onClose, 1000);
+    } catch (e) {
+      setMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1000;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const left = Math.min(x, vw - 236);
+  const top = Math.min(y, vh - 300);
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-40"
+        onClick={onClose}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onClose();
+        }}
+      />
+      <div className="fixed z-50 w-56 card p-1 shadow-xl border border-ink-700 max-h-72 overflow-y-auto" style={{ left, top }}>
+        <div className="px-2.5 py-1.5 text-[11px] uppercase tracking-wide text-neutral-600 truncate">
+          Añadir a reto · {title}
+        </div>
+        {list === null ? (
+          <div className="px-2.5 py-2 text-sm text-neutral-500">Cargando…</div>
+        ) : msg ? (
+          <div className="px-2.5 py-2 text-sm text-emerald-400">{msg}</div>
+        ) : list.length === 0 ? (
+          <div className="px-2.5 py-2 text-sm text-neutral-500">
+            No tienes retos.{' '}
+            <Link to="/retos" className="text-gold-400 hover:underline">
+              Crear uno →
+            </Link>
+          </div>
+        ) : (
+          list.map((ch) => (
+            <button
+              key={ch.id}
+              onClick={() => add(ch)}
+              disabled={busy}
+              className="w-full text-left px-2.5 py-1.5 rounded text-sm text-neutral-300 hover:bg-ink-800 inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              <Trophy size={13} className="text-neutral-500 shrink-0" />
+              <span className="truncate">{ch.name}</span>
+              <span className="text-xs text-neutral-600 ml-auto shrink-0">{ch.item_count}</span>
+            </button>
+          ))
+        )}
+      </div>
+    </>
   );
 }
 
