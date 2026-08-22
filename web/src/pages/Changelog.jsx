@@ -9,6 +9,17 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.6',
+    title: 'Avisos, resumen y recomendaciones',
+    items: [
+      'Notificaciones por webhook (Discord / Slack / ntfy): aviso al importar descargas y de novedades de tus artistas (Ajustes → Notificaciones).',
+      'Resumen tipo Wrapped: tu año en música — top artistas/álbumes, totales, evolución por mes y discos añadidos (menú Losing My Edge).',
+      'Recomendaciones en la ficha: «Discos que quizá te gusten» de artistas afines que aún no tienes, con seguir/descargar.',
+      'Escuchas: «Los más escuchados» con rango de fechas (semana / mes / 3 meses / año / todo).',
+      'Búsqueda: arreglado el caso de artistas colaborativos — si la cadena entera no da resultados, reintenta con el título (y limpia «&»).',
+    ],
+  },
+  {
     version: '0.9.5',
     title: 'Retos por todas partes',
     items: [
