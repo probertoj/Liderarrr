@@ -7,11 +7,11 @@ import { PageTitle, Spinner, ErrorMsg, Button } from '../components.jsx';
 // Estilo del badge de diagnóstico por ítem (por qué no se auto-importa). Los códigos los
 // fija el servidor en importer.js classifyPending().
 const DIAG_CLS = {
-  'multi-album': 'bg-amber-900/40 text-amber-300 border-amber-800/60',
-  'in-library': 'bg-amber-900/30 text-amber-300/90 border-amber-800/50',
-  'not-torrent': 'bg-sky-900/40 text-sky-300 border-sky-800/60',
-  'torrent-pending': 'bg-neutral-800 text-neutral-300 border-neutral-700',
-  ready: 'bg-emerald-900/40 text-emerald-300 border-emerald-800/60',
+  'multi-album': 'diag-warn',
+  'in-library': 'diag-warn',
+  'not-torrent': 'diag-info',
+  'torrent-pending': 'diag-muted',
+  ready: 'diag-ok',
 };
 
 // «hace Ns / Nm / Nh» a partir de un timestamp (para ver si el auto-import se dispara solo).
@@ -293,7 +293,7 @@ export default function Imports() {
               </span>
               {it.diag && (
                 <span
-                  className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full border ${DIAG_CLS[it.diag.code] || DIAG_CLS.ready}`}
+                  className={`diag-badge shrink-0 text-[11px] px-2 py-0.5 rounded-full ${DIAG_CLS[it.diag.code] || DIAG_CLS.ready}`}
                   title={it.diag.hint}
                 >
                   {it.diag.label}
