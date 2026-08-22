@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PartyPopper } from 'lucide-react';
+import { PartyPopper, Download } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { api, coverUrl } from '../api.js';
 import { PageTitle, Spinner, StatCard, ArtistPhoto } from '../components.jsx';
@@ -22,11 +22,52 @@ export default function Wrapped() {
   );
   const [sel, setSel] = useState(presets[3]); // por defecto: último año
   const [data, setData] = useState(null);
+  const [imgBusy, setImgBusy] = useState(false);
 
   useEffect(() => {
     setData(null);
     api.wrapped(sel.since, sel.until).then(setData).catch(() => setData({ empty: true }));
   }, [sel]);
+
+  // Descarga una imagen (PNG) del mosaico: pide el SVG al servidor (con las portadas ya
+  // embebidas) y lo rasteriza en un canvas para descargar un PNG compartible.
+  const downloadImage = async () => {
+    setImgBusy(true);
+    try {
+      const p = new URLSearchParams();
+      if (sel.since) p.set('since', String(sel.since));
+      if (sel.until) p.set('until', String(sel.until));
+      p.set('label', sel.label);
+      const svg = await (await fetch(`/api/listening/wrapped/image?${p}`)).text();
+      const img = new Image();
+      await new Promise((res, rej) => {
+        img.onload = res;
+        img.onerror = () => rej(new Error('no se pudo renderizar'));
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = 1080;
+      canvas.getContext('2d').drawImage(img, 0, 0, 1080, 1080);
+      await new Promise((res) =>
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `resumen-${sel.label.replace(/\s+/g, '-').toLowerCase()}.png`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          res();
+        }, 'image/png')
+      );
+    } catch (e) {
+      alert(`No se pudo generar la imagen: ${e.message}`);
+    } finally {
+      setImgBusy(false);
+    }
+  };
 
   if (data?.empty) {
     return (
@@ -88,7 +129,16 @@ export default function Wrapped() {
           {/* Mosaico de portadas de los discos más escuchados */}
           {data.topAlbums.length > 0 && (
             <div className="mb-8">
-              <h2 className="text-sm text-neutral-400 mb-3">Tus discos más escuchados</h2>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h2 className="text-sm text-neutral-400">Tus discos más escuchados</h2>
+                <button
+                  onClick={downloadImage}
+                  disabled={imgBusy}
+                  className="text-xs px-2.5 py-1.5 rounded-lg border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1.5 disabled:opacity-60"
+                >
+                  <Download size={13} /> {imgBusy ? 'Generando…' : 'Descargar imagen'}
+                </button>
+              </div>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                 {data.topAlbums.map((a, i) => (
                   <MosaicCell key={i} a={a} rank={i + 1} />

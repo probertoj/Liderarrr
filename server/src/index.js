@@ -42,6 +42,7 @@ import { similarSuggestions, refreshArtistSuggestions, dismissSuggestion, follow
 import { externalNewReleases, refreshExternalReleases, dismissExternalRelease } from './newreleases.js';
 import { spotifyTest, spotifyAlbumUrl } from './spotify.js';
 import { notifyTest } from './notify.js';
+import { wrappedImageSvg } from './wrappedimage.js';
 import {
   followLabel,
   followLabelByName,
@@ -605,6 +606,15 @@ app.get('/api/listening/wrapped', async (req) => {
   const since = req.query?.since ? Number(req.query.since) : null;
   const until = req.query?.until ? Number(req.query.until) : null;
   return await wrapped({ since, until });
+});
+// imagen compartible (SVG) del mosaico del Resumen; el cliente la rasteriza a PNG
+app.get('/api/listening/wrapped/image', async (req, reply) => {
+  if (!hasScrobbles()) return reply.code(400).send({ error: 'Sin escuchas' });
+  const since = req.query?.since ? Number(req.query.since) : null;
+  const until = req.query?.until ? Number(req.query.until) : null;
+  const svg = await wrappedImageSvg({ since, until, label: req.query?.label || '' });
+  reply.header('Content-Type', 'image/svg+xml; charset=utf-8');
+  return reply.send(svg);
 });
 
 // --- retos ------------------------------------------------------------------
