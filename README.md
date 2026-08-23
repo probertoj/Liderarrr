@@ -300,7 +300,8 @@ Gracias en especial:
 - A **ForeverRamone**, por PowaFlex y por la idea de la que sale todo esto.
 - A **[calltheranger](https://www.buymusic.club/user/calltheranger)**, por su selección semanal de
   novedades en Bandcamp, que alimenta el radar de la app.
-- A **los hipersónicos**.
+- A **Serge**, por ser el mejor tester posible. Heaven knows you're miserable now. 
+- A **los hipersónicos**, en general.
 - A **Sanpitopato**. Seguimosseguimos.
 
 Datos por cortesía de [MusicBrainz](https://musicbrainz.org), [AcoustID](https://acoustid.org),
