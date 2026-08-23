@@ -389,3 +389,57 @@ export async function importFolder(sourceDir, override = {}) {
   }
   return { dest: destDir, linked, method, errors, artist: meta.artist, album: meta.album, year: meta.year };
 }
+
+// Como importFolder pero para un ÚNICO fichero (torrents de un solo tema): lo enlaza a
+// media/<Artista>/<Álbum>/<fichero>. Las descargas de un fichero suelto (singles, remixes)
+// las saltaba el auto-import; ahora también entran. Lanza un error «no es de audio» si no
+// lo es (el auto-import lo salta en silencio, igual que las carpetas sin música).
+export async function importFile(sourceFile, override = {}) {
+  const { enabled, source, dest } = importConfig();
+  if (!enabled) throw new Error('La importación está desactivada. Actívala en Ajustes → Importar descargas.');
+  if (!source || !dest) throw new Error('Configura las carpetas de descargas y de biblioteca en Ajustes.');
+  const norm = path.resolve(sourceFile);
+  if (!norm.startsWith(path.resolve(source))) throw new Error('El fichero de origen está fuera de la carpeta de descargas.');
+  if (!fs.existsSync(norm)) throw new Error('El fichero de origen ya no existe.');
+  if (!AUDIO_EXT.has(path.extname(norm).toLowerCase())) throw new Error('El fichero no es de audio.');
+
+  const tags = await readTags(norm);
+  const meta = { ...tags, ...override };
+  const base = path.basename(norm, path.extname(norm));
+  const destDir = path.join(
+    dest,
+    renderPath(getSetting('import_naming'), {
+      artist: meta.artist || 'Artista desconocido',
+      album: meta.album || base,
+      year: meta.year || null,
+    })
+  );
+  const target = path.join(destDir, path.basename(norm));
+  fs.mkdirSync(destDir, { recursive: true });
+  const copyAllowed = getSetting('import_copy_fallback') === '1';
+  let method = 'hardlink';
+  if (!fs.existsSync(target)) {
+    try {
+      fs.linkSync(norm, target);
+    } catch (e) {
+      if (e.code === 'EXDEV') {
+        if (!copyAllowed) {
+          throw new Error(
+            'El origen y la biblioteca están en sistemas de ficheros distintos: el hardlink no es posible. Monta /data como un único volumen (guía TRaSH), o activa «Copiar si el hardlink no es posible» en Ajustes → Importar descargas.'
+          );
+        }
+        fs.copyFileSync(norm, target);
+        method = 'copy';
+      } else {
+        throw e;
+      }
+    }
+  }
+  recordImport.run(norm, destDir, Date.now());
+  try {
+    reconcileImported({ sourceName: base, artist: meta.artist, album: meta.album, dest: destDir });
+  } catch {
+    /* best-effort */
+  }
+  return { dest: destDir, linked: 1, method, artist: meta.artist, album: meta.album, year: meta.year };
+}

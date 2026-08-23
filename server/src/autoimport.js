@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { db, getSetting } from './db.js';
 import { qbCompletedTorrents } from './qbittorrent.js';
-import { importFolder, importConfig, isIgnoredImport } from './importer.js';
+import { importFolder, importFile, importConfig, isIgnoredImport } from './importer.js';
 import { matchRequest, setDownloadStatus, reconcileAgainstLibrary, pruneDownloads } from './downloads.js';
 import { runScan } from './scanner.js';
 import { runIdentify } from './identify.js';
@@ -99,7 +99,8 @@ export async function runAutoImport() {
       } catch {
         continue; // el contenido no es accesible desde aquí
       }
-      if (!isDir) continue; // MVP: solo carpetas (los álbumes vienen en carpeta)
+      // Carpeta (álbum) o fichero suelto (single/remix): ambos se importan. Un no-audio
+      // suelto lanzará «no es de audio» y se salta en silencio abajo, como las carpetas vacías.
       if (isImported.get(path.resolve(cp))) {
         // ya importada (a mano o en una pasada anterior): si aún tenía un pedido abierto,
         // ciérralo — así el backlog deja de mostrarse como "pedido" eternamente.
@@ -119,16 +120,16 @@ export async function runAutoImport() {
       const override = req ? { artist: req.artist, album: req.album, year: req.year } : {};
       if (req) setDownloadStatus(req.id, 'importing');
       try {
-        const r = await importFolder(cp, override);
+        const r = isDir ? await importFolder(cp, override) : await importFile(cp, override);
         importedAny = true;
         autoImportStatus.imported++;
         if (req) setDownloadStatus(req.id, 'imported', r.dest);
         console.log(`[autoimport] ✓ ${t.name} → ${r.dest} (${r.linked} ficheros)`);
       } catch (e) {
         const msg = String(e.message || e);
-        // torrent no-música (software, ebooks…) en la carpeta de música: NO es un error real,
-        // simplemente no hay nada que importar. Se salta en silencio (sin ensuciar el panel).
-        if (/no tiene ficheros de audio/i.test(msg)) {
+        // no-música (software, ebooks… en carpeta, o fichero suelto no-audio): NO es un error
+        // real, simplemente no hay nada que importar. Se salta en silencio.
+        if (/no (tiene ficheros de audio|es de audio)/i.test(msg)) {
           autoImportStatus.checked--; // no era un candidato real de importación
           autoImportStatus.skippedNonMusic++;
           continue;

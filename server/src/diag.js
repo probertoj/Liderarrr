@@ -62,7 +62,7 @@ export function diagnostics() {
     albums: db.prepare('SELECT COUNT(*) AS n FROM albums').get().n,
     artists: db.prepare('SELECT COUNT(DISTINCT artist_id) AS n FROM albums').get().n,
     tracks: db.prepare('SELECT COUNT(*) AS n FROM tracks').get().n,
-    listens: db.prepare("SELECT COUNT(*) AS n FROM listens WHERE source='lastfm'").get().n,
+    listens: db.prepare("SELECT COUNT(*) AS n FROM listens WHERE source IN ('lastfm','listenbrainz')").get().n,
   };
   let lastScan = null;
   try {

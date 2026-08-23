@@ -4,7 +4,7 @@ import { runIdentify, identifyStatus } from './identify.js';
 import { lidarrSync } from './lidarr.js';
 import { enrichAllDiscographies, discographyStatus } from './discography.js';
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
-import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
+import { importListens, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
 import { refreshAllLabels } from './followlabels.js';
 import { refreshAllCurators } from './radar.js';
 import { runAutoImport, autoImportEnabled, autoImportStatus } from './autoimport.js';
@@ -68,10 +68,10 @@ function buildSteps() {
     },
     {
       key: 'scrobbles',
-      label: 'Importar escuchas de Last.fm',
+      label: 'Importar escuchas (Last.fm / ListenBrainz)',
       enabled: () => scrobblesConfigured(),
       run: async () => {
-        const r = await importScrobbles({ full: false });
+        const r = await importListens({ full: false });
         if (r.error) throw new Error(r.error);
         return `${scrobbleStatus.imported} escuchas nuevas`;
       },

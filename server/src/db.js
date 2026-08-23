@@ -523,6 +523,7 @@ const SECRET_SETTING_KEYS = new Set([
   'qbittorrent_pass',
   'spotify_client_secret',
   'notify_url',
+  'listenbrainz_token',
 ]);
 const secretKey = process.env.LIDERARRR_SECRET
   ? crypto.createHash('sha256').update(process.env.LIDERARRR_SECRET).digest()

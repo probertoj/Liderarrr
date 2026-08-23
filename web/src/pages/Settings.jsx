@@ -286,6 +286,13 @@ export default function Settings() {
           <p className="mt-1">Pon también tu usuario de Last.fm arriba para importar tus escuchas.</p>
         </HowTo>
 
+        <Field label="ListenBrainz · usuario" hint="Alternativa (o complemento) abierta a Last.fm, alineada con MusicBrainz. Solo el usuario basta (el historial es público).">
+          <input value={s.listenbrainz_user || ''} onChange={set('listenbrainz_user')} className={input} placeholder="tu_usuario" />
+        </Field>
+        <Field label="ListenBrainz · token" hint="Opcional, solo para cuentas privadas (listenbrainz.org → Settings).">
+          <input value={s.listenbrainz_token || ''} onChange={set('listenbrainz_token')} className={input} placeholder="••••••••" />
+        </Field>
+
         <Field
           label="Spotify · Client ID"
           hint="Opcional. Suma Spotify como fuente de novedades adelantadas (además de Deezer, que ya funciona sin clave)."
@@ -309,6 +316,7 @@ export default function Settings() {
           <TestButton service="acoustid" label="AcoustID" beforeTest={save} />
           <TestButton service="discogs" label="Discogs" beforeTest={save} />
           <TestButton service="lastfm" label="Last.fm" beforeTest={save} />
+          <TestButton service="listenbrainz" label="ListenBrainz" beforeTest={save} />
           <TestButton service="spotify" label="Spotify" beforeTest={save} />
         </div>
       </section>

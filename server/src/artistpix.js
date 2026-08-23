@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { db, DATA_DIR, cacheRead, cacheWrite } from './db.js';
 import { matchKey } from './matchkey.js';
+import * as lastfm from './lastfm.js';
 
 // Fotos de artista, en paralelo a las carátulas (covers.js): resolución automática
 // desde Deezer (por nombre, sin API key) y edición manual (buscar candidatos o subir).
@@ -120,6 +121,28 @@ export async function deezerAlbumCover(artist, title) {
   }
   cacheWrite(key, out);
   return out.url || null;
+}
+
+// Carátula de un álbum con RESPALDOS: Deezer → Last.fm (imagen) → Cover Art Archive (por el
+// MBID que Last.fm devuelva). Cacheada 30 días. Para el mosaico del Resumen: así casi ningún
+// disco queda sin portada aunque Deezer no lo tenga.
+export async function albumCoverUrl(artist, title) {
+  if (!artist || !title) return null;
+  const key = `albumcover:${matchKey(artist, title)}`;
+  const cached = cacheRead(key, ALBUM_COVER_TTL);
+  if (cached !== null) return cached.url || null;
+  let url = await deezerAlbumCover(artist, title).catch(() => null);
+  if (!url) {
+    try {
+      const info = await lastfm.albumInfo(artist, title);
+      if (info?.image) url = info.image;
+      else if (info?.mbid) url = `https://coverartarchive.org/release-group/${info.mbid}/front-500`;
+    } catch {
+      /* sin respaldo */
+    }
+  }
+  cacheWrite(key, { url: url || null });
+  return url || null;
 }
 
 // Resolución RÁPIDA (sin red): foto en caché. 'ok' | 'none' | 'pending' | 'notfound'.

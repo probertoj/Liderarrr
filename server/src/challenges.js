@@ -88,7 +88,7 @@ function playsIndex() {
   if (playsCache.map && Date.now() - playsCache.at < CACHE_TTL) return playsCache.map;
   const map = new Map();
   for (const r of db
-    .prepare("SELECT artist, album, COUNT(*) AS n FROM listens WHERE source='lastfm' AND album IS NOT NULL AND album <> '' GROUP BY artist, album")
+    .prepare("SELECT artist, album, COUNT(*) AS n FROM listens WHERE source IN ('lastfm','listenbrainz') AND album IS NOT NULL AND album <> '' GROUP BY artist, album")
     .all()) {
     const k = playKey(r.artist, r.album);
     map.set(k, (map.get(k) || 0) + r.n);

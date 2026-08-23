@@ -1,5 +1,6 @@
 import { db, getSetting, setSetting } from './db.js';
 import { recentTracks, lastfmConfigured } from './lastfm.js';
+import { lbConfigured, importListenBrainz } from './listenbrainz.js';
 
 // Importa tu historial de escuchas de Last.fm a la tabla listens. Incremental:
 // guarda el ts del scrobble más reciente y la próxima vez pide solo lo posterior.
@@ -22,14 +23,39 @@ const insertListen = db.prepare(
    VALUES (@artist, @album, @track, @ts, 'lastfm', @mbid)`
 );
 
-export function scrobblesConfigured() {
+export function lastfmScrobblesConfigured() {
   return lastfmConfigured() && !!getSetting('lastfm_user');
+}
+// hay escuchas que importar si está configurado Last.fm o ListenBrainz (o ambos)
+export function scrobblesConfigured() {
+  return lastfmScrobblesConfigured() || lbConfigured();
+}
+
+// Importa de TODAS las fuentes configuradas (Last.fm y/o ListenBrainz) a la tabla listens.
+// Es lo que llaman el refresco y el botón «Actualizar escuchas».
+export async function importListens({ full = false } = {}) {
+  let total = 0;
+  scrobbleStatus.error = null;
+  if (lastfmScrobblesConfigured()) {
+    const s = await importScrobbles({ full });
+    total += s.imported || 0;
+  }
+  if (lbConfigured()) {
+    try {
+      const r = await importListenBrainz({ full });
+      total += r.imported || 0;
+    } catch (e) {
+      scrobbleStatus.error = `ListenBrainz: ${String(e.message || e)}`;
+    }
+  }
+  scrobbleStatus.imported = total; // total combinado (para el panel/refresco)
+  return { ...scrobbleStatus, imported: total };
 }
 
 export async function importScrobbles({ full = false } = {}) {
   if (scrobbleStatus.running) return scrobbleStatus;
   const user = getSetting('lastfm_user');
-  if (!scrobblesConfigured()) throw new Error('Falta el usuario de Last.fm o la API key (Ajustes)');
+  if (!lastfmScrobblesConfigured()) throw new Error('Falta el usuario de Last.fm o la API key (Ajustes)');
 
   // incremental salvo que se pida completo: desde el último ts conocido
   const lastTs = full ? 0 : Number(getSetting('lastfm_last_scrobble') || 0);

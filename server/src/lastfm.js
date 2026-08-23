@@ -44,10 +44,15 @@ export async function albumInfo(artist, album) {
     });
     const a = data.album;
     if (!a) return null;
+    // imagen más grande disponible, descartando el placeholder «estrella» de Last.fm
+    let image = null;
+    for (const im of Array.isArray(a.image) ? a.image : [])
+      if (im['#text'] && !im['#text'].includes('2a96cbd8b46e442fc41c2b86b821562f')) image = im['#text'];
     return {
       name: a.name,
       artist: a.artist,
       mbid: a.mbid || null,
+      image,
       listeners: Number(a.listeners) || 0,
       playcount: Number(a.playcount) || 0,
       url: a.url || null,

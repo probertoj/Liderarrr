@@ -63,7 +63,8 @@ import {
   addHipersonicaTierList,
 } from './radar.js';
 import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.js';
-import { importScrobbles, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
+import { importListens, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
+import { lbTest } from './listenbrainz.js';
 import { listeningOverview, ownershipGap, ownedUnplayed, unownedScrobbledAlbums, hasScrobbles, topPlayed, wrapped } from './listening.js';
 import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing, nextChallengeListens, createChallenge, addItemsToChallenge, removeChallengeItem } from './challenges.js';
 import { importListFromUrl } from './listimport.js';
@@ -138,7 +139,7 @@ app.get('/api/update-check', async () => updateCheck());
 app.get('/api/diag', async () => diagnostics());
 
 // --- ajustes ----------------------------------------------------------------
-const SECRET_KEYS = new Set(['lidarr_key', 'prowlarr_key', 'jackett_key', 'qbittorrent_pass', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token', 'spotify_client_secret', 'notify_url']);
+const SECRET_KEYS = new Set(['lidarr_key', 'prowlarr_key', 'jackett_key', 'qbittorrent_pass', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token', 'spotify_client_secret', 'notify_url', 'listenbrainz_token']);
 app.get('/api/settings', async () => {
   const raw = getAllSettings();
   const out = {};
@@ -170,6 +171,7 @@ app.post('/api/settings/test/:service', async (req, reply) => {
       acoustid: acoustidTest,
       discogs: discogsTest,
       lastfm: lastfmTest,
+      listenbrainz: lbTest,
       spotify: spotifyTest,
       notify: notifyTest,
     };
@@ -589,7 +591,7 @@ app.post('/api/albums/:id/write-tags', async (req, reply) => {
 
 // --- escuchas (Last.fm) -----------------------------------------------------
 app.post('/api/scrobbles/import', async (req) => {
-  importScrobbles({ full: !!req.body?.full }).catch((e) => console.error('scrobbles', e));
+  importListens({ full: !!req.body?.full }).catch((e) => console.error('scrobbles', e));
   return { started: true };
 });
 app.get('/api/scrobbles/status', async () => ({ ...scrobbleStatus, configured: scrobblesConfigured() }));

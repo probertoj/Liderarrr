@@ -1,5 +1,5 @@
 import { db } from './db.js';
-import { deezerAlbumCover } from './artistpix.js';
+import { albumCoverUrl } from './artistpix.js';
 
 // Análisis de escuchas y la brecha escucha↔propiedad.
 //
@@ -22,7 +22,7 @@ const normText = (s) => strip(s);
 const albumKey = (artist, title) => `${normArtist(artist)}|${normText(title)}`;
 
 export function hasScrobbles() {
-  return db.prepare("SELECT COUNT(*) AS n FROM listens WHERE source='lastfm'").get().n > 0;
+  return db.prepare("SELECT COUNT(*) AS n FROM listens WHERE source IN ('lastfm','listenbrainz')").get().n > 0;
 }
 
 // Mapa nombre-normalizado -> { albums, id, mbid } de artistas que TIENES.
@@ -66,13 +66,13 @@ export function listeningOverview() {
       `SELECT COUNT(*) AS scrobbles, COUNT(DISTINCT artist) AS artists,
         COUNT(DISTINCT artist || '|' || album) AS albums,
         MIN(ts) AS first, MAX(ts) AS last
-       FROM listens WHERE source='lastfm'`
+       FROM listens WHERE source IN ('lastfm','listenbrainz')`
     )
     .get();
 
   const owned = ownedArtistMap();
   const topArtists = db
-    .prepare("SELECT artist, COUNT(*) AS plays FROM listens WHERE source='lastfm' GROUP BY LOWER(artist) ORDER BY plays DESC LIMIT 25")
+    .prepare("SELECT artist, COUNT(*) AS plays FROM listens WHERE source IN ('lastfm','listenbrainz') GROUP BY LOWER(artist) ORDER BY plays DESC LIMIT 25")
     .all()
     .map((r) => {
       const o = owned.get(normArtist(r.artist));
@@ -82,7 +82,7 @@ export function listeningOverview() {
   const ownedAlbums = ownedAlbumSet();
   const topAlbums = db
     .prepare(
-      "SELECT artist, album, COUNT(*) AS plays FROM listens WHERE source='lastfm' AND album<>'' GROUP BY LOWER(artist), LOWER(album) ORDER BY plays DESC LIMIT 25"
+      "SELECT artist, album, COUNT(*) AS plays FROM listens WHERE source IN ('lastfm','listenbrainz') AND album<>'' GROUP BY LOWER(artist), LOWER(album) ORDER BY plays DESC LIMIT 25"
     )
     .all()
     .map((r) => ({ artist: r.artist, album: r.album, plays: r.plays, owned: ownedAlbums.has(albumKey(r.artist, r.album)) }));
@@ -90,7 +90,7 @@ export function listeningOverview() {
   const byYear = db
     .prepare(
       `SELECT CAST(strftime('%Y', ts/1000, 'unixepoch') AS INTEGER) AS year, COUNT(*) AS plays
-       FROM listens WHERE source='lastfm' GROUP BY year ORDER BY year`
+       FROM listens WHERE source IN ('lastfm','listenbrainz') GROUP BY year ORDER BY year`
     )
     .all();
 
@@ -111,7 +111,7 @@ export function topPlayed({ since = null, limit = 12 } = {}) {
   }
   const artists = db
     .prepare(
-      `SELECT artist, COUNT(*) AS plays FROM listens WHERE source='lastfm'${sinceClause}
+      `SELECT artist, COUNT(*) AS plays FROM listens WHERE source IN ('lastfm','listenbrainz')${sinceClause}
        GROUP BY LOWER(artist) ORDER BY plays DESC LIMIT @limit`
     )
     .all(args)
@@ -121,7 +121,7 @@ export function topPlayed({ since = null, limit = 12 } = {}) {
     });
   const albums = db
     .prepare(
-      `SELECT artist, album, COUNT(*) AS plays FROM listens WHERE source='lastfm' AND album<>''${sinceClause}
+      `SELECT artist, album, COUNT(*) AS plays FROM listens WHERE source IN ('lastfm','listenbrainz') AND album<>''${sinceClause}
        GROUP BY LOWER(artist), LOWER(album) ORDER BY plays DESC LIMIT @limit`
     )
     .all(args)
@@ -151,13 +151,13 @@ export async function wrapped({ since = null, until = null } = {}) {
     .prepare(
       `SELECT COUNT(*) AS scrobbles, COUNT(DISTINCT LOWER(artist)) AS artists,
         COUNT(DISTINCT LOWER(artist) || '|' || LOWER(album)) AS albums
-       FROM listens WHERE source='lastfm'${rt.c}`
+       FROM listens WHERE source IN ('lastfm','listenbrainz')${rt.c}`
     )
     .get(rt.a);
 
   const owned = ownedArtistMap();
   const topArtists = db
-    .prepare(`SELECT artist, COUNT(*) AS plays FROM listens WHERE source='lastfm'${rt.c} GROUP BY LOWER(artist) ORDER BY plays DESC LIMIT 12`)
+    .prepare(`SELECT artist, COUNT(*) AS plays FROM listens WHERE source IN ('lastfm','listenbrainz')${rt.c} GROUP BY LOWER(artist) ORDER BY plays DESC LIMIT 12`)
     .all(rt.a)
     .map((r) => {
       const o = owned.get(normArtist(r.artist));
@@ -172,7 +172,7 @@ export async function wrapped({ since = null, until = null } = {}) {
   }
   const topAlbums = db
     .prepare(
-      `SELECT artist, album, COUNT(*) AS plays FROM listens WHERE source='lastfm' AND album<>''${rt.c}
+      `SELECT artist, album, COUNT(*) AS plays FROM listens WHERE source IN ('lastfm','listenbrainz') AND album<>''${rt.c}
        GROUP BY LOWER(artist), LOWER(album) ORDER BY plays DESC LIMIT 24`
     )
     .all(rt.a)
@@ -185,7 +185,7 @@ export async function wrapped({ since = null, until = null } = {}) {
     topAlbums
       .filter((a) => !a.album_id)
       .map(async (a) => {
-        a.cover = await deezerAlbumCover(a.artist, a.album).catch(() => null);
+        a.cover = await albumCoverUrl(a.artist, a.album).catch(() => null);
       })
   );
 
@@ -204,12 +204,12 @@ export async function wrapped({ since = null, until = null } = {}) {
   const byMonth = db
     .prepare(
       `SELECT strftime('%Y-%m', ts/1000, 'unixepoch') AS month, COUNT(*) AS plays
-       FROM listens WHERE source='lastfm'${rt.c} GROUP BY month ORDER BY month`
+       FROM listens WHERE source IN ('lastfm','listenbrainz')${rt.c} GROUP BY month ORDER BY month`
     )
     .all(rt.a);
 
   const years = db
-    .prepare("SELECT DISTINCT CAST(strftime('%Y', ts/1000, 'unixepoch') AS INTEGER) AS y FROM listens WHERE source='lastfm' ORDER BY y DESC")
+    .prepare("SELECT DISTINCT CAST(strftime('%Y', ts/1000, 'unixepoch') AS INTEGER) AS y FROM listens WHERE source IN ('lastfm','listenbrainz') ORDER BY y DESC")
     .all()
     .map((r) => r.y);
 
@@ -228,7 +228,7 @@ export function ownershipGap({ minPlays = 15, since = null } = {}) {
     sinceClause = ' AND ts >= @since';
     args.since = Number(since);
   }
-  for (const r of db.prepare(`SELECT artist, COUNT(*) AS plays FROM listens WHERE source='lastfm'${sinceClause} GROUP BY LOWER(artist)`).all(args)) {
+  for (const r of db.prepare(`SELECT artist, COUNT(*) AS plays FROM listens WHERE source IN ('lastfm','listenbrainz')${sinceClause} GROUP BY LOWER(artist)`).all(args)) {
     const k = normArtist(r.artist);
     if (!k) continue;
     const e = scrobbles.get(k) || { artist: r.artist, plays: 0 };
@@ -269,7 +269,7 @@ export function unownedScrobbledAlbums({ since = null, minPlays = 2 } = {}) {
   const rows = db
     .prepare(
       `SELECT artist, album, COUNT(*) AS plays, MAX(ts) AS last
-       FROM listens WHERE source='lastfm' AND album<>''${sinceClause}
+       FROM listens WHERE source IN ('lastfm','listenbrainz') AND album<>''${sinceClause}
        GROUP BY LOWER(artist), LOWER(album) HAVING plays >= @minPlays
        ORDER BY plays DESC, last DESC LIMIT 400`
     )
@@ -293,7 +293,7 @@ export function recentListenedAlbums(limit = 14) {
     idByKey.set(albumKey(a.album_artist, a.title), a.id);
   const seen = new Set();
   const out = [];
-  for (const r of db.prepare("SELECT artist, album, ts FROM listens WHERE source='lastfm' AND album<>'' ORDER BY ts DESC LIMIT 2000").all()) {
+  for (const r of db.prepare("SELECT artist, album, ts FROM listens WHERE source IN ('lastfm','listenbrainz') AND album<>'' ORDER BY ts DESC LIMIT 2000").all()) {
     const k = albumKey(r.artist, r.album);
     if (seen.has(k)) continue;
     seen.add(k);
@@ -307,7 +307,7 @@ export function recentListenedAlbums(limit = 14) {
 // en tu propio disco. Cruce en memoria: Set de escuchados + filtro de álbumes.
 export function ownedUnplayed() {
   const listened = new Set();
-  for (const r of db.prepare("SELECT DISTINCT artist, album FROM listens WHERE source='lastfm' AND album<>''").all())
+  for (const r of db.prepare("SELECT DISTINCT artist, album FROM listens WHERE source IN ('lastfm','listenbrainz') AND album<>''").all())
     listened.add(albumKey(r.artist, r.album));
   const albums = db
     .prepare(
