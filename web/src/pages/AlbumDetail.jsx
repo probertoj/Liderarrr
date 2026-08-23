@@ -390,7 +390,14 @@ export default function AlbumDetail() {
                         <button
                           key={i.key}
                           onClick={() => {
-                            setShownSec((s) => new Set(s).add(i.key));
+                            // Toggle: si la sección ya está revelada, al volver a pinchar se oculta
+                            // (el check indica el estado). Antes solo añadía, así que no se cerraba.
+                            setShownSec((s) => {
+                              const next = new Set(s);
+                              if (next.has(i.key)) next.delete(i.key);
+                              else next.add(i.key);
+                              return next;
+                            });
                             setSecMenu(false);
                           }}
                           className="w-full text-left px-2.5 py-1.5 rounded text-sm text-neutral-300 hover:bg-ink-800 inline-flex items-center gap-2"

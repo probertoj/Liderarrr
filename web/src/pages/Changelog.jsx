@@ -9,6 +9,13 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.12',
+    title: 'Arreglo: menús de la ficha',
+    items: [
+      'En la ficha de disco, los menús opcionales del botón «⋯» (Multidisco, Versiones, etc.) ahora se ocultan al volver a pinchar la misma opción; antes solo se abrían.',
+    ],
+  },
+  {
     version: '0.9.11',
     title: 'Importar (restaurar) la base de datos',
     items: [

@@ -11,6 +11,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.12] — 2026-08-23
+
+### Arreglado
+- Ficha de disco: los menús opcionales del botón «⋯» (Multidisco, Versiones, Corregir
+  emparejamiento, Etiquetas MusicBrainz) no se ocultaban al volver a pinchar la misma
+  opción. Ahora el clic hace *toggle* (mostrar/ocultar).
+
+---
+
 ## [0.9.11] — 2026-08-23
 
 **Importar (restaurar) la base de datos.** El complemento del exportar existente.
