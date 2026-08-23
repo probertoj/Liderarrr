@@ -9,6 +9,19 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.8',
+    title: 'Motor de descargas y escuchas',
+    items: [
+      'ListenBrainz como fuente de escuchas (alternativa o complemento a Last.fm): Escuchas, Resumen y retos cuentan las dos.',
+      'Auto-import: ahora también coge los torrents de un solo fichero (singles/remixes), no solo carpetas.',
+      'Auto-descarga: cruce de propiedad EN VIVO (no re-descarga lo que ya tienes) y, si «artista título» no casa, reintenta con el título.',
+      'Auto-import: los torrents sin música (software/ebooks) se saltan en silencio, sin salir como error.',
+      'Exportar listas M3U (un reto o tus «no escuchados») para tu reproductor.',
+      'Novedades de Spotify: casilla «mostrar también los que ya tengo»; y mejor detección de lo que ya posees en todo el calendario.',
+      'Resumen: las portadas del mosaico tienen respaldos (Deezer → Last.fm → Cover Art Archive).',
+    ],
+  },
+  {
     version: '0.9.7',
     title: 'Resumen con portadas',
     items: [
