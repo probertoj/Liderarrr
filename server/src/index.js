@@ -720,8 +720,9 @@ app.get('/api/quality/overview', async () => q.qualityOverview());
 app.get('/api/quality/duplicates', async () => q.duplicates());
 app.get('/api/unidentified', async () => q.unidentified());
 app.get('/api/rarities', async () => q.rarities());
+app.get('/api/bootlegs', async () => q.bootlegs());
 
-// marcar estado (rareza/orphan, descartar, devolver a pendiente)
+// marcar estado (rareza/orphan, bootleg, descartar, devolver a pendiente)
 app.post('/api/albums/:id/state', async (req, reply) => {
   try {
     return setMatchState(Number(req.params.id), req.body?.state);

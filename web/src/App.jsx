@@ -3,7 +3,7 @@ import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle,
   Sparkles, Settings as SettingsIcon, Menu, X, RefreshCw, Star, Compass, CalendarClock,
-  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud, ExternalLink, Wrench, Rocket, PartyPopper,
+  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud, ExternalLink, Wrench, Rocket, PartyPopper, Radio,
 } from 'lucide-react';
 import { api } from './api.js';
 import { Spinner, ErrorBoundary } from './components.jsx';
@@ -17,6 +17,7 @@ const Incomplete = lazy(() => import('./pages/Incomplete.jsx'));
 const Quality = lazy(() => import('./pages/Quality.jsx'));
 const Unidentified = lazy(() => import('./pages/Unidentified.jsx'));
 const Rarities = lazy(() => import('./pages/Rarities.jsx'));
+const Bootlegs = lazy(() => import('./pages/Bootlegs.jsx'));
 const Tracked = lazy(() => import('./pages/Tracked.jsx'));
 const Discover = lazy(() => import('./pages/Discover.jsx'));
 const Calendar = lazy(() => import('./pages/Calendar.jsx'));
@@ -70,6 +71,7 @@ const NAV = [
       { to: '/sin-identificar', label: 'Sin identificar', Icon: HelpCircle },
       { to: '/correcciones', label: 'Correcciones', Icon: Wrench },
       { to: '/rarezas', label: 'Rarezas e inéditos', Icon: Sparkles },
+      { to: '/bootlegs', label: 'Bootlegs', Icon: Radio },
       { to: '/papelera', label: 'Papelera', Icon: Trash2 },
     ],
   },
@@ -349,6 +351,7 @@ export default function App() {
             <Route path="/sin-identificar" element={<Unidentified />} />
             <Route path="/mb-nueva" element={<MbSeedCallback />} />
             <Route path="/rarezas" element={<Rarities />} />
+            <Route path="/bootlegs" element={<Bootlegs />} />
             <Route path="/papelera" element={<Trash />} />
             <Route path="/ajustes" element={<Settings />} />
             <Route path="/como-funciona" element={<HowItWorks />} />

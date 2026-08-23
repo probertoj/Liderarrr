@@ -4,8 +4,8 @@ import { albumCredits, writeAlbumCredits } from './credits.js';
 
 // Todas las consultas que alimentan las secciones. Regla de oro del diseño:
 //  - Lo DESCRIPTIVO (totales, disco, formatos, escuchas) incluye TODO, también
-//    las rarezas (orphan): están en tu disco, ocupan y suenan.
-//  - Lo COMPARATIVO (% de discografía, retos, huecos) excluye orphan/unmatched:
+//    las rarezas (orphan) y bootlegs: están en tu disco, ocupan y suenan.
+//  - Lo COMPARATIVO (% de discografía, retos, huecos) excluye orphan/bootleg/unmatched:
 //    no puedes completar contra algo que la referencia no conoce.
 const DESCRIPTIVE = "match_state != 'dismissed'";
 
@@ -523,8 +523,8 @@ export function setArtistMbid(id, mbid) {
 }
 
 // Álbumes incompletos: la feature estrella. Faltan pistas frente a lo que
-// deberían tener. Ordenados por cuántas faltan. Excluye orphan (una maqueta no
-// "está incompleta": es lo que es).
+// deberían tener. Ordenados por cuántas faltan. Excluye orphan/bootleg (una maqueta o
+// un directo no oficial no "están incompletos": son lo que son).
 // Álbumes incompletos, COLAPSANDO cajas multidisco: los discos de una misma caja
 // (mismo disc_group) cuentan como un solo álbum, con have = suma de ficheros y total
 // = total de la caja. Así una caja completa desaparece de aquí (aunque cada disco
@@ -535,7 +535,7 @@ export function incompleteGroups() {
       `SELECT id, title, album_artist, year, cover, track_file_count, track_count,
         disc_group, match_state
        FROM albums
-       WHERE ${DESCRIPTIVE} AND match_state NOT IN ('orphan')
+       WHERE ${DESCRIPTIVE} AND match_state NOT IN ('orphan','bootleg')
          AND (track_file_count < track_count OR disc_group IS NOT NULL)`
     )
     .all();
@@ -632,12 +632,24 @@ export function unidentified() {
     .all();
 }
 
-// Rarezas e inéditos: los orphan, material que en otras herramientas se pierde.
+// Rarezas e inéditos: los orphan (demos, maquetas, tomas perdidas), material que en
+// otras herramientas se pierde.
 export function rarities() {
   return db
     .prepare(
       `SELECT id, title, album_artist, year, cover, track_file_count, path
        FROM albums WHERE match_state = 'orphan' ORDER BY album_artist, year, title`
+    )
+    .all();
+}
+
+// Bootlegs: directos no oficiales, sesiones de radio, ROIOs. Como las rarezas, cuentan
+// en lo descriptivo pero no en el completismo; aquí tienen su propia sección.
+export function bootlegs() {
+  return db
+    .prepare(
+      `SELECT id, title, album_artist, year, cover, track_file_count, path
+       FROM albums WHERE match_state = 'bootleg' ORDER BY album_artist, year, title`
     )
     .all();
 }

@@ -72,12 +72,13 @@ export function ErrorMsg({ children }) {
   return <div className="card p-4 text-red-300 border-red-900/60 bg-red-950/30">{children}</div>;
 }
 
-// El estado de emparejado, con color y sentido. orphan es de primera clase.
+// El estado de emparejado, con color y sentido. orphan y bootleg son de primera clase.
 const STATE_META = {
   matched: { label: 'identificado', cls: 'bg-emerald-900/50 text-emerald-300 border-emerald-800/60' },
   pending: { label: 'pendiente', cls: 'bg-neutral-800 text-neutral-300 border-neutral-700' },
   unmatched: { label: 'sin identificar', cls: 'bg-amber-900/40 text-amber-300 border-amber-800/60' },
   orphan: { label: 'rareza', cls: 'bg-violet-900/40 text-violet-300 border-violet-800/60' },
+  bootleg: { label: 'bootleg', cls: 'bg-rose-900/40 text-rose-300 border-rose-800/60' },
   dismissed: { label: 'descartado', cls: 'bg-neutral-900 text-neutral-500 border-neutral-800' },
 };
 export function StateBadge({ state }) {
@@ -252,7 +253,7 @@ export function AlbumCard({ album, onClick, selectable = false, selected = false
               {album.track_file_count}/{album.track_count}
             </span>
           )}
-          {(album.dup || album.match_state === 'orphan') && (
+          {(album.dup || album.match_state === 'orphan' || album.match_state === 'bootleg') && (
             <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
               {album.dup &&
                 (onClick ? (
@@ -272,6 +273,9 @@ export function AlbumCard({ album, onClick, selectable = false, selected = false
                 ))}
               {album.match_state === 'orphan' && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-600/90 text-violet-50">rareza</span>
+              )}
+              {album.match_state === 'bootleg' && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-600/90 text-rose-50">bootleg</span>
               )}
             </div>
           )}

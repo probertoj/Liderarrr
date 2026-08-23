@@ -11,6 +11,26 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.10] — 2026-08-23
+
+**Bootlegs con espacio propio.** La clasificación de «rarezas» se divide en dos.
+
+### Añadido
+- Nuevo estado de álbum **`bootleg`** (directos no oficiales, sesiones de radio, ROIOs),
+  paralelo a `orphan` (rarezas: demos, maquetas, inéditos, tomas perdidas). Ambos cuentan
+  en lo descriptivo (totales, escuchas) pero **no** en el completismo, y nunca reciben
+  escritura de etiquetas.
+- Página **«Bootlegs»** propia (menú *Identikit*, ruta `/bootlegs`), distintivo rosa en
+  las tarjetas, filtro **«Bootleg»** en la Discoteca, y recuento aparte en el Dashboard.
+- Marcar como **rareza** o como **bootleg** (y volver a pendiente) desde la ficha del
+  álbum y desde «Sin identificar».
+
+### Notas
+- Sin migración: las rarezas existentes siguen como `orphan`; reclasifica a `bootleg` las
+  que quieras, disco a disco.
+
+---
+
 ## [0.9.9] — 2026-08-23
 
 **Crear fichas en MusicBrainz desde tu colección.** Cuando un disco no existe en

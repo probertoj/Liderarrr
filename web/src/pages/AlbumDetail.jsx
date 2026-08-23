@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy, Database } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy, Database, Radio } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { openMbReleaseEditor } from '../mb.js';
 import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies } from '../components.jsx';
+
+// orphan y bootleg son «de primera clase»: material fuera de catálogo (rarezas y
+// directos no oficiales) que cuenta en lo descriptivo pero no en el completismo. En toda
+// la ficha se tratan igual — ninguno se identifica ni se le escriben etiquetas.
+const isRarity = (s) => s === 'orphan' || s === 'bootleg';
 
 export default function AlbumDetail() {
   const { id } = useParams();
@@ -316,13 +321,21 @@ export default function AlbumDetail() {
           )}
 
           <div className="flex flex-wrap gap-2 mt-5">
-            {album.match_state !== 'orphan' ? (
+            {album.match_state !== 'orphan' && (
               <Button variant="default" onClick={() => setState('orphan')} disabled={busy}>
                 <span className="inline-flex items-center gap-1.5">
                   <Sparkles size={14} /> Marcar como rareza
                 </span>
               </Button>
-            ) : (
+            )}
+            {album.match_state !== 'bootleg' && (
+              <Button variant="default" onClick={() => setState('bootleg')} disabled={busy}>
+                <span className="inline-flex items-center gap-1.5">
+                  <Radio size={14} /> Marcar como bootleg
+                </span>
+              </Button>
+            )}
+            {isRarity(album.match_state) && (
               <Button variant="default" onClick={() => setState('pending')} disabled={busy}>
                 <span className="inline-flex items-center gap-1.5">
                   <RotateCcw size={14} /> Devolver a pendiente
@@ -368,7 +381,7 @@ export default function AlbumDetail() {
                         key: 'rematch',
                         label: 'Corregir emparejamiento',
                         icon: Sparkles,
-                        show: album.match_state === 'matched' || album.match_state === 'orphan',
+                        show: album.match_state === 'matched' || isRarity(album.match_state),
                       },
                       { key: 'tags', label: 'Etiquetas MusicBrainz', icon: Tag, show: album.match_state === 'matched' },
                     ]
@@ -404,13 +417,13 @@ export default function AlbumDetail() {
 
       {/* secciones secundarias: solo si se revelan desde el menú «⋯» */}
       {shownSec.has('disc') && <DiscBox album={album} onDone={load} />}
-      {shownSec.has('rematch') && (album.match_state === 'matched' || album.match_state === 'orphan') && (
+      {shownSec.has('rematch') && (album.match_state === 'matched' || isRarity(album.match_state)) && (
         <ReMatch album={album} onDone={load} />
       )}
       {shownSec.has('versions') && <Editions albumId={album.id} />}
       {shownSec.has('tags') && album.match_state === 'matched' && <TagWriter albumId={album.id} />}
 
-      {album.match_state !== 'matched' && album.match_state !== 'orphan' && (
+      {album.match_state !== 'matched' && !isRarity(album.match_state) && (
         <IdentifySection album={album} onDone={load} />
       )}
 

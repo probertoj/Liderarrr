@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS albums (
   scanned_at INTEGER,
   cover TEXT,                -- ruta relativa de la carátula encontrada
   -- estado de emparejado con una base de datos externa
-  match_state TEXT DEFAULT 'pending',   -- matched | pending | unmatched | orphan | dismissed
+  match_state TEXT DEFAULT 'pending',   -- matched | pending | unmatched | orphan | bootleg | dismissed
   match_source TEXT,                    -- tags | acoustid | musicbrainz | discogs | lastfm | manual
   match_confidence REAL,
   matched_at INTEGER,

@@ -312,7 +312,7 @@ export function ownedUnplayed() {
   const albums = db
     .prepare(
       `SELECT id, title, album_artist, year, cover FROM albums
-       WHERE match_state NOT IN ('dismissed','orphan') ORDER BY album_artist, year`
+       WHERE match_state NOT IN ('dismissed','orphan','bootleg') ORDER BY album_artist, year`
     )
     .all();
   const out = [];

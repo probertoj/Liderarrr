@@ -79,6 +79,7 @@ export const api = {
   duplicates: () => req('/quality/duplicates'),
   unidentified: () => req('/unidentified'),
   rarities: () => req('/rarities'),
+  bootlegs: () => req('/bootlegs'),
 
   lidarrSync: () => req('/lidarr/sync', { method: 'POST' }),
   lidarrAdd: (rg_mbid, artist_mbid) => req('/lidarr/add', { method: 'POST', body: { rg_mbid, artist_mbid } }),

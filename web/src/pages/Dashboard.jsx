@@ -261,7 +261,17 @@ export default function Dashboard() {
         <StatCard label="Horas de música" value={hours.toLocaleString('es')} sub={`≈ ${Math.round(hours / 24)} días`} />
         <StatCard label="En disco" value={fmtBytes(ov.sizeBytes)} sub={`${ov.tracks.toLocaleString('es')} pistas`} />
         <StatCard label="Sin pérdida" value={`${ov.losslessPct}%`} sub="de las pistas" />
-        <StatCard label="Incompletos" value={ov.incomplete} sub={ov.states?.orphan ? `${ov.states.orphan} rarezas` : 'les falta alguna pista'} />
+        <StatCard
+          label="Incompletos"
+          value={ov.incomplete}
+          sub={
+            ov.states?.orphan || ov.states?.bootleg
+              ? [ov.states?.orphan && `${ov.states.orphan} rarezas`, ov.states?.bootleg && `${ov.states.bootleg} bootlegs`]
+                  .filter(Boolean)
+                  .join(' · ')
+              : 'les falta alguna pista'
+          }
+        />
       </div>
 
       {/* siguiente por escuchar de tus retos */}

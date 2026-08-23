@@ -131,6 +131,7 @@ export default function Library() {
           <option value="">Estado</option>
           <option value="matched">Identificado</option>
           <option value="orphan">Rareza</option>
+          <option value="bootleg">Bootleg</option>
           <option value="unmatched">Sin identificar</option>
         </select>
         <select value={f.sort} onChange={set('sort')} className={sel}>

@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.10',
+    title: 'Bootlegs con espacio propio',
+    items: [
+      'Las «rarezas» se dividen en dos: rarezas (demos, maquetas, inéditos, tomas perdidas) y bootlegs (directos no oficiales, sesiones de radio, ROIOs), cada uno con su página y su distintivo.',
+      'Marca un disco como rareza o como bootleg desde su ficha o desde «Sin identificar»; nueva sección «Bootlegs» en el menú y filtro «Bootleg» en la Discoteca.',
+      'Ambos cuentan en tus estadísticas pero no en el completismo (igual que antes las rarezas). Tus rarezas actuales se quedan como están; reclasifica a bootleg las que quieras.',
+    ],
+  },
+  {
     version: '0.9.9',
     title: 'Crear fichas en MusicBrainz',
     items: [

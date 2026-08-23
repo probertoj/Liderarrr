@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Sparkles, Check, ExternalLink, Loader2, Pencil, X, Database } from 'lucide-react';
+import { HelpCircle, Sparkles, Check, ExternalLink, Loader2, Pencil, X, Database, Radio } from 'lucide-react';
 import { api } from '../api.js';
 import { openMbReleaseEditor } from '../mb.js';
 import { PageTitle, Cover, Spinner, ErrorMsg, Button } from '../components.jsx';
@@ -235,6 +235,11 @@ export default function Unidentified() {
                   <Button variant="default" onClick={() => act(() => api.albumState(a.id, 'orphan'))}>
                     <span className="inline-flex items-center gap-1.5">
                       <Sparkles size={14} /> Es una rareza
+                    </span>
+                  </Button>
+                  <Button variant="default" onClick={() => act(() => api.albumState(a.id, 'bootleg'))} title="Directo no oficial, sesión de radio, ROIO">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Radio size={14} /> Es un bootleg
                     </span>
                   </Button>
                 </div>

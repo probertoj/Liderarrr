@@ -3,9 +3,9 @@ import { Sparkles } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, AlbumCard, Spinner, ErrorMsg } from '../components.jsx';
 
-// Rarezas e inéditos: los orphan. Maquetas, sesiones de radio, directos no
-// oficiales, inéditos. Material que en otras herramientas se pierde entre lo
-// demás; aquí tiene su propia sección con personalidad.
+// Rarezas e inéditos: los orphan. Demos, maquetas, inéditos y tomas perdidas. Material
+// que en otras herramientas se pierde entre lo demás; aquí tiene su propia sección con
+// personalidad. Los directos no oficiales van aparte, en «Bootlegs».
 export default function Rarities() {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
@@ -26,7 +26,8 @@ export default function Rarities() {
       {rows.length === 0 ? (
         <div className="card p-8 text-center text-neutral-400">
           Aún no has marcado ninguna rareza. Desde «Sin identificar» o desde la ficha de un álbum puedes marcar
-          maquetas, bootlegs e inéditos como rarezas: cuentan en tus estadísticas, pero no en el completismo.
+          demos, maquetas, inéditos y tomas perdidas como rarezas: cuentan en tus estadísticas, pero no en el
+          completismo. Los directos no oficiales tienen su propia sección en «Bootlegs».
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">

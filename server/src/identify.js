@@ -274,10 +274,10 @@ export async function identifyOne(albumId) {
   return { matched: !!source, source: source || null };
 }
 
-// Marca un álbum como rareza (orphan) o lo devuelve a pendiente. El estado
-// orphan es de primera clase: cuenta en todo lo descriptivo, no en lo comparativo.
+// Marca un álbum como rareza (orphan), bootleg o lo devuelve a pendiente. orphan y
+// bootleg son de primera clase: cuentan en todo lo descriptivo, no en lo comparativo.
 export function setMatchState(albumId, state) {
-  const valid = ['orphan', 'pending', 'unmatched', 'dismissed'];
+  const valid = ['orphan', 'bootleg', 'pending', 'unmatched', 'dismissed'];
   if (!valid.includes(state)) throw new Error(`Estado inválido: ${state}`);
   db.prepare('UPDATE albums SET match_state = ?, matched_at = ? WHERE id = ?').run(state, Date.now(), albumId);
   return db.prepare('SELECT id, title, match_state FROM albums WHERE id = ?').get(albumId);
