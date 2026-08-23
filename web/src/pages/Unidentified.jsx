@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Sparkles, Check, ExternalLink, Loader2, Pencil, X } from 'lucide-react';
+import { HelpCircle, Sparkles, Check, ExternalLink, Loader2, Pencil, X, Database } from 'lucide-react';
 import { api } from '../api.js';
+import { openMbReleaseEditor } from '../mb.js';
 import { PageTitle, Cover, Spinner, ErrorMsg, Button } from '../components.jsx';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -230,6 +231,7 @@ export default function Unidentified() {
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <Button onClick={() => setOpenId(openId === a.id ? null : a.id)}>Buscar</Button>
+                  <CreateMbButton album={a} />
                   <Button variant="default" onClick={() => act(() => api.albumState(a.id, 'orphan'))}>
                     <span className="inline-flex items-center gap-1.5">
                       <Sparkles size={14} /> Es una rareza
@@ -243,6 +245,42 @@ export default function Unidentified() {
         </div>
       )}
     </div>
+  );
+}
+
+// Sembrar la ficha del disco en MusicBrainz (release editor seeding) directamente desde
+// la lista, sin entrar en la ficha. Si MB ya tiene un candidato muy parecido, avisa con
+// un confirm() antes de sembrar (evita crear duplicados sin recargar la fila). El detalle
+// completo del aviso vive en la ficha del álbum.
+function CreateMbButton({ album }) {
+  const [busy, setBusy] = useState(false);
+  const create = async () => {
+    setBusy(true);
+    try {
+      const r = await api.mbSeed(album.id);
+      if (
+        r.possibleDuplicate &&
+        !confirm(
+          `MusicBrainz ya tiene algo muy parecido (${r.possibleDuplicate.score}%):\n` +
+            `${r.possibleDuplicate.artist} — ${r.possibleDuplicate.title}\n\n` +
+            '¿Crear la ficha igualmente? (Cancela si es este disco: enlázalo desde su ficha.)'
+        )
+      ) {
+        return;
+      }
+      openMbReleaseEditor(r.fields, album.id);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button onClick={create} disabled={busy} title="Crear su ficha en MusicBrainz">
+      <span className="inline-flex items-center gap-1.5">
+        {busy ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />} Crear en MB
+      </span>
+    </Button>
   );
 }
 

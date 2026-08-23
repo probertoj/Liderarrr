@@ -9,6 +9,16 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.9',
+    title: 'Crear fichas en MusicBrainz',
+    items: [
+      'Discos que no están en MusicBrainz: botón «Crear ficha en MusicBrainz» que abre su editor ya relleno con la tracklist, duraciones, artista(s), año y sello de tu copia — revisas, confirmas con tu sesión de MB y listo. Devolvemos a la comunidad lo que la app aprovecha de ella.',
+      'Al guardar la ficha, MusicBrainz te devuelve a Liderarr: el álbum se enlaza solo (deja de estar «sin identificar») y puedes subir la portada con un clic (con el userscript Enhanced Cover Art Uploads) e importarlo en record.club.',
+      'Aviso de posible duplicado antes de crear: si MusicBrainz ya tiene algo casi idéntico, te ofrece enlazarlo en vez de duplicar.',
+      'El botón está en la ficha del disco y, por fila, en «Sin identificar» para sembrar sin entrar disco a disco.',
+    ],
+  },
+  {
     version: '0.9.8',
     title: 'Motor de descargas y escuchas',
     items: [

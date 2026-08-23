@@ -32,6 +32,7 @@ const Changelog = lazy(() => import('./pages/Changelog.jsx'));
 const Wrapped = lazy(() => import('./pages/Wrapped.jsx'));
 const Trash = lazy(() => import('./pages/Trash.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
+const MbSeedCallback = lazy(() => import('./pages/MbSeedCallback.jsx'));
 
 const NAV = [
   {
@@ -346,6 +347,7 @@ export default function App() {
             <Route path="/sellos" element={<Labels />} />
             <Route path="/diagnostico" element={<Diagnostics />} />
             <Route path="/sin-identificar" element={<Unidentified />} />
+            <Route path="/mb-nueva" element={<MbSeedCallback />} />
             <Route path="/rarezas" element={<Rarities />} />
             <Route path="/papelera" element={<Trash />} />
             <Route path="/ajustes" element={<Settings />} />

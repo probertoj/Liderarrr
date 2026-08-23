@@ -19,7 +19,8 @@ import { pendingImports, importFolder, listAlbumSubfolders, ignoreImport, unigno
 import { recordGrab, magnetHash, downloadsList, activeRequestRgs, clearImported } from './downloads.js';
 import { runAutoImport, autoImportStatus, autoImportEnabled } from './autoimport.js';
 import { runAutoGrab, autoGrabConfig, autoGrabStatus, searchAndGrabBest } from './autograb.js';
-import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground } from './musicbrainz.js';
+import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground, releaseGroupOfRelease } from './musicbrainz.js';
+import { buildReleaseSeed, findPossibleDuplicate } from './mbseed.js';
 import { acoustidTest } from './acoustid.js';
 import { discogsTest, searchRelease } from './discogs.js';
 import { lastfmTest } from './lastfm.js';
@@ -780,6 +781,37 @@ app.post('/api/albums/:id/match', async (req, reply) => {
 app.post('/api/albums/:id/match-url', async (req, reply) => {
   try {
     return await matchByMbUrl(Number(req.params.id), req.body?.url);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// Campos para SEMBRAR una ficha nueva en MusicBrainz (release editor seeding) a partir
+// del disco tal y como vive en la colección. Devuelve el dict plano de campos + un aviso
+// de posible duplicado. El POST al editor lo hace el cliente (usa la sesión de MB del
+// navegador); redirect_uri lo pone el cliente. Solo tiene sentido para discos sin MBID.
+app.get('/api/albums/:id/mb-seed', async (req, reply) => {
+  const album = q.albumDetail(Number(req.params.id));
+  if (!album) return reply.code(404).send({ error: 'No encontrado' });
+  try {
+    const fields = buildReleaseSeed(album);
+    const possibleDuplicate = await findPossibleDuplicate(album);
+    return { fields, possibleDuplicate };
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// Enlaza el álbum al release recién creado en MusicBrainz (callback tras sembrar):
+// resuelve release→release-group y reutiliza manualMatch (tipo/año reales + créditos +
+// reintento de portada). Cierra el bucle: el álbum pasa de unmatched a matched.
+app.post('/api/albums/:id/link-release', async (req, reply) => {
+  const release_mbid = String(req.body?.release_mbid || '').trim();
+  const U = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!U.test(release_mbid)) return reply.code(400).send({ error: 'release_mbid inválido' });
+  try {
+    const rgMbid = await releaseGroupOfRelease(release_mbid.toLowerCase());
+    if (!rgMbid) return reply.code(400).send({ error: 'No encontré el release-group de ese release en MusicBrainz.' });
+    await manualMatch(Number(req.params.id), rgMbid);
+    return { rg_mbid: rgMbid };
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }

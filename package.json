@@ -1,6 +1,6 @@
 {
   "name": "liderarrr",
-  "version": "0.9.8",
+  "version": "0.9.9",
   "private": true,
   "type": "module",
   "description": "Panel de completismo para tu colección de música digital, junto a Lidarr.",
@@ -13,7 +13,7 @@
     "dev": "concurrently -k -n api,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
     "build": "npm run build -w web",
     "start": "node server/src/index.js",
-    "test": "node --test server/test/"
+    "test": "node --test \"server/test/**/*.test.js\""
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

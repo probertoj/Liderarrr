@@ -64,6 +64,10 @@ export const api = {
       }`
     ),
   identifyAlbum: (id) => req(`/albums/${id}/identify`, { method: 'POST' }),
+  // sembrar una ficha nueva en MusicBrainz: campos del editor + aviso de duplicado
+  mbSeed: (id) => req(`/albums/${id}/mb-seed`),
+  // enlazar el álbum al release recién creado en MB (callback tras sembrar)
+  linkRelease: (id, release_mbid) => req(`/albums/${id}/link-release`, { method: 'POST', body: { release_mbid } }),
   lidarrReleases: (id) => req(`/albums/${id}/lidarr-releases`),
   lidarrGrab: (guid, indexerId) => req('/lidarr/grab', { method: 'POST', body: { guid, indexerId } }),
 

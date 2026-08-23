@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy, Database } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
+import { openMbReleaseEditor } from '../mb.js';
 import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies } from '../components.jsx';
 
 export default function AlbumDetail() {
@@ -1659,6 +1660,120 @@ function IdentifySection({ album, onDone }) {
           }}
         />
       )}
+      <div className="mt-4 pt-4 border-t border-ink-800">
+        <CreateInMusicBrainz album={album} onDone={onDone} />
+      </div>
+    </div>
+  );
+}
+
+// ¿No está en MusicBrainz? Crea su ficha desde la colección (release editor seeding):
+// abre el editor de MB PRE-RELLENO con la tracklist/duraciones/artista(s)/año/sello del
+// disco local. El usuario revisa y confirma en su sesión de MB; al guardar, MB devuelve
+// a /mb-nueva, que enlaza el álbum y ofrece subir la portada. Así se devuelve a la
+// comunidad lo que la app aprovecha de ella. Antes de sembrar, avisa si MB ya tiene un
+// candidato muy parecido (para no crear duplicados).
+function CreateInMusicBrainz({ album, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [dup, setDup] = useState(null); // posible duplicado detectado por el servidor
+  const [seed, setSeed] = useState(null); // campos cacheados tras el aviso
+  const [linking, setLinking] = useState(false);
+
+  const start = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await api.mbSeed(album.id);
+      if (r.possibleDuplicate) {
+        // primer clic: no sembrar aún; avisar del candidato y guardar los campos
+        setDup(r.possibleDuplicate);
+        setSeed(r.fields);
+      } else {
+        openMbReleaseEditor(r.fields, album.id);
+      }
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const linkExisting = async () => {
+    setLinking(true);
+    setErr(null);
+    try {
+      await api.match(album.id, dup.rg_mbid);
+      await onDone();
+    } catch (e) {
+      setErr(e.message);
+      setLinking(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="text-sm text-neutral-400 flex items-center gap-2">
+          <Database size={15} /> ¿No está en MusicBrainz?
+        </h3>
+        {!dup && (
+          <Button onClick={start} disabled={busy}>
+            <span className="inline-flex items-center gap-1.5">
+              {busy ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+              {busy ? 'Preparando…' : 'Crear ficha en MusicBrainz'}
+            </span>
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-neutral-600 mt-1">
+        Crea su ficha en MusicBrainz con la tracklist, duraciones, artista(s), año y sello de tu copia. Revisas y
+        confirmas en MusicBrainz (con tu sesión); al guardar, volverás aquí para enlazarlo y subir la portada.
+      </p>
+
+      {dup && (
+        <div className="mt-3 rounded border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+          <p className="text-amber-300/90 flex items-center gap-2">
+            <AlertTriangle size={14} /> MusicBrainz ya tiene algo muy parecido ({dup.score}%):
+          </p>
+          <p className="mt-1 text-neutral-300">
+            {dup.artist} — {dup.title}
+            <a
+              href={`https://musicbrainz.org/release-group/${dup.rg_mbid}`}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-2 text-gold-400 hover:underline inline-flex items-center gap-0.5"
+            >
+              Ver en MusicBrainz <ExternalLink size={11} />
+            </a>
+          </p>
+          <p className="text-xs text-neutral-600 mt-2">
+            Si es este disco, enlázalo (no crees un duplicado). Si de verdad es otro, créala igualmente.
+          </p>
+          <div className="flex gap-2 mt-3 flex-wrap">
+            <Button variant="gold" onClick={linkExisting} disabled={linking}>
+              <span className="inline-flex items-center gap-1.5">
+                {linking ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Es este: enlazar
+              </span>
+            </Button>
+            <Button
+              onClick={() => {
+                openMbReleaseEditor(seed, album.id);
+                setDup(null);
+              }}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Database size={14} /> Es otro: crear igualmente
+              </span>
+            </Button>
+            <Button variant="default" onClick={() => setDup(null)}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {err && <p className="text-sm text-red-400 mt-2">{err}</p>}
     </div>
   );
 }

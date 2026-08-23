@@ -11,6 +11,35 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.9] — 2026-08-23
+
+**Crear fichas en MusicBrainz desde tu colección.** Cuando un disco no existe en
+MusicBrainz, ahora puedes sembrarlo con un clic y devolver a la comunidad lo que la app
+aprovecha de ella. (La página in-app «Novedades» cubre el detalle de 0.9.1–0.9.8.)
+
+### Añadido
+- **«Crear ficha en MusicBrainz»** en la ficha del disco (sin identificar) y por fila en
+  **«Sin identificar»**. Abre el *release editor* de MusicBrainz **ya relleno** con la
+  tracklist, duraciones, artista(s), año y sello de tu copia — el POST sale de tu
+  navegador para usar **tu sesión** de MusicBrainz (MB exige revisión humana; no se
+  automatiza esa parte, a propósito).
+- **Bucle cerrado.** Al guardar en MusicBrainz, este te devuelve a Liderarr
+  (`/mb-nueva`): el álbum se **enlaza solo** a su nuevo release-group (deja de estar «sin
+  identificar»), y se ofrece **subir la portada** con un clic (seeding del userscript
+  *Enhanced Cover Art Uploads* de ROpdebee, apuntando a la portada de tu copia) y
+  **importar en record.club**.
+- **Aviso de duplicado** antes de sembrar: si MusicBrainz ya tiene algo casi idéntico
+  (≥90 %), ofrece **enlazarlo** en vez de crear un duplicado.
+- Red de seguridad si MusicBrainz no devuelve el identificador: pegar la URL de MB a mano.
+
+### Interno
+- Nuevo `server/src/mbseed.js` (`buildReleaseSeed`) + rutas `GET /api/albums/:id/mb-seed`
+  y `POST /api/albums/:id/link-release`. Primeras pruebas unitarias del proyecto
+  (`server/test/mbseed.test.js`) y arreglado el script `npm test` (glob en vez de
+  directorio, que fallaba en Node 24/Windows).
+
+---
+
 ## [0.9.0] — 2026-08-16
 
 Tanda grande centrada en el **radar multifuente** (descubrir novedades curadas fuera de Bandcamp),
