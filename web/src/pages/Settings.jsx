@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Settings as SettingsIcon, Check, X, Loader2, Download, FolderSearch, RefreshCw } from 'lucide-react';
+import { Settings as SettingsIcon, Check, X, Loader2, Download, Upload, FolderSearch, RefreshCw, AlertTriangle } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, Button } from '../components.jsx';
 
@@ -142,6 +142,91 @@ function TestButton({ service, label, beforeTest }) {
         </span>
       </Button>
       {msg && <span className={`text-xs ${state === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>{msg}</span>}
+    </div>
+  );
+}
+
+// Restaurar/importar la base de datos desde una copia. Acción destructiva (reemplaza toda
+// la base) pero con respaldo automático; sube el .db y reinicia la app para aplicar el swap.
+function RestoreDatabase() {
+  const inputRef = useRef(null);
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [err, setErr] = useState(null);
+
+  const restore = async () => {
+    if (!file) return;
+    if (
+      !confirm(
+        `Vas a REEMPLAZAR toda la base de datos por «${file.name}».\n\n` +
+          'Se guardará un respaldo automático de la actual y la app se reiniciará. ¿Continuar?'
+      )
+    )
+      return;
+    setBusy(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/restore/database', { method: 'POST', body: fd });
+      if (!res.ok) {
+        let m = `Error ${res.status}`;
+        try {
+          m = (await res.json()).error || m;
+        } catch {
+          /* noop */
+        }
+        throw new Error(m);
+      }
+      setMsg('Base de datos importada. Reiniciando… la app volverá en unos segundos.');
+      setTimeout(() => window.location.reload(), 4500);
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-4 pt-4 border-t border-ink-800">
+      <p className="text-xs text-neutral-500 mb-2">
+        <b className="font-normal text-neutral-300">Restaurar</b> desde una copia (el <code>.db</code> que descargaste):
+        reemplaza TODA la base actual —se guarda un respaldo automático— y reinicia la app.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".db,application/octet-stream,application/x-sqlite3"
+          onChange={(e) => {
+            setFile(e.target.files?.[0] || null);
+            setErr(null);
+            setMsg(null);
+          }}
+          className="hidden"
+        />
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800 disabled:opacity-50"
+        >
+          <Upload size={14} /> Elegir fichero…
+        </button>
+        {file && <span className="text-xs text-neutral-400 truncate max-w-[16rem]">{file.name}</span>}
+        {file && (
+          <Button variant="gold" onClick={restore} disabled={busy}>
+            <span className="inline-flex items-center gap-1.5">
+              {busy ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />} Restaurar base de datos
+            </span>
+          </Button>
+        )}
+      </div>
+      {msg && <p className="text-sm text-emerald-400 mt-2">{msg}</p>}
+      {err && <p className="text-sm text-red-400 mt-2">{err}</p>}
+      <p className="text-[11px] text-neutral-600 mt-2">
+        Si la app no vuelve sola (sin Docker o supervisor que la reinicie), reinicia el contenedor a mano.
+      </p>
     </div>
   );
 }
@@ -811,6 +896,7 @@ export default function Settings() {
         >
           <Download size={14} /> Descargar base de datos
         </a>
+        <RestoreDatabase />
       </section>
 
       {/* 7 · guiño (Talking Heads — «Once in a Lifetime»). Solo el título, a propósito. */}

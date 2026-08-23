@@ -28,9 +28,56 @@ try {
   );
 }
 
-export const db = new Database(path.join(DATA_DIR, 'liderarrr.db'));
+export const DB_PATH = path.join(DATA_DIR, 'liderarrr.db');
+const IMPORT_PATH = DB_PATH + '.import';
+
+// RESTAURACIÓN de copia de seguridad (Ajustes → «Restaurar base de datos»). El endpoint
+// deja el fichero subido y validado en liderarrr.db.import y reinicia el proceso; el
+// intercambio REAL se hace AQUÍ, al arrancar, ANTES de abrir la base. Es el único momento
+// en que nadie la tiene abierta, así que es seguro en cualquier sistema (no hay que
+// sobrescribir un fichero abierto, que en Windows ni se puede y en Linux dejaría al
+// proceso con la base vieja). Guarda un respaldo de la actual por si el import sale mal.
+if (fs.existsSync(IMPORT_PATH)) {
+  try {
+    if (fs.existsSync(DB_PATH)) {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      fs.copyFileSync(DB_PATH, `${DB_PATH}.bak-${stamp}`);
+    }
+    // Los sidecars WAL/SHM pertenecen a la base VIEJA: si sobreviven, SQLite los aplicaría
+    // sobre la nueva al abrirla y la corromperían. Se eliminan.
+    for (const ext of ['-wal', '-shm']) fs.rmSync(DB_PATH + ext, { force: true });
+    fs.renameSync(IMPORT_PATH, DB_PATH);
+    console.log('[Liderarrr] Base de datos restaurada desde la copia importada.');
+  } catch (e) {
+    console.error('[Liderarrr] No se pudo restaurar la BBDD importada:', e.message);
+    // Se deja el .import para reintentar en el próximo arranque y se abre la base actual.
+  }
+}
+
+export const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
+
+// Valida un fichero .db subido y, si es una base de Liderarr sana, lo deja como pendiente
+// (liderarrr.db.import) para que el swap ocurra en el próximo arranque. Lanza si no vale.
+export function stageDatabaseImport(tempPath) {
+  const test = new Database(tempPath, { readonly: true, fileMustExist: true });
+  try {
+    if (test.pragma('integrity_check', { simple: true }) !== 'ok')
+      throw new Error('el fichero está corrupto (integrity_check falló)');
+    const hasTable = (n) => test.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(n);
+    if (!hasTable('albums') || !hasTable('artists') || !hasTable('settings'))
+      throw new Error('no parece una base de datos de Liderarr');
+  } finally {
+    test.close();
+  }
+  // Abrir un .db en modo WAL (aunque sea readonly) crea sidecars -wal/-shm junto al
+  // temporal; se limpian para no dejar basura. La copia exportada ya viene con el WAL
+  // volcado (checkpoint al exportar), así que el fichero principal está completo.
+  for (const ext of ['-wal', '-shm']) fs.rmSync(tempPath + ext, { force: true });
+  fs.rmSync(IMPORT_PATH, { force: true });
+  fs.renameSync(tempPath, IMPORT_PATH);
+}
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS settings (

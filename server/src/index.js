@@ -1,10 +1,12 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
+import fastifyMultipart from '@fastify/multipart';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
-import { db, DATA_DIR, getAllSettings, getSetting, setSetting } from './db.js';
+import { db, DATA_DIR, DB_PATH, getAllSettings, getSetting, setSetting, stageDatabaseImport } from './db.js';
 import { runScan, scanStatus } from './scanner.js';
 import { regroupDiscs, combineAlbums, uncombineAlbum, combineCandidates } from './discgroup.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch, matchByMbUrl } from './identify.js';
@@ -85,6 +87,9 @@ import * as q from './queries.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf-8'));
 const app = Fastify({ logger: { level: 'info' }, bodyLimit: 20 * 1024 * 1024 });
+// Subida de ficheros para «Restaurar base de datos» (Ajustes). El límite de 4 GB cubre
+// bibliotecas grandes; el bodyLimit de arriba NO aplica a multipart, que streamea a disco.
+app.register(fastifyMultipart, { limits: { fileSize: 4 * 1024 * 1024 * 1024 } });
 
 // --- autenticación básica opcional (idéntica en espíritu a PowaFlex) --------
 const AUTH_OPEN_PATHS = new Set(['/api/version']);
@@ -1096,10 +1101,44 @@ app.post('/api/cover/:id/apply', async (req, reply) => {
 
 // --- copia de seguridad -----------------------------------------------------
 app.get('/api/backup/database', async (req, reply) => {
-  const file = path.join(DATA_DIR, 'liderarrr.db');
+  // Vuelca el WAL al fichero principal antes de descargarlo, para que la copia incluya
+  // las escrituras recientes (en modo WAL podrían estar solo en el sidecar -wal).
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+  } catch {
+    /* si falla el checkpoint, se descarga igual lo que haya en el fichero principal */
+  }
   reply.header('Content-Disposition', 'attachment; filename="liderarrr.db"');
   reply.header('Content-Type', 'application/octet-stream');
-  return reply.send(fs.createReadStream(file));
+  return reply.send(fs.createReadStream(DB_PATH));
+});
+
+// Restaurar/importar la base de datos: sube un .db (el que exportaste) y reemplaza la
+// actual. El intercambio real se hace al ARRANCAR (db.js), cuando la base no está abierta;
+// aquí solo se valida y se deja pendiente, y luego se reinicia el proceso. En Docker con
+// política de reinicio, la app vuelve sola en segundos. Se guarda un respaldo automático.
+app.post('/api/restore/database', async (req, reply) => {
+  if (!req.isMultipart()) return reply.code(400).send({ error: 'Sube el fichero .db exportado (multipart).' });
+  let data;
+  try {
+    data = await req.file();
+  } catch (err) {
+    return reply.code(400).send({ error: `El fichero supera el límite o es inválido: ${String(err.message || err)}` });
+  }
+  if (!data) return reply.code(400).send({ error: 'Falta el fichero.' });
+  const tmp = path.join(DATA_DIR, `liderarrr.db.upload-${Date.now()}`);
+  try {
+    await pipeline(data.file, fs.createWriteStream(tmp));
+    if (data.file.truncated) throw new Error('el fichero supera el límite de tamaño');
+    stageDatabaseImport(tmp); // valida (integrity_check + tablas) y lo deja como pendiente
+  } catch (err) {
+    for (const ext of ['', '-wal', '-shm']) fs.rmSync(tmp + ext, { force: true });
+    return reply.code(400).send({ error: `No se pudo importar: ${String(err.message || err)}` });
+  }
+  // Responder ANTES de salir para que el cliente reciba el ok; el rearranque aplica el swap.
+  reply.send({ ok: true, restarting: true });
+  setTimeout(() => process.exit(0), 300);
+  return reply;
 });
 
 // --- SPA estática -----------------------------------------------------------

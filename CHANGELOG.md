@@ -11,6 +11,28 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.11] — 2026-08-23
+
+**Importar (restaurar) la base de datos.** El complemento del exportar existente.
+
+### Añadido
+- **Ajustes → Copia de seguridad → «Restaurar base de datos»**: sube el `.db` que
+  exportaste y reemplaza la base actual. Pensado como red de seguridad si una
+  actualización deja la base en mal estado.
+- El fichero subido se **valida** (`integrity_check` + tablas clave) antes de aceptarlo; se
+  guarda un **respaldo automático** de la base actual (`liderarrr.db.bak-<fecha>`), y el
+  intercambio se hace **al arrancar** (cuando la base no está abierta), reiniciando el
+  proceso. En Docker con política de reinicio, la app vuelve sola.
+
+### Cambiado
+- La **descarga** de la base hace `wal_checkpoint(TRUNCATE)` antes de servir el fichero,
+  para que la copia incluya siempre las escrituras más recientes (modo WAL).
+
+### Interno
+- Registrado `@fastify/multipart` (ya era dependencia) para la subida en streaming.
+
+---
+
 ## [0.9.10] — 2026-08-23
 
 **Bootlegs con espacio propio.** La clasificación de «rarezas» se divide en dos.

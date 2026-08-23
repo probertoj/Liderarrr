@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.11',
+    title: 'Importar (restaurar) la base de datos',
+    items: [
+      'Ajustes → Copia de seguridad: ahora además de descargar la base puedes RESTAURARLA subiendo un .db que exportaste antes. Red de seguridad por si una actualización deja la base rara.',
+      'Al restaurar se valida el fichero, se guarda un respaldo automático de la base actual y la app se reinicia para aplicar el cambio (en el NAS con Docker vuelve sola en segundos).',
+      'La descarga de la base ahora vuelca antes el WAL, para que la copia incluya siempre las escrituras más recientes.',
+    ],
+  },
+  {
     version: '0.9.10',
     title: 'Bootlegs con espacio propio',
     items: [
