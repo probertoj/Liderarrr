@@ -43,6 +43,7 @@ import { externalNewReleases, refreshExternalReleases, dismissExternalRelease } 
 import { spotifyTest, spotifyAlbumUrl } from './spotify.js';
 import { notifyTest } from './notify.js';
 import { wrappedImageSvg } from './wrappedimage.js';
+import { buildM3U, challengeM3U, sanitizePlaylistName } from './playlist.js';
 import {
   followLabel,
   followLabelByName,
@@ -393,7 +394,9 @@ app.post('/api/suggestions/follow', async (req, reply) => {
 app.post('/api/suggestions/dismiss', async (req) => dismissSuggestion(req.body?.name));
 
 // novedades en Deezer/Spotify que MusicBrainz aún no lista
-app.get('/api/newreleases', async (req) => externalNewReleases({ limit: Number(req.query?.limit) || 100 }));
+app.get('/api/newreleases', async (req) =>
+  externalNewReleases({ limit: Number(req.query?.limit) || 200, includeOwned: req.query?.includeOwned === '1' })
+);
 app.post('/api/newreleases/refresh', async (req, reply) => {
   try {
     return await refreshExternalReleases();
@@ -656,6 +659,21 @@ app.get('/api/challenges/:id', async (req, reply) => {
   return c;
 });
 app.delete('/api/challenges/:id', async (req) => deleteChallenge(Number(req.params.id)));
+// exportar el reto como lista M3U (solo los discos que tienes), para escucharlo en tu player
+app.get('/api/challenges/:id/m3u', async (req, reply) => {
+  const c = db.prepare('SELECT name FROM challenges WHERE id = ?').get(Number(req.params.id));
+  const m3u = challengeM3U(Number(req.params.id));
+  reply.header('Content-Type', 'audio/x-mpegurl; charset=utf-8');
+  reply.header('Content-Disposition', `attachment; filename="${sanitizePlaylistName(c?.name || 'reto')}.m3u"`);
+  return reply.send(m3u);
+});
+// M3U genérico a partir de una lista de álbumes que tienes (no escuchados, selección…)
+app.post('/api/playlist/m3u', async (req, reply) => {
+  const m3u = buildM3U(req.body?.albumIds || []);
+  reply.header('Content-Type', 'audio/x-mpegurl; charset=utf-8');
+  reply.header('Content-Disposition', `attachment; filename="${sanitizePlaylistName(req.body?.name)}.m3u"`);
+  return reply.send(m3u);
+});
 // Resuelve los faltantes contra MusicBrainz y los encola a Lidarr EN SEGUNDO PLANO.
 // Antes era bloqueante (resolución MB a 1 req/s + lidarrAdd de decenas de s por ítem
 // dentro del request → un reto grande colgaba minutos). Ahora responde al instante y

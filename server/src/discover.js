@@ -19,9 +19,22 @@ const lidarrConnected = () => {
 // rg.is_owned (que envejece: un disco recién importado seguía saliendo como "no lo
 // tienes" en el calendario hasta re-enriquecer la discografía, y así se pedía dos veces).
 export function ownedMatcher() {
-  const rows = db.prepare("SELECT rg_mbid, album_artist, title FROM albums WHERE match_state != 'dismissed'").all();
+  const rows = db
+    .prepare(
+      `SELECT a.rg_mbid, a.album_artist, a.title, ar.name AS artist_name
+       FROM albums a LEFT JOIN artists ar ON ar.id = a.artist_id
+       WHERE a.match_state != 'dismissed'`
+    )
+    .all();
   const ownedRg = new Set(rows.filter((o) => o.rg_mbid).map((o) => o.rg_mbid));
-  const ownedKey = new Set(rows.map((o) => matchKey(o.album_artist, o.title)));
+  // clave por título + artista, indexando TANTO el album_artist guardado COMO el nombre
+  // canónico del artista: así casa aunque el release-group use uno y tu álbum el otro (la
+  // desincronización que hacía salir como «no lo tienes» algo que sí tienes).
+  const ownedKey = new Set();
+  for (const o of rows) {
+    ownedKey.add(matchKey(o.album_artist, o.title));
+    if (o.artist_name) ownedKey.add(matchKey(o.artist_name, o.title));
+  }
   return (rgMbid, artist, title) => (rgMbid && ownedRg.has(rgMbid)) || ownedKey.has(matchKey(artist, title));
 }
 

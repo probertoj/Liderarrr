@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Headphones, TrendingUp, Star, EarOff, Search, Disc3 } from 'lucide-react';
+import { Headphones, TrendingUp, Star, EarOff, Search, Disc3, ListMusic } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { api } from '../api.js';
 import { PageTitle, Stat, Spinner, ErrorMsg, Button, SearchModal } from '../components.jsx';
@@ -13,6 +13,29 @@ const RANGES = [
   { key: 'q', label: 'Últimos 3 meses', since: () => Date.now() - 90 * 86400000 },
   { key: 'year', label: 'Último año', since: () => Date.now() - 365 * 86400000 },
 ];
+
+// Descarga una lista M3U (para el reproductor) de una lista de álbumes que tienes.
+async function downloadM3U(albumIds, name) {
+  try {
+    const res = await fetch('/api/playlist/m3u', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ albumIds, name }),
+    });
+    if (!res.ok) throw new Error(`error ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name}.m3u`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert(`No se pudo generar la lista: ${e.message}`);
+  }
+}
 
 export default function Listening() {
   const [ov, setOv] = useState(null);
@@ -195,9 +218,18 @@ export default function Listening() {
 
       {unplayed && unplayed.length > 0 && (
         <div className="card p-4">
-          <h2 className="text-sm text-neutral-400 mb-3 flex items-center gap-2">
-            <EarOff size={15} /> Tienes pero nunca has escuchado ({unplayed.length})
-          </h2>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className="text-sm text-neutral-400 flex items-center gap-2">
+              <EarOff size={15} /> Tienes pero nunca has escuchado ({unplayed.length})
+            </h2>
+            <button
+              onClick={() => downloadM3U(unplayed.map((a) => a.id), 'Nunca escuchados')}
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1.5"
+              title="Descargar como lista M3U para escucharlos en tu reproductor"
+            >
+              <ListMusic size={13} /> Descargar M3U
+            </button>
+          </div>
           <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
             {unplayed.map((a) => (
               <Link

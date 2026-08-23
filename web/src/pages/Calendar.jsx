@@ -139,6 +139,7 @@ function ExternalReleaseRow({ r, added, busy, onAdd, onSearch, onDismiss }) {
           {r.ahead && (
             <span className="text-amber-400/80" title="MusicBrainz aún no lo lista">⚡ MB no lo tiene</span>
           )}
+          {r.owned && <span className="text-emerald-400/70">ya lo tienes</span>}
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -726,6 +727,7 @@ export default function Calendar() {
   const [labels, setLabels] = useState([]);
   const [curators, setCurators] = useState([]);
   const [unowned, setUnowned] = useState(false);
+  const [novIncludeOwned, setNovIncludeOwned] = useState(false);
 
   const loadLabels = () => api.trackedLabels().then(setLabels).catch(() => {});
   const loadCurators = () => api.curators().then(setCurators).catch(() => {});
@@ -742,12 +744,12 @@ export default function Calendar() {
           : view === 'radar'
             ? api.radar(since, unowned)
             : view === 'novedades'
-              ? api.newReleases()
+              ? api.newReleases(novIncludeOwned)
               : api.upcoming(all);
     load.then(setRows).catch((e) => setErr(e.message));
     if (view === 'labels') loadLabels();
     if (view === 'radar') loadCurators();
-  }, [view, all, since, unowned]);
+  }, [view, all, since, unowned, novIncludeOwned]);
 
   const lidarrOn = useLidarrEnabled();
 
@@ -878,7 +880,7 @@ export default function Calendar() {
     setNovMsg(null);
     try {
       const r = await api.refreshNewReleases();
-      setRows(await api.newReleases());
+      setRows(await api.newReleases(novIncludeOwned));
       setNovMsg(
         r.seeds === 0
           ? 'No sigues a ningún artista todavía: sigue a alguien para ver sus novedades.'
@@ -930,6 +932,12 @@ export default function Calendar() {
           <label className="flex items-center gap-2 text-sm text-neutral-400 ml-auto cursor-pointer">
             <input type="checkbox" checked={unowned} onChange={(e) => setUnowned(e.target.checked)} />
             Ocultar lo que ya tengo
+          </label>
+        )}
+        {view === 'novedades' && (
+          <label className="flex items-center gap-2 text-sm text-neutral-400 ml-auto cursor-pointer">
+            <input type="checkbox" checked={novIncludeOwned} onChange={(e) => setNovIncludeOwned(e.target.checked)} />
+            Mostrar también los que ya tengo
           </label>
         )}
       </div>

@@ -133,7 +133,10 @@ export async function refreshExternalReleases({ months = 6, maxArtists = 500 } =
       const date = (c.release_date || '').slice(0, 10);
       if (!date || date < cutoff || date === '0000-00-00') continue;
       const mk = matchKey(s.name, c.title);
-      if (owned(s.id, s.name, c.title)) continue; // solo saltamos lo que YA tienes
+      // Guardamos TODOS los estrenos recientes (también los que ya tienes), para poder
+      // ofrecer la opción «mostrar los que ya tengo». El filtrado por propiedad se hace EN
+      // VIVO al mostrar. `added` cuenta solo los NUEVOS que NO tienes (para el aviso).
+      const isOwnedRel = owned(s.id, s.name, c.title);
       const info = upsert.run({
         source: c.source,
         artist_id: s.id,
@@ -147,31 +150,30 @@ export async function refreshExternalReleases({ months = 6, maxArtists = 500 } =
         ahead: mbKeys.has(mk) ? 0 : 1, // MB aún no lo lista → adelantada
         now,
       });
-      if (info.changes) added++;
+      if (info.changes && !isOwnedRel) added++;
     }
   }
 
-  // poda: fuera lo que YA tienes y lo más viejo que la ventana (lo que MB alcanza NO se
-  // borra: solo deja de ser «adelantada», ya lo actualiza el upsert con ahead = 0)
-  const stored = db.prepare('SELECT id, artist_id, artist, title, release_date FROM external_releases').all();
+  // poda: fuera solo lo más viejo que la ventana (los que ya tienes se conservan, para la
+  // opción «mostrar los que ya tengo»; lo que MB alcanza deja de ser «adelantada» vía upsert)
+  const stored = db.prepare('SELECT id, release_date FROM external_releases').all();
   const del = db.prepare('DELETE FROM external_releases WHERE id = ?');
   const prune = db.transaction(() => {
     for (const r of stored) {
-      if (owned(r.artist_id, r.artist, r.title) || (r.release_date && r.release_date < cutoff)) del.run(r.id);
+      if (r.release_date && r.release_date < cutoff) del.run(r.id);
     }
   });
   prune();
 
-  const count = db.prepare('SELECT COUNT(*) c FROM external_releases WHERE dismissed = 0').get().c;
+  const count = externalNewReleases({ limit: 100000 }).length; // los que NO tienes (para el aviso)
   return { count, added, seeds: seeds.length };
 }
 
 // Novedades para la UI (Lanzamientos). Más recientes primero; `ahead` marca las que MB
 // aún no lista (para el badge «⚡ MB no lo tiene»). Marca el artista local.
-export function externalNewReleases({ limit = 200 } = {}) {
-  // Filtro EN VIVO de lo que ya tienes (no un flag guardado): así, aunque una novedad se
-  // guardara antes de que tuvieras el disco —o el cruce al guardar fallara—, nunca se
-  // muestra algo que ya está en tu biblioteca. Es la red de seguridad definitiva.
+export function externalNewReleases({ limit = 200, includeOwned = false } = {}) {
+  // Propiedad EN VIVO (no un flag guardado): por defecto oculta lo que ya tienes; con
+  // includeOwned se muestran también, marcados con `owned` para que la UI lo indique.
   const owned = buildOwnedCheck();
   return db
     .prepare(
@@ -182,9 +184,9 @@ export function externalNewReleases({ limit = 200 } = {}) {
        ORDER BY e.release_date DESC, e.artist COLLATE NOCASE`
     )
     .all()
-    .filter((r) => !owned(r.artist_id, r.artist, r.title))
-    .slice(0, limit)
-    .map((r) => ({ ...r, tracked: !!r.tracked, ahead: !!r.ahead }));
+    .map((r) => ({ ...r, tracked: !!r.tracked, ahead: !!r.ahead, owned: owned(r.artist_id, r.artist, r.title) }))
+    .filter((r) => includeOwned || !r.owned)
+    .slice(0, limit);
 }
 
 export function dismissExternalRelease(id) {

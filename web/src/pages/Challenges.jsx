@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download, X } from 'lucide-react';
+import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download, X, ListMusic } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button, SearchModal, useLidarrEnabled } from '../components.jsx';
 
@@ -321,6 +321,15 @@ function Detail({ id, onBack }) {
               <Send size={14} /> {sending ? (lidarrOn ? 'Enviando…' : 'Descargando…') : lidarrOn ? 'Faltantes a Lidarr' : 'Descargar faltantes'}
             </span>
           </Button>
+          {c.owned > 0 && (
+            <a
+              href={`/api/challenges/${id}/m3u`}
+              className="text-sm px-3 py-1.5 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1.5"
+              title="Descargar como lista M3U los discos que tienes de este reto, para escucharlos en tu reproductor"
+            >
+              <ListMusic size={14} /> M3U
+            </a>
+          )}
           <Button variant="ghost" onClick={remove}>
             <Trash2 size={14} />
           </Button>

@@ -620,6 +620,27 @@ export default function Settings() {
         )}
       </section>
 
+      {/* Listas de reproducción (M3U) */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">Listas de reproducción <span className="text-xs text-neutral-500">(opcional)</span></h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Puedes exportar un reto o tus «no escuchados» como lista <b>M3U</b> para tu reproductor. Las rutas de los
+          ficheros son las que ve el servidor (p. ej. <code>/data/media/music/…</code>). Si tu reproductor monta la música
+          en otra ruta, define aquí la sustitución para que la lista funcione.
+        </p>
+        <Field
+          label="Sustitución de ruta"
+          hint="Una línea: «rutaServidor => rutaReproductor». Ej.: /data/media/music => \\NAS\music"
+        >
+          <input
+            value={s.playlist_path_map || ''}
+            onChange={set('playlist_path_map')}
+            className={input}
+            placeholder="/data/media/music => \\NAS\music"
+          />
+        </Field>
+      </section>
+
       {/* 4. Auto-Lidarr */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">4 · Auto-Lidarr diario <span className="text-xs text-neutral-500">(opcional)</span></h2>
