@@ -98,6 +98,7 @@ function AutoImportPanel() {
             <b className="text-neutral-300">{st.underSource ?? 0}</b> bajo tu carpeta de torrents ·{' '}
             <b className="text-neutral-300">{st.imported ?? 0}</b> importados
             {st.alreadyImported ? ` · ${st.alreadyImported} ya estaban` : ''}
+            {st.skippedNonMusic ? ` · ${st.skippedNonMusic} sin música (saltados)` : ''}
             {st.errors?.length ? ` · ${st.errors.length} con error` : ''}.
           </div>
           {st.torrents === 0 && (

@@ -53,6 +53,7 @@ export async function runAutoImport() {
     torrents: 0,
     underSource: 0,
     alreadyImported: 0,
+    skippedNonMusic: 0,
     source,
     samplePaths: [],
   });
@@ -125,6 +126,13 @@ export async function runAutoImport() {
         console.log(`[autoimport] ✓ ${t.name} → ${r.dest} (${r.linked} ficheros)`);
       } catch (e) {
         const msg = String(e.message || e);
+        // torrent no-música (software, ebooks…) en la carpeta de música: NO es un error real,
+        // simplemente no hay nada que importar. Se salta en silencio (sin ensuciar el panel).
+        if (/no tiene ficheros de audio/i.test(msg)) {
+          autoImportStatus.checked--; // no era un candidato real de importación
+          autoImportStatus.skippedNonMusic++;
+          continue;
+        }
         autoImportStatus.errors.push(`${t.name}: ${msg}`);
         if (req) setDownloadStatus(req.id, 'error');
         console.warn(`[autoimport] ✗ ${t.name} — ${msg}`);

@@ -4,6 +4,7 @@ import { prowlarrSearch, prowlarrGrab } from './prowlarr.js';
 import { qbAdd } from './qbittorrent.js';
 import { recordGrab, magnetHash, activeRequestRgs } from './downloads.js';
 import { normName } from './matchkey.js';
+import { ownedMatcher } from './discover.js';
 
 // AUTO-DESCARGA NATIVA (independencia de Lidarr, pasos ③+④). Reemplaza al auto-Lidarr:
 // para los huecos/estrenos de tus artistas seguidos, busca en tus indexers (Jackett/
@@ -49,7 +50,17 @@ function trackerRank(indexer, priority) {
 //  - exige coincidencia mínima con el álbum (evita agarrar algo ajeno);
 //  - ordena por CALIDAD (formato + bonus de artista), luego por PRIORIDAD DE TRACKER (a
 //    igual calidad, el disco del tracker que prefieras) y por último por seeders.
-export function pickBestRelease(results, { artist, album, minSeeders = 1, freeleechOnly = false, trackerPriority = [] } = {}) {
+// ¿el título de la release parece de este artista? Casa por el nombre normalizado entero
+// o, tolerando «&/and/feat», por su primera palabra significativa. Se usa en el fallback
+// (búsqueda solo por título) para no agarrar el disco homónimo de OTRO artista.
+function artistMatches(nt, artist) {
+  const na = normName(artist);
+  if (na && nt.includes(na)) return true;
+  const w = String(artist || '').split(/\s+/).map(normName).filter((x) => x.length >= 3);
+  return w.length > 0 && nt.includes(w[0]);
+}
+
+export function pickBestRelease(results, { artist, album, minSeeders = 1, freeleechOnly = false, trackerPriority = [], requireArtist = false } = {}) {
   const na = normName(artist);
   const nal = normName(album);
   const scored = [];
@@ -60,6 +71,7 @@ export function pickBestRelease(results, { artist, album, minSeeders = 1, freele
     if (freeleechOnly && r.freeleech !== true) continue;
     const nt = normName(r.title);
     if (nal && !nt.includes(nal)) continue; // no parece ser ese álbum
+    if (requireArtist && artist && !artistMatches(nt, artist)) continue; // ni de este artista
     // Calidad/relevancia SIN seeders: así, a igual calidad, manda la prioridad de tracker
     // y solo después los seeders (antes los seeders entraban en el score y colaban).
     const score = formatRank(r.title) + (na && nt.includes(na) ? 10 : 0);
@@ -77,8 +89,15 @@ export async function searchAndGrabBest(query, context = {}) {
   const minSeeders = Number(getSetting('auto_grab_min_seeders')) || 1;
   const freeleechOnly = getSetting('auto_grab_freeleech_only') === '1';
   const trackerPriority = trackerPriorityList();
-  const results = engine === 'jackett' ? await jackettSearch(query) : await prowlarrSearch(query);
-  const best = pickBestRelease(results, { artist: context.artist, album: context.album, minSeeders, freeleechOnly, trackerPriority });
+  const search = (q) => (engine === 'jackett' ? jackettSearch(q) : prowlarrSearch(q));
+  const opts = { artist: context.artist, album: context.album, minSeeders, freeleechOnly, trackerPriority };
+  let best = pickBestRelease(await search(query), opts);
+  // fallback: si la cadena entera «artista título» no casa (típico en colaboraciones con
+  // «&»), reintenta buscando solo el título — exigiendo que la release sea de este artista
+  // (requireArtist) para no agarrar el disco homónimo de otro.
+  if (!best && context.album && normName(context.album) && normName(context.album) !== normName(query)) {
+    best = pickBestRelease(await search(context.album), { ...opts, requireArtist: true });
+  }
   if (!best)
     return {
       grabbed: false,
@@ -126,14 +145,16 @@ export async function runAutoGrab({ months, lookbackDays, limit, dryRun = false 
     const floor = new Date(Date.now() - lb * DAY).toISOString().slice(0, 10);
     const horizon = new Date(Date.now() + m * 30 * DAY).toISOString().slice(0, 10);
     const requested = activeRequestRgs();
+    // propiedad EN VIVO (por rg_mbid o por artista+título), no el flag guardado rg.is_owned,
+    // que envejece y hacía re-descargar discos que ya tenías tras importarlos.
+    const isOwned = ownedMatcher();
     const candidates = db
       .prepare(
         `SELECT rg.rg_mbid, rg.title, rg.first_release, ar.name AS artist
          FROM release_groups rg
          JOIN tracked_artists t ON t.artist_id = rg.artist_id AND t.facet = 'artist'
          JOIN artists ar ON ar.id = rg.artist_id
-         WHERE rg.is_owned = 0
-           AND rg.primary_type = 'Album'
+         WHERE rg.primary_type = 'Album'
            AND (rg.secondary_types IS NULL OR rg.secondary_types = '[]')
            AND rg.first_release IS NOT NULL
            AND rg.first_release >= ? AND rg.first_release <= ?
@@ -141,7 +162,7 @@ export async function runAutoGrab({ months, lookbackDays, limit, dryRun = false 
          ORDER BY rg.first_release`
       )
       .all(floor, horizon)
-      .filter((c) => !requested.has(c.rg_mbid));
+      .filter((c) => !requested.has(c.rg_mbid) && !isOwned(c.rg_mbid, c.artist, c.title));
     autoGrabStatus.considered = candidates.length;
 
     let n = 0;
