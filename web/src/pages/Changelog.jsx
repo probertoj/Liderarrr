@@ -9,6 +9,13 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.13',
+    title: '«Siguiente por escuchar» en Retos',
+    items: [
+      'La página de Retos muestra arriba «Siguiente por escuchar de tus retos»: las portadas de los discos que ya tienes de tus retos y aún no has oído, para ir directo a escucharlos. Es la misma sección que ya estaba en el Dashboard.',
+    ],
+  },
+  {
     version: '0.9.12',
     title: 'Arreglo: menús de la ficha',
     items: [

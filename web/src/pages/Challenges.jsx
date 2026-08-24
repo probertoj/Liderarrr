@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download, X, ListMusic } from 'lucide-react';
-import { api } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, Button, SearchModal, useLidarrEnabled } from '../components.jsx';
+import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download, X, ListMusic, Headphones } from 'lucide-react';
+import { api, coverUrl } from '../api.js';
+import { PageTitle, Section, Spinner, ErrorMsg, Button, SearchModal, useLidarrEnabled } from '../components.jsx';
 
 // Retos: listas de álbumes "que hay que tener/oír". Anillos concéntricos de lo
 // que tienes vs lo que has escuchado, y envío en bloque a Lidarr de lo que falta.
 export default function Challenges() {
   const [list, setList] = useState(null);
+  const [nextListens, setNextListens] = useState(null);
   const [openId, setOpenId] = useState(null);
   const [err, setErr] = useState(null);
   const [adding, setAdding] = useState(false);
 
-  const load = () => api.challenges().then(setList).catch((e) => setErr(e.message));
+  const load = () => {
+    api.nextChallengeListens().then(setNextListens).catch(() => {});
+    return api.challenges().then(setList).catch((e) => setErr(e.message));
+  };
   useEffect(() => {
     load();
   }, []);
@@ -32,6 +36,28 @@ export default function Challenges() {
       </PageTitle>
 
       {adding && <AddForm onDone={() => { setAdding(false); load(); }} />}
+
+      {/* siguiente por escuchar: los discos que tienes de tus retos y aún no has oído */}
+      {nextListens?.length > 0 && (
+        <Section title="Siguiente por escuchar de tus retos" className="mb-8">
+          <div className="card p-3">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+              {nextListens.map((n) => (
+                <Link key={n.owned_album_id} to={`/album/${n.owned_album_id}`} className="group block" title={`De «${n.challenge}»`}>
+                  <div className="aspect-square rounded-lg overflow-hidden bg-ink-850 border border-ink-800 group-hover:border-gold-400 transition-colors flex items-center justify-center relative">
+                    <img src={coverUrl(n.owned_album_id)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                    <span className="absolute bottom-1 right-1 bg-ink-900/80 rounded-full p-1">
+                      <Headphones size={11} className="text-gold-300" />
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-neutral-300 truncate">{n.album}</div>
+                  <div className="text-[11px] text-neutral-600 truncate">{n.artist}</div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </Section>
+      )}
 
       {list.length === 0 && !adding && (
         <div className="card p-6 text-center text-neutral-400">

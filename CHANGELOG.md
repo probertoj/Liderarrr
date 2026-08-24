@@ -11,6 +11,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.13] — 2026-08-24
+
+### Añadido
+- La página de **Retos** muestra arriba la sección **«Siguiente por escuchar de tus
+  retos»** (los discos que ya tienes de tus retos y aún no has oído), la misma que ya
+  estaba en el Dashboard.
+
+---
+
 ## [0.9.12] — 2026-08-23
 
 ### Arreglado
