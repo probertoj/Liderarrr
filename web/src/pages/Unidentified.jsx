@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Sparkles, Check, ExternalLink, Loader2, Pencil, X, Database, Radio } from 'lucide-react';
+import { HelpCircle, Sparkles, Check, ExternalLink, Loader2, Pencil, X, Database, Radio, RefreshCw } from 'lucide-react';
 import { api } from '../api.js';
 import { openMbReleaseEditor } from '../mb.js';
 import { PageTitle, Cover, Spinner, ErrorMsg, Button } from '../components.jsx';
@@ -230,6 +230,7 @@ export default function Unidentified() {
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
+                  <RetryButton album={a} onDone={load} />
                   <Button onClick={() => setOpenId(openId === a.id ? null : a.id)}>Buscar</Button>
                   <CreateMbButton album={a} />
                   <Button variant="default" onClick={() => act(() => api.albumState(a.id, 'orphan'))}>
@@ -250,6 +251,39 @@ export default function Unidentified() {
         </div>
       )}
     </div>
+  );
+}
+
+// Reintentar la identificación de UN solo disco (la cadena completa: MusicBrainz, Last.fm y
+// AcoustID si está activado), sin lanzar el barrido masivo. Útil tras mejorar el motor,
+// activar AcoustID o corregir el artista/título: si casa, el disco desaparece de la lista.
+function RetryButton({ album, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [nope, setNope] = useState(false);
+  const retry = async () => {
+    setBusy(true);
+    setNope(false);
+    try {
+      const r = await api.identifyAlbum(album.id);
+      if (r.matched) {
+        await onDone(); // casó → se recarga la lista y este disco desaparece
+      } else {
+        setBusy(false);
+        setNope(true);
+        setTimeout(() => setNope(false), 2500);
+      }
+    } catch (e) {
+      alert(e.message);
+      setBusy(false);
+    }
+  };
+  return (
+    <Button variant="gold" onClick={retry} disabled={busy} title="Volver a identificar solo este disco">
+      <span className="inline-flex items-center gap-1.5">
+        {busy ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+        {nope ? 'Sin coincidencia' : 'Reintentar'}
+      </span>
+    </Button>
   );
 }
 

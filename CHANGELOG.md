@@ -22,6 +22,8 @@ solo los lee para calcular la huella; el resultado va a la base de datos.
   huellan hasta 4 pistas y gana el release-group que aparece en **más** de ellas, exigiendo
   que **≥2 coincidan**. El disco real es el único RG común a varias pistas.
 - Umbral de score de AcoustID subido a **0.8** (menos coincidencias débiles).
+- **«Sin identificar»**: botón **«Reintentar» por disco** (además del masivo), que re-lanza la
+  cadena de identificación de un solo álbum. Útil tras activar AcoustID o corregir datos.
 
 ### Arreglado
 - **Corrupción de la ficha comodín «Artista desconocido»**: `anchorArtist` escribía el MBID
