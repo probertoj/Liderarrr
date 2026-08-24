@@ -9,6 +9,14 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.15',
+    title: 'Identificar recopilatorios (Various Artists)',
+    items: [
+      'Los discos etiquetados como «Varios / Various / VA / AA.VV.» ahora se buscan acotados a «Various Artists» en MusicBrainz, así que se identifican recopilatorios que antes se quedaban fuera (La Bola de Cristal, El Planeta de los Ritmos, bandas sonoras…).',
+      'Se exige coincidencia EXACTA del título para no confundir un recopilatorio genérico con un volumen concreto equivocado (p. ej. un «Momentos Rockdelux» cualquiera con el volumen de otro año). Cero falsos positivos.',
+    ],
+  },
+  {
     version: '0.9.14',
     title: 'Mejor identificación en MusicBrainz',
     items: [

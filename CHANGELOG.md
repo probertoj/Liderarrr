@@ -11,6 +11,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.15] — 2026-08-24
+
+**Identificación de recopilatorios (Various Artists)** — sin bajar la precisión.
+
+### Añadido
+- `searchReleaseGroup`: cuando el artista es un comodín de recopilatorio (Varios / Various /
+  VA / V.A. / AA.VV. / Artistas Varios / Compilation), la búsqueda se **acota al artista
+  «Various Artists» de MusicBrainz** (por su MBID). Recupera comps que antes fallaban
+  porque el filtro por nombre de artista no casaba.
+- Para VA se exige **coincidencia exacta del título normalizado**: evita casar un título de
+  recopilatorio genérico con un **volumen concreto equivocado** de una serie (p. ej.
+  «Momentos Rockdelux» → «…Vol. 3/2019»). Sigue el principio de **cero falsos positivos**.
+
+---
+
 ## [0.9.14] — 2026-08-24
 
 **Motor de identificación más certero** (sin bajar la precisión: cero falsos positivos).

@@ -113,6 +113,10 @@ const EDITION_TAIL_RE = /\s+(remaster\w*|remasteriz\w*|deluxe|expanded|expandida
 // Prefijo de listas/rippers: "2021 - ", "1. ", "01 - ".
 const LEADING_RE = /^(\d{4}\s*[-–—]\s*|\d{1,3}[.\-)]\s+)/;
 
+// "Various Artists" en MusicBrainz + los comodines que usan las etiquetas para recopilatorios.
+const VA_MBID = '89ad4ac3-39f7-470e-963a-56509c546377';
+const VA_ARTIST_RE = /^\s*(various\s*artists?|various|varios(\s+artistas)?|artistas?\s+varios|v\.?\s*a\.?|v\/a|aa\.?\s*vv\.?|compilation|recopilatorio)\s*$/i;
+
 // Limpia el título para buscarlo en MusicBrainz. Dos ruidos de etiquetado rompen
 // la búsqueda: (1) el nombre del artista repetido al principio ("Neil Young Archives
 // Vol. II" en vez de "Archives Vol. II"), y (2) paréntesis/corchetes finales con
@@ -167,11 +171,15 @@ function formatRg(rg) {
 export async function searchReleaseGroup(artist, title, artistMbid = null) {
   if (!title) return null;
   const clean = cleanAlbumTitle(title, artist);
+  // Recopilatorios: si el "artista" es un comodín (Varios / Various / VA / AA.VV.), MB los
+  // acredita a "Various Artists". Buscar por su nombre falla; acotamos por el arid de VA,
+  // como si fuera un artista conocido. Umbral algo más alto (títulos de comp. genéricos).
+  const va = !artistMbid && artist && VA_ARTIST_RE.test(artist);
   // Si conocemos el MBID del artista, acotamos por `arid:` (preciso e inmune a nombres con
   // caracteres raros como «Florence + The Machine», que rompen el filtro por nombre).
-  const scope = artistMbid ? `arid:${artistMbid}` : artist ? `artist:"${lucene(artist)}"` : null;
+  const scope = artistMbid ? `arid:${artistMbid}` : va ? `arid:${VA_MBID}` : artist ? `artist:"${lucene(artist)}"` : null;
   const q = scope ? `releasegroup:"${lucene(clean)}" AND ${scope}` : `releasegroup:"${lucene(clean)}"`;
-  const data = await mbCached(`rg-search:${artistMbid || artist || ''}:${clean}`.toLowerCase(), `/release-group?query=${enc(q)}&limit=5`);
+  const data = await mbCached(`rg-search:${artistMbid || (va ? 'va' : artist) || ''}:${clean}`.toLowerCase(), `/release-group?query=${enc(q)}&limit=5`);
   const list = data['release-groups'] || [];
   const target = nrm(clean);
   const isStudio = (r) => r['primary-type'] === 'Album' && !((r['secondary-types'] || []).length);
@@ -179,6 +187,14 @@ export async function searchReleaseGroup(artist, title, artistMbid = null) {
   // homónimo: MB puede devolver primero el single "Heaven or Las Vegas" en vez del álbum,
   // y coger el [0] a ciegas lo archivaba como Single. Si no hay exactas, el mejor por score.
   const best = list.length ? list.filter((r) => nrm(r.title) === target).find(isStudio) || list[0] : null;
+
+  // Recopilatorios: SOLO coincidencia EXACTA de título normalizado. Los títulos de comp.
+  // son genéricos y a menudo prefijo de un volumen concreto de MB («Momentos Rockdelux» →
+  // «…Vol. 3/2019»): exigir exactitud evita casar con el volumen equivocado.
+  if (va) {
+    return best && nrm(best.title) === target && (Number(best.score) || 0) >= 80 ? formatRg(best) : null;
+  }
+
   if (best && (Number(best.score) || 0) >= 80) return formatRg(best);
 
   // FALLBACK por título solo + verificación de artista (nombre normalizado). Pesca las
