@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.14',
+    title: 'Mejor identificación en MusicBrainz',
+    items: [
+      'La búsqueda en MusicBrainz limpia mejor el título: quita sufijos de edición de la misma obra (Remasterizado, Deluxe, Edición, Reissue, Versión, bandas sonoras…) y prefijos («2021 - », «1. »). Recupera discos que antes se quedaban sin identificar por el sufijo.',
+      'Nuevo respaldo por título: si «artista + título» no casa, busca solo el título y acepta el resultado si el artista coincide al normalizar el nombre. Arregla variantes como ACDC↔AC/DC, acentos y signos.',
+      'Se mantiene el criterio de cero falsos positivos: no toca sufijos arriesgados (Live/Remix) y exige verificación de artista. Pulsa «Reintentar identificación» en «Sin identificar» para reprocesar lo pendiente.',
+    ],
+  },
+  {
     version: '0.9.13',
     title: '«Siguiente por escuchar» en Retos',
     items: [

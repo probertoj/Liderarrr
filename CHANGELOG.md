@@ -11,6 +11,31 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.14] — 2026-08-24
+
+**Motor de identificación más certero** (sin bajar la precisión: cero falsos positivos).
+
+### Cambiado
+- `cleanAlbumTitle` (limpieza del título para buscar en MusicBrainz) ahora quita, de forma
+  **conservadora**, sufijos de edición de la **misma obra** —también en español
+  («Remasterizado», «Versión», «Edición», «Reedición»)— más bandas sonoras entre
+  paréntesis y prefijos de listas/rippers («2021 - », «1. »). **No** toca `(Live)`/`(Remix)`
+  (podrían ser obras distintas y arriesgarían un match erróneo).
+
+### Añadido
+- **Respaldo por título en `searchReleaseGroup`**: si la búsqueda «artista + título» no da
+  un resultado fuerte, se busca **solo por título** y se acepta un candidato cuyo **artista
+  coincida al normalizar el nombre** (sin acentos ni signos). Recupera variantes como
+  **ACDC ↔ AC/DC**, acentos y puntuación. Umbral alto + verificación → sin falsos positivos.
+- Tests de regresión de `cleanAlbumTitle`.
+
+### Notas
+- Validado contra una base real: recupera discos como *Apollo (Atmospheres & Soundtracks)*,
+  *Crestone (Original Score)*, AC/DC *Rock or Bust* y varios de *Florence + The Machine*,
+  sin identificar ninguno mal. Pulsa **«Reintentar identificación»** para reprocesar.
+
+---
+
 ## [0.9.13] — 2026-08-24
 
 ### Añadido

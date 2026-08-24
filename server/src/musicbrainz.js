@@ -101,9 +101,17 @@ function lucene(s) {
   return String(s || '').replace(/[+\-!(){}[\]^"~*?:\\/]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// Palabras de edición que, entre paréntesis al final del título, son decoración y
-// estorban la búsqueda (no forman parte del nombre real del álbum en MusicBrainz).
-const EDITION_RE = /\b(remaster(ed)?|deluxe|expanded|anniversary|edition|reissue|mono|stereo|bonus|disc\s*\d+|cd\s*\d+)\b/i;
+// Sufijos de edición de la MISMA obra: no cambian de qué disco hablamos, solo estorban
+// la búsqueda (español incluido). CONSERVADOR a propósito: NO incluye live/remix/mix/edit
+// —esos pueden ser obras distintas y arriesgarían casar con la versión de estudio.
+const EDITION_RE =
+  /(remaster\w*|remasteriz\w*|deluxe|expanded|expandida|anniversary|aniversario|edition|edici[oó]n|reissue|reedici[oó]n|\bversion\b|versi[oó]n|mono|stereo|bonus|special|especial|explicit|clean|vinyl|\bflac\b|\bmp3\b|disc\s*\d+|disco\s*\d+|cd\s*\d+|japanese|australian)/i;
+// Bandas sonoras: a veces cuelgan entre paréntesis y rompen la búsqueda del título real.
+const SOUNDTRACK_RE = /(original\s+(motion\s+picture\s+)?(score|soundtrack)|motion\s+picture|banda\s+sonora|soundtracks?|\bost\b|\bscore\b)/i;
+// Palabra de edición SUELTA al final del título ("Apollo Remastered", "… Deluxe").
+const EDITION_TAIL_RE = /\s+(remaster\w*|remasteriz\w*|deluxe|expanded|expandida|reissue|reedici[oó]n|mono|stereo|explicit)\s*$/i;
+// Prefijo de listas/rippers: "2021 - ", "1. ", "01 - ".
+const LEADING_RE = /^(\d{4}\s*[-–—]\s*|\d{1,3}[.\-)]\s+)/;
 
 // Limpia el título para buscarlo en MusicBrainz. Dos ruidos de etiquetado rompen
 // la búsqueda: (1) el nombre del artista repetido al principio ("Neil Young Archives
@@ -125,37 +133,24 @@ export function cleanAlbumTitle(title, artist) {
   let t = String(title || '').trim();
   if (!t) return t;
   t = stripLeadingArtist(t, artist);
-  // quita paréntesis/corchetes finales que sean año o edición (repetido: puede haber
-  // varios, p. ej. "Album (Deluxe) (2009)")
+  t = t.replace(LEADING_RE, '').trim(); // prefijo "2021 - ", "1. "
+  // quita paréntesis/corchetes finales que sean año, edición o banda sonora (repetido:
+  // puede haber varios, p. ej. "Album (Deluxe) (2009)"). NO toca (Live)/(Remix).
   for (;;) {
     const m = t.match(/[([]([^)\]]*)[)\]]\s*$/);
-    if (!m || (!/\d{4}/.test(m[1]) && !EDITION_RE.test(m[1]))) break;
+    if (!m || (!/\d{4}/.test(m[1]) && !EDITION_RE.test(m[1]) && !SOUNDTRACK_RE.test(m[1]))) break;
     t = t.slice(0, m.index).trim();
   }
+  // y una palabra de edición suelta al final ("Apollo Remastered" -> "Apollo")
+  t = t.replace(EDITION_TAIL_RE, '').trim();
   return t || String(title || '').trim();
 }
 
 // Busca un release group por artista + título. Devuelve el mejor candidato con
 // su score (0-100), tipos y artista, o null.
-export async function searchReleaseGroup(artist, title, artistMbid = null) {
-  if (!title) return null;
-  const clean = cleanAlbumTitle(title, artist);
-  // Si conocemos el MBID del artista, acotamos por `arid:` (preciso e inmune a nombres con
-  // caracteres raros como «Florence + The Machine», que rompen el filtro por nombre).
-  const scope = artistMbid ? `arid:${artistMbid}` : artist ? `artist:"${lucene(artist)}"` : null;
-  const q = scope ? `releasegroup:"${lucene(clean)}" AND ${scope}` : `releasegroup:"${lucene(clean)}"`;
-  const data = await mbCached(`rg-search:${artistMbid || artist || ''}:${clean}`.toLowerCase(), `/release-group?query=${enc(q)}&limit=5`);
-  const list = data['release-groups'] || [];
-  if (!list.length) return null;
-  const nrm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-  const target = nrm(clean);
-  const isStudio = (r) => r['primary-type'] === 'Album' && !((r['secondary-types'] || []).length);
-  // Entre coincidencias EXACTAS de título, prioriza el álbum de estudio sobre el single/EP
-  // homónimo: MB puede devolver primero el single "Heaven or Las Vegas" en vez del álbum,
-  // y coger el [0] a ciegas lo archivaba como Single (oculto en la sección plegada). Si no
-  // hay exactas, se respeta el mejor por score de MB.
-  const rg = list.filter((r) => nrm(r.title) === target).find(isStudio) || list[0];
-  if (!rg) return null;
+const nrm = (s) => String(s || '').normalize('NFD').toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+function formatRg(rg) {
   return {
     rg_mbid: rg.id,
     title: rg.title,
@@ -167,6 +162,41 @@ export async function searchReleaseGroup(artist, title, artistMbid = null) {
     credits: mapCredits(rg),
     score: Number(rg.score) || 0,
   };
+}
+
+export async function searchReleaseGroup(artist, title, artistMbid = null) {
+  if (!title) return null;
+  const clean = cleanAlbumTitle(title, artist);
+  // Si conocemos el MBID del artista, acotamos por `arid:` (preciso e inmune a nombres con
+  // caracteres raros como «Florence + The Machine», que rompen el filtro por nombre).
+  const scope = artistMbid ? `arid:${artistMbid}` : artist ? `artist:"${lucene(artist)}"` : null;
+  const q = scope ? `releasegroup:"${lucene(clean)}" AND ${scope}` : `releasegroup:"${lucene(clean)}"`;
+  const data = await mbCached(`rg-search:${artistMbid || artist || ''}:${clean}`.toLowerCase(), `/release-group?query=${enc(q)}&limit=5`);
+  const list = data['release-groups'] || [];
+  const target = nrm(clean);
+  const isStudio = (r) => r['primary-type'] === 'Album' && !((r['secondary-types'] || []).length);
+  // Entre coincidencias EXACTAS de título, prioriza el álbum de estudio sobre el single/EP
+  // homónimo: MB puede devolver primero el single "Heaven or Las Vegas" en vez del álbum,
+  // y coger el [0] a ciegas lo archivaba como Single. Si no hay exactas, el mejor por score.
+  const best = list.length ? list.filter((r) => nrm(r.title) === target).find(isStudio) || list[0] : null;
+  if (best && (Number(best.score) || 0) >= 80) return formatRg(best);
+
+  // FALLBACK por título solo + verificación de artista (nombre normalizado). Pesca las
+  // variantes de nombre que el filtro por artista no casa: ACDC↔AC/DC, acentos, signos.
+  // Busca solo el título y acepta un candidato cuyo artista normalizado coincida con el de
+  // tus etiquetas. Umbral alto (85) + verificación → sin falsos positivos.
+  if (artist && clean) {
+    const want = nrm(artist);
+    const artistMatch = (a) => a === want || (a.length >= 4 && want.length >= 4 && (a.includes(want) || want.includes(a)));
+    if (want.length >= 2) {
+      const d2 = await mbCached(`rg-title:${clean}`.toLowerCase(), `/release-group?query=${enc(`releasegroup:"${lucene(clean)}"`)}&limit=8`);
+      const verified = (d2['release-groups'] || []).find(
+        (r) => (Number(r.score) || 0) >= 85 && artistMatch(nrm((r['artist-credit'] || []).map((x) => x.name).join('')))
+      );
+      if (verified) return formatRg(verified);
+    }
+  }
+  return best ? formatRg(best) : null;
 }
 
 // Artist-credit completo (para álbumes acreditados a varios: splits, colaboraciones).
