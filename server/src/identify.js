@@ -38,6 +38,18 @@ const setArtistFromMb = db.prepare(
 );
 const artistNeedsMbid = db.prepare('SELECT id, name, mbid FROM artists WHERE id = ?');
 const findArtistByMbid = db.prepare('SELECT id FROM artists WHERE mbid = ? LIMIT 1');
+const insertArtist = db.prepare(
+  `INSERT INTO artists (name, sort_name, mbid, type, country, began, ended, disambiguation, details_fetched_at)
+   VALUES (@name, @sort_name, @mbid, @type, @country, @began, @ended, @disambiguation, @now)`
+);
+
+// Nombres COMODÍN: fichas que agrupan artistas DISTINTOS (no un artista concreto). Ej.: una
+// única fila «Artista desconocido» con cientos de discos ajenos. NUNCA hay que pegarles un
+// MBID: lo asociaría todo a un mismo artista y corrompería cientos de fichas.
+export const isPlaceholderArtist = (name) =>
+  /^\s*(artistas?\s+(desconocidos?|varios)|artista\s+desconocido|desconocid[oa]s?|unknown(\s+artists?)?|various(\s+artists?)?|varios(\s+artistas)?|v\.?\s*a\.?|v\/a|aa\.?\s*vv\.?|sin\s+artista|no\s+artist)\s*$/i.test(
+    String(name || '')
+  );
 
 const applyMatch = db.prepare(`
 UPDATE albums SET rg_mbid=@rg_mbid, primary_type=@primary_type, secondary_types=@secondary_types,
@@ -61,6 +73,27 @@ async function anchorArtist(albumId, artistMbid) {
     db.prepare('UPDATE albums SET artist_id = ? WHERE id = ?').run(owner.id, albumId);
     return;
   }
+  // FICHA COMODÍN (Artista desconocido / Various…): NO la mutes —agrupa artistas distintos—.
+  // Crea una ficha propia para el artista real y mueve SOLO este álbum. Así, además de
+  // identificarlo, AcoustID lo re-hogar bajo su artista de verdad y vacía el cubo comodín.
+  if (isPlaceholderArtist(cur.name)) {
+    const info = await mb.artistByMbid(artistMbid).catch(() => null);
+    const name = info?.name || 'Artista (AcoustID)';
+    const r = insertArtist.run({
+      name,
+      sort_name: info?.sort_name || name,
+      mbid: artistMbid,
+      type: info?.type || null,
+      country: info?.country || null,
+      began: info?.began || null,
+      ended: info?.ended || null,
+      disambiguation: info?.disambiguation || '',
+      now: Date.now(),
+    });
+    db.prepare('UPDATE albums SET artist_id = ? WHERE id = ?').run(r.lastInsertRowid, albumId);
+    return;
+  }
+  // ficha dedicada a este artista (todos sus discos son suyos): enriquécela con el MBID
   try {
     const info = await mb.artistByMbid(artistMbid);
     if (info) setArtistFromMb.run({ ...info, id: album.artist_id, now: Date.now() });
@@ -171,27 +204,49 @@ async function identifyAlbum(album) {
     /* sigue la cadena */
   }
 
-  // 4. AcoustID (huella del audio) — ÚLTIMO recurso: fpcalc LEE EL FICHERO ENTERO y
-  //    calcula la huella (caro por red y CPU). Solo se hace si lo anterior falló y
-  //    está activado; si no, en una biblioteca enorme ahogaría toda la app.
+  // 4. AcoustID (huella del audio) — ÚLTIMO recurso: fpcalc LEE EL FICHERO ENTERO y calcula
+  //    la huella (caro por red y CPU). Solo si lo anterior falló y está activado.
+  //    CONSENSO MULTIPISTA: una grabación aparece en muchos discos (álbum + recopilatorios),
+  //    así que fiarse de UNA sola pista es arriesgado. Huellamos varias y elegimos el
+  //    release-group que aparece en MÁS de ellas: el disco real es el único RG común a varias
+  //    pistas; los recopilatorios incidentales caen solos. Exige ≥2 pistas de acuerdo cuando
+  //    se pudo huellar más de una. Umbral de score alto (0.8) para evitar coincidencias débiles.
   if (getSetting('identify_acoustid') !== '0') {
-    const rep = db
-      .prepare('SELECT path FROM tracks WHERE album_id = ? AND path IS NOT NULL ORDER BY duration_ms DESC LIMIT 1')
-      .get(album.id);
-    if (rep) {
-      try {
-        const hit = await acoustid.lookup(rep.path);
-        if (hit?.mb_recording_id && hit.score >= 0.5) {
-          const { artist_mbid, releaseGroups } = await mb.recordingReleaseGroups(hit.mb_recording_id);
-          const rg = pickBest(releaseGroups, album.title);
-          if (rg) {
-            commitMatch(album, rg, 'acoustid', hit.score);
-            await anchorArtist(album.id, artist_mbid);
-            return 'acoustid';
-          }
+    const tracks = db
+      .prepare('SELECT path FROM tracks WHERE album_id = ? AND path IS NOT NULL ORDER BY duration_ms DESC')
+      .all(album.id);
+    if (tracks.length) {
+      const votes = new Map(); // rg_mbid -> { count, rg, artist_mbid }
+      let scanned = 0;
+      let bestScore = 0;
+      for (const t of tracks.slice(0, 4)) {
+        let hit;
+        try {
+          hit = await acoustid.lookup(t.path);
+        } catch {
+          continue;
         }
-      } catch {
-        /* sigue */
+        if (!hit?.mb_recording_id || hit.score < 0.8) continue;
+        scanned++;
+        bestScore = Math.max(bestScore, hit.score);
+        let res;
+        try {
+          res = await mb.recordingReleaseGroups(hit.mb_recording_id);
+        } catch {
+          continue;
+        }
+        // recordingReleaseGroups ya devuelve cada RG una vez por grabación → 1 voto por pista
+        for (const rg of res?.releaseGroups || []) {
+          const v = votes.get(rg.rg_mbid) || { count: 0, rg, artist_mbid: res.artist_mbid };
+          v.count++;
+          votes.set(rg.rg_mbid, v);
+        }
+      }
+      const top = pickConsensusRg(votes, scanned);
+      if (top) {
+        commitMatch(album, top.rg, 'acoustid', bestScore);
+        await anchorArtist(album.id, top.artist_mbid);
+        return 'acoustid';
       }
     }
   }
@@ -210,6 +265,20 @@ function pickBest(list, title) {
   // mejor álbum de estudio; si no, el primero.
   const exact = list.filter((r) => norm(r.title) === target);
   return exact.find(isStudio) || exact[0] || list.find(isStudio) || list[0];
+}
+
+// Consenso de AcoustID: `votes` es un Map rg_mbid -> { count, rg, artist_mbid } donde count
+// es cuántas pistas del álbum tienen una grabación que aparece en ese release-group. Gana el
+// más votado; empate → álbum de estudio. Exige ≥2 votos cuando se pudieron huellar ≥2 pistas
+// (consenso: el disco real es el RG común a varias pistas, no un recopilatorio incidental).
+export function pickConsensusRg(votes, scanned) {
+  const isStudio = (r) => r.primary_type === 'Album' && !(r.secondary_types || []).length;
+  const ranked = [...votes.values()].sort(
+    (a, b) => b.count - a.count || (isStudio(b.rg) ? 1 : 0) - (isStudio(a.rg) ? 1 : 0)
+  );
+  const top = ranked[0];
+  const need = scanned >= 2 ? 2 : 1;
+  return top && top.count >= need ? top : null;
 }
 
 // Procesa todos los álbumes pendientes (o unmatched si force). Trabajo lento en

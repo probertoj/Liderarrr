@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.16',
+    title: 'AcoustID más fino y seguro',
+    items: [
+      'Identificación por huella de audio (AcoustID) con consenso multipista: en vez de fiarse de una sola pista, huella varias y elige el disco que aparece en más de ellas. Mucho más certero para los «Artista desconocido» (donde el título no ayuda).',
+      'Arreglo importante: al identificar un disco de la ficha compartida «Artista desconocido», ahora se le crea su propia ficha de artista y se mueve solo ese disco — antes se corría el riesgo de asociar cientos de discos al artista equivocado.',
+      'Sube el umbral de confianza de AcoustID (menos coincidencias débiles). Para usarlo: Ajustes → API key de AcoustID + activar «Usar AcoustID al identificar», y «Reintentar identificación». No modifica tus ficheros.',
+    ],
+  },
+  {
     version: '0.9.15',
     title: 'Identificar recopilatorios (Various Artists)',
     items: [

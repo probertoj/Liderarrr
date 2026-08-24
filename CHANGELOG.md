@@ -11,6 +11,30 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.16] — 2026-08-25
+
+**AcoustID (huella de audio) más fino y seguro.** AcoustID **no** modifica tus ficheros:
+solo los lee para calcular la huella; el resultado va a la base de datos.
+
+### Añadido
+- **Consenso multipista** en la identificación por AcoustID (`identify.js`): en vez de fiarse
+  de una sola pista (una grabación aparece en muchos discos: álbum + recopilatorios), se
+  huellan hasta 4 pistas y gana el release-group que aparece en **más** de ellas, exigiendo
+  que **≥2 coincidan**. El disco real es el único RG común a varias pistas.
+- Umbral de score de AcoustID subido a **0.8** (menos coincidencias débiles).
+
+### Arreglado
+- **Corrupción de la ficha comodín «Artista desconocido»**: `anchorArtist` escribía el MBID
+  del artista resuelto sobre la ficha compartida por cientos de discos, arrastrándolos todos
+  a un mismo artista. Ahora, si la ficha es un comodín (Artista desconocido / Various /
+  Unknown…), se **crea una ficha propia** para el artista real y se mueve **solo ese disco**.
+
+### Notas
+- Para usar AcoustID: Ajustes → API key de AcoustID + activar «Usar AcoustID al identificar»,
+  y luego «Reintentar identificación». Es lento (huella fichero a fichero, cacheada). + tests.
+
+---
+
 ## [0.9.15] — 2026-08-24
 
 **Identificación de recopilatorios (Various Artists)** — sin bajar la precisión.
