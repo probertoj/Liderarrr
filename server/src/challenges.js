@@ -278,7 +278,12 @@ export function deleteChallenge(id) {
 // reto más reciente y su posición, así sugiere lo primero pendiente de tu último reto.
 // Usa los índices cacheados (biblioteca + escuchas), sin depender de owned_album_id
 // guardado (que puede estar sin resolver si no abriste ese reto tras importar).
-export function nextChallengeListens(limit = 5) {
+// Lo siguiente por escuchar de tus retos: discos que YA TIENES y aún no has oído.
+//   - Por defecto (Dashboard): los primeros `limit` en total, recorriendo los retos por
+//     recencia.
+//   - perChallenge (página de Retos): el SIGUIENTE de CADA reto — uno por reto, para no
+//     quedarte solo con los del primero.
+export function nextChallengeListens({ perChallenge = false, limit = 5 } = {}) {
   const owned = ownedIndex();
   const plays = playsIndex();
   const rows = db
@@ -288,13 +293,34 @@ export function nextChallengeListens(limit = 5) {
        WHERE c.hidden = 0 ORDER BY c.added_at DESC, ci.position ASC`
     )
     .all();
-  const out = [];
-  for (const r of rows) {
+  // ¿Es el «siguiente por escuchar»? Lo tienes (para oírlo ya) y aún no lo has oído.
+  const asNext = (r) => {
     const ownedId = owned.get(matchKey(r.artist, r.album));
-    if (!ownedId) continue; // solo lo que tienes (para poder escucharlo ya)
-    if ((plays.get(playKey(r.artist, r.album)) || 0) > 0) continue; // y aún no oído
-    out.push({ artist: r.artist, album: r.album, year: r.year, owned_album_id: ownedId, challenge_id: r.challenge_id, challenge: r.challenge });
-    if (out.length >= limit) break;
+    if (!ownedId) return null;
+    if ((plays.get(playKey(r.artist, r.album)) || 0) > 0) return null;
+    return { artist: r.artist, album: r.album, year: r.year, owned_album_id: ownedId, challenge_id: r.challenge_id, challenge: r.challenge };
+  };
+  const out = [];
+  if (perChallenge) {
+    // Uno por reto: el primer ítem (por posición) que casa. rows ya viene ordenado por
+    // reto y posición, así que en cuanto uno casa, ese reto queda resuelto.
+    const done = new Set();
+    for (const r of rows) {
+      if (done.has(r.challenge_id)) continue;
+      const hit = asNext(r);
+      if (hit) {
+        out.push(hit);
+        done.add(r.challenge_id);
+      }
+    }
+    return out;
+  }
+  for (const r of rows) {
+    const hit = asNext(r);
+    if (hit) {
+      out.push(hit);
+      if (out.length >= limit) break;
+    }
   }
   return out;
 }

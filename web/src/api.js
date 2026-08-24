@@ -178,7 +178,7 @@ export const api = {
     return req(`/listening/wrapped${p.length ? `?${p.join('&')}` : ''}`);
   },
   challenges: () => req('/challenges'),
-  nextChallengeListens: () => req('/challenges/next-listens'),
+  nextChallengeListens: (perChallenge) => req(`/challenges/next-listens${perChallenge ? '?per_challenge=1' : ''}`),
   addChallenge: (name, text) => req('/challenges', { method: 'POST', body: { name, text } }),
   addChallengeItems: (id, text) => req(`/challenges/${id}/items`, { method: 'POST', body: { text } }),
   removeChallengeItem: (id, position) => req(`/challenges/${id}/items/${position}`, { method: 'DELETE' }),

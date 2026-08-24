@@ -12,7 +12,7 @@ const RELEASES = [
     version: '0.9.13',
     title: '«Siguiente por escuchar» en Retos',
     items: [
-      'La página de Retos muestra arriba «Siguiente por escuchar de tus retos»: las portadas de los discos que ya tienes de tus retos y aún no has oído, para ir directo a escucharlos. Es la misma sección que ya estaba en el Dashboard.',
+      'La página de Retos muestra arriba «Siguiente por escuchar de tus retos»: el próximo disco de CADA reto que ya tienes y aún no has oído (uno por reto, con el nombre del reto), para ir directo a escucharlos.',
     ],
   },
   {

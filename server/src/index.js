@@ -631,7 +631,13 @@ app.get('/api/listening/wrapped/image', async (req, reply) => {
 // --- retos ------------------------------------------------------------------
 app.get('/api/challenges', async () => listChallenges());
 // dashboard: siguiente(s) disco(s) por escuchar de tus retos (los que tienes y no oíste)
-app.get('/api/challenges/next-listens', async (req) => nextChallengeListens(Number(req.query?.limit) || 5));
+app.get('/api/challenges/next-listens', async (req) => {
+  const per = req.query?.per_challenge;
+  return nextChallengeListens({
+    perChallenge: per === '1' || per === 'true',
+    limit: Number(req.query?.limit) || 5,
+  });
+});
 app.post('/api/challenges', async (req, reply) => {
   try {
     // sin texto → reto VACÍO editable; con texto → parsea la lista como hasta ahora

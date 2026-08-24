@@ -14,7 +14,7 @@ export default function Challenges() {
   const [adding, setAdding] = useState(false);
 
   const load = () => {
-    api.nextChallengeListens().then(setNextListens).catch(() => {});
+    api.nextChallengeListens(true).then(setNextListens).catch(() => {});
     return api.challenges().then(setList).catch((e) => setErr(e.message));
   };
   useEffect(() => {
@@ -37,13 +37,14 @@ export default function Challenges() {
 
       {adding && <AddForm onDone={() => { setAdding(false); load(); }} />}
 
-      {/* siguiente por escuchar: los discos que tienes de tus retos y aún no has oído */}
+      {/* siguiente por escuchar de CADA reto: el próximo disco que tienes y no has oído */}
       {nextListens?.length > 0 && (
         <Section title="Siguiente por escuchar de tus retos" className="mb-8">
           <div className="card p-3">
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
               {nextListens.map((n) => (
-                <Link key={n.owned_album_id} to={`/album/${n.owned_album_id}`} className="group block" title={`De «${n.challenge}»`}>
+                <Link key={n.challenge_id} to={`/album/${n.owned_album_id}`} className="group block" title={`De «${n.challenge}»`}>
+                  <div className="text-[10px] text-gold-500/80 truncate mb-1">{n.challenge}</div>
                   <div className="aspect-square rounded-lg overflow-hidden bg-ink-850 border border-ink-800 group-hover:border-gold-400 transition-colors flex items-center justify-center relative">
                     <img src={coverUrl(n.owned_album_id)} alt="" loading="lazy" className="w-full h-full object-cover" />
                     <span className="absolute bottom-1 right-1 bg-ink-900/80 rounded-full p-1">
