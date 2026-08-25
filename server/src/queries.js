@@ -226,6 +226,7 @@ function sameAlbumRows(a) {
   const rows = db
     .prepare(
       `SELECT id, title, year, rg_mbid, album_artist, track_file_count, track_count, size_bytes, path, preferred_copy,
+        disc_group, disc_count,
         (SELECT format FROM tracks WHERE album_id=albums.id AND format IS NOT NULL AND format<>'' GROUP BY format ORDER BY COUNT(*) DESC LIMIT 1) AS format,
         (SELECT CASE WHEN COUNT(*)>0 AND MIN(lossless)=1 THEN 1 ELSE 0 END FROM tracks WHERE album_id=albums.id) AS lossless
        FROM albums
@@ -237,32 +238,76 @@ function sameAlbumRows(a) {
   );
 }
 
-export function albumDupGroup(albumId) {
-  const a = db.prepare('SELECT id, rg_mbid, album_artist, title, track_count, track_file_count FROM albums WHERE id = ?').get(albumId);
-  if (!a) return null;
-  const key = editionKey(a);
-  // Copias = SOLO la misma edición (misma clave). Antes agrupaba por rg_mbid y metía la
-  // original junto a la deluxe como si fueran duplicados a borrar.
-  const copies = sameAlbumRows(a).filter((c) => editionKey(c) === key);
-  if (copies.length < 2) return { title: a.title, copies: [] };
-  const best = pickBestCopy(copies);
+// UNIDAD de colección: una CAJA (varios discos del mismo disc_group) o un álbum suelto. Así
+// las copias se comparan a nivel de "release completo" y una caja de 5 CDs y la misma caja en
+// una sola carpeta de 50 pistas se ven como COPIAS (misma release, distinto empaquetado), no
+// como discos sueltos ni ediciones distintas. rep = el mejor miembro (para portada/formato).
+function makeUnit(members) {
+  const rep = members.reduce((m, c) => (copyScore(c) > copyScore(m) ? c : m), members[0]);
   return {
-    title: best.title,
-    pinned: !!best.preferred_copy,
-    bestReason: bestReason(best, copies),
+    members,
+    rep,
+    tracks: members.reduce((n, r) => n + (r.track_file_count || 0), 0),
+    discTotal: Math.max(1, ...members.map((r) => r.disc_count || 1)),
+    discs: members.length,
+    box: members.length > 1 || (members[0].disc_group != null),
+    lossless: members.every((m) => m.lossless),
+    size: members.reduce((n, m) => n + (m.size_bytes || 0), 0),
+    preferred: members.some((m) => m.preferred_copy),
+  };
+}
+function buildUnits(rows) {
+  const groups = new Map();
+  const units = [];
+  for (const r of rows) {
+    if (r.disc_group) {
+      if (!groups.has(r.disc_group)) groups.set(r.disc_group, []);
+      groups.get(r.disc_group).push(r);
+    } else units.push(makeUnit([r]));
+  }
+  for (const [, ms] of groups) units.push(makeUnit(ms));
+  return units;
+}
+// Firma de "misma release" dentro del conjunto (ya filtrado a mismo álbum por sameAlbumRows):
+// nº total de discos + nº total de pistas. Conservador: solo agrupa contenido IDÉNTICO, así
+// no mezcla original vs deluxe (distinto total) ni una caja parcial con la completa.
+const unitSig = (u) => `${u.discTotal}|${u.tracks}`;
+const unitScore = (u) => (u.preferred ? 1e15 : 0) + (u.lossless ? 1e12 : 0) + u.tracks * 1e6 - u.discs * 1e3 + u.size / 1e6;
+
+export function albumDupGroup(albumId) {
+  const a = db.prepare('SELECT id, rg_mbid, album_artist, title FROM albums WHERE id = ?').get(albumId);
+  if (!a) return null;
+  const units = buildUnits(sameAlbumRows(a));
+  const aUnit = units.find((u) => u.members.some((m) => m.id === a.id));
+  if (!aUnit) return { title: a.title, copies: [] };
+  const copies = units.filter((u) => unitSig(u) === unitSig(aUnit));
+  if (copies.length < 2) return { title: a.title, copies: [] };
+  const best = copies.find((u) => u.preferred) || copies.reduce((m, u) => (unitScore(u) > unitScore(m) ? u : m), copies[0]);
+  const reason = best.preferred
+    ? 'La marcaste tú como la mejor.'
+    : copies.every((u) => u.lossless === best.lossless && u.tracks === best.tracks)
+      ? 'son el mismo disco (misma release) empaquetado distinto; se eligió una — puedes marcar otra.'
+      : 'es la de mejor calidad/más completa.';
+  return {
+    title: best.rep.title,
+    pinned: !!best.preferred,
+    bestReason: reason,
     copies: copies
-      .map((c) => ({
-        id: c.id,
-        title: c.title,
-        year: c.year,
-        track_file_count: c.track_file_count,
-        track_count: c.track_count,
-        size_bytes: c.size_bytes,
-        path: c.path,
-        format: c.format,
-        lossless: !!c.lossless,
-        matched: !!c.rg_mbid,
-        best: c.id === best.id,
+      .map((u) => ({
+        id: u.rep.id,
+        member_ids: u.members.map((m) => m.id),
+        title: u.rep.title,
+        year: u.rep.year,
+        track_file_count: u.tracks,
+        track_count: u.box ? u.tracks : u.rep.track_count,
+        discs: u.box ? u.discs : 0, // >0 => es una caja de N discos
+        disc_total: u.discTotal,
+        size_bytes: u.size,
+        path: u.rep.path,
+        format: u.rep.format,
+        lossless: u.lossless,
+        matched: !!u.rep.rg_mbid,
+        best: u === best,
       }))
       .sort((x, y) => Number(y.best) - Number(x.best)),
   };
@@ -311,20 +356,19 @@ export function preferCopy(albumId, clear = false) {
 // tengan distinto (Sign o' the Times original vs Expanded Edition). Una entrada por edición
 // (la mejor copia). NO son copias a limpiar; complementan a «Copias de este disco».
 export function ownedEditions(albumId) {
-  const a = db.prepare('SELECT id, rg_mbid, album_artist, title, track_count, track_file_count FROM albums WHERE id = ?').get(albumId);
-  if (!a) return [];
-  if (!String(a.album_artist || '').trim()) return [];
-  const key = editionKey(a);
-  const others = sameAlbumRows(a).filter((c) => c.id !== a.id && editionKey(c) !== key);
-  const byEd = new Map();
-  for (const c of others) {
-    const k = editionKey(c);
-    const cur = byEd.get(k);
-    if (!cur || copyScore(c) > copyScore(cur)) byEd.set(k, c);
-  }
-  return [...byEd.values()]
-    .sort((x, y) => (x.year || 0) - (y.year || 0))
-    .map((c) => ({ id: c.id, title: c.title, year: c.year, format: c.format, lossless: !!c.lossless, tracks: c.track_count || c.track_file_count || null }));
+  const a = db.prepare('SELECT id, rg_mbid, album_artist, title FROM albums WHERE id = ?').get(albumId);
+  if (!a || !String(a.album_artist || '').trim()) return [];
+  const units = buildUnits(sameAlbumRows(a));
+  const aUnit = units.find((u) => u.members.some((m) => m.id === a.id));
+  if (!aUnit) return [];
+  const aSig = unitSig(aUnit);
+  // Ediciones = unidades con firma DISTINTA (otro contenido real: deluxe, expandida, una copia
+  // parcial…). Las de MISMA firma son copias del mismo disco → van a «Copias de este disco»,
+  // NO aquí (antes una caja en 1 carpeta de 50 salía como «edición» de la misma caja en 5 CDs).
+  return units
+    .filter((u) => u !== aUnit && unitSig(u) !== aSig)
+    .sort((x, y) => (x.rep.year || 0) - (y.rep.year || 0))
+    .map((u) => ({ id: u.rep.id, title: u.rep.title, year: u.rep.year, format: u.rep.format, lossless: u.lossless, tracks: u.tracks, discs: u.box ? u.discs : 0 }));
 }
 
 export function albumDetail(id) {

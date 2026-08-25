@@ -42,7 +42,7 @@ import {
 } from './tracked.js';
 import { gaps, upcoming, recentlyReleased, dismissGap, undismissGap, dismissedList } from './discover.js';
 import { similarSuggestions, refreshArtistSuggestions, dismissSuggestion, followSuggestion } from './suggest.js';
-import { externalNewReleases, refreshExternalReleases, dismissExternalRelease } from './newreleases.js';
+import { externalNewReleases, externalNewSongs, refreshExternalReleases, dismissExternalRelease } from './newreleases.js';
 import { spotifyTest, spotifyAlbumUrl } from './spotify.js';
 import { notifyTest } from './notify.js';
 import { wrappedImageSvg } from './wrappedimage.js';
@@ -428,6 +428,12 @@ app.post('/api/suggestions/dismiss', async (req) => dismissSuggestion(req.body?.
 app.get('/api/newreleases', async (req) =>
   externalNewReleases({ limit: Number(req.query?.limit) || 200, includeOwned: req.query?.includeOwned === '1' })
 );
+// canciones nuevas (singles) de tus artistas en los últimos `days` días (0 = solo hoy)
+app.get('/api/newsongs', async (req) => {
+  const raw = req.query?.days;
+  const days = raw == null || raw === '' ? 7 : Math.max(0, Number(raw) || 0);
+  return externalNewSongs({ days, includeOwned: req.query?.includeOwned === '1' });
+});
 app.post('/api/newreleases/refresh', async (req, reply) => {
   try {
     return await refreshExternalReleases();

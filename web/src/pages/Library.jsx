@@ -1,14 +1,26 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Disc, Layers, X, Loader2 } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, AlbumCard, Spinner, ErrorMsg, DuplicateGroupPanel, Button } from '../components.jsx';
 
+// Campos de filtro que se guardan en la URL (?q=…&sort=…). Así, al entrar a un disco y volver
+// con «atrás» del navegador, se restaura tu búsqueda/filtros en vez de la vista global.
+const FILTER_KEYS = ['q', 'genre', 'decade', 'year', 'format', 'lossless', 'state', 'sort', 'dupesOnly'];
+const DEFAULTS = { q: '', genre: '', decade: '', year: '', format: '', lossless: '', state: '', sort: 'added', dupesOnly: '' };
+
 export default function Library() {
+  const [sp, setSp] = useSearchParams();
   const [filters, setFilters] = useState(null);
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [group, setGroup] = useState(null); // grupo de duplicados abierto (al pinchar ×N)
-  const [f, setF] = useState({ q: '', genre: '', decade: '', year: '', format: '', lossless: '', state: '', sort: 'added', dupesOnly: '' });
+  // estado inicial de los filtros: desde la URL (para restaurar al volver con «atrás»)
+  const [f, setF] = useState(() => {
+    const init = { ...DEFAULTS };
+    for (const k of FILTER_KEYS) if (sp.get(k) != null) init[k] = sp.get(k);
+    return init;
+  });
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
   const [combining, setCombining] = useState(false);
@@ -64,6 +76,15 @@ export default function Library() {
     }, 250);
     return () => clearTimeout(t);
   }, [f, selectMode]);
+
+  // refleja los filtros en la URL (replace: no ensucia el historial con cada tecla). Al abrir
+  // un disco se apila una entrada nueva; «atrás» vuelve a esta URL y restaura los filtros.
+  useEffect(() => {
+    const next = {};
+    for (const k of FILTER_KEYS) if (f[k] && f[k] !== DEFAULTS[k]) next[k] = f[k];
+    setSp(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [f]);
 
   const set = (k) => (e) => setF((prev) => ({ ...prev, [k]: e.target.value }));
   const sel = 'bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm';

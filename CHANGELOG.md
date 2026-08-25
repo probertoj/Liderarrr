@@ -11,6 +11,32 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.18] — 2026-08-25
+
+**Canciones nuevas (singles), copias de cajas y navegación.**
+
+### Añadido
+- **Canciones nuevas (singles) en Lanzamientos**: nueva pestaña «🎵 Canciones nuevas» que
+  lista los **singles** recién publicados por tus artistas seguidos (Deezer/Spotify), con
+  ventana **Hoy / Últimos 7 días / Últimos 30 días**. Antes los singles se descartaban; ahora
+  se guardan (`record_type='single'`, retención 45 días) pero **no** ensucian la vista de
+  discos (esa sigue mostrando solo álbumes/EPs). Endpoint `GET /api/newsongs?days=N`.
+
+### Cambiado
+- **Copias de una caja multidisco**: las distintas representaciones de la MISMA release
+  (misma en una carpeta de N pistas, la misma en N carpetas de disco, etc.) ahora se
+  reconocen como **copias** en «Copias de este disco» (una caja se muestra como una fila
+  «caja de N discos») y se pueden descartar/borrar de una vez. Ya no aparecen como
+  «Otras ediciones» distintas. (Conservador: solo agrupa contenido idéntico —mismo nº de
+  discos y de pistas—, así no mezcla una original con su deluxe ni una copia parcial.)
+
+### Arreglado
+- **Discoteca**: la búsqueda y los filtros ahora viven en la URL (`?q=…`), así que al entrar
+  a un disco y volver con «atrás» del navegador se **restaura tu búsqueda** en vez de la
+  vista global.
+
+---
+
 ## [0.9.17] — 2026-08-25
 
 **Multidiscos (modelo Roon), copias y pulido de móvil.**

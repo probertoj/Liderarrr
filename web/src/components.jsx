@@ -681,11 +681,14 @@ export function DuplicateCopies({ copies, onChange, reason, pinned }) {
     }
   };
 
-  const dismiss = async (id) => {
-    setBusy(id);
+  // Una copia puede ser una CAJA (varios discos): las acciones aplican a TODOS sus miembros.
+  const idsOf = (c) => (c.member_ids && c.member_ids.length ? c.member_ids : [c.id]);
+
+  const dismiss = async (c) => {
+    setBusy(c.id);
     try {
-      await api.albumState(id, 'dismissed');
-      setDismissed((p) => ({ ...p, [id]: true }));
+      for (const id of idsOf(c)) await api.albumState(id, 'dismissed');
+      setDismissed((p) => ({ ...p, [c.id]: true }));
       onChange?.();
     } catch (e) {
       alert(e.message);
@@ -693,13 +696,13 @@ export function DuplicateCopies({ copies, onChange, reason, pinned }) {
       setBusy(null);
     }
   };
-  const undo = async (id) => {
-    setBusy(id);
+  const undo = async (c) => {
+    setBusy(c.id);
     try {
-      await api.restoreAlbum(id);
+      for (const id of idsOf(c)) await api.restoreAlbum(id);
       setDismissed((p) => {
         const n = { ...p };
-        delete n[id];
+        delete n[c.id];
         return n;
       });
       onChange?.();
@@ -711,15 +714,17 @@ export function DuplicateCopies({ copies, onChange, reason, pinned }) {
   };
   // Borrado de disco: IRREVERSIBLE. Confirmación dura con la ruta y el aviso de seeding.
   const del = async (c) => {
+    const ids = idsOf(c);
     const ok = window.confirm(
-      `BORRAR DEL DISCO de forma permanente:\n\n${c.title}${c.year ? ` (${c.year})` : ''}\n${c.path || ''}\n\n` +
+      `BORRAR DEL DISCO de forma permanente:\n\n${c.title}${c.year ? ` (${c.year})` : ''}` +
+        `${ids.length > 1 ? `\n(${ids.length} discos de la caja)` : ''}\n${c.path || ''}\n\n` +
         'Se eliminan los ficheros de tu biblioteca. Es IRREVERSIBLE (no va a la Papelera) y, si esa copia está ' +
         'seedeando en qBittorrent, puede romper el torrent.\n\n¿Borrar de verdad?'
     );
     if (!ok) return;
     setBusy(c.id);
     try {
-      await api.deleteAlbum(c.id);
+      for (const id of ids) await api.deleteAlbum(id);
       setDeleted((p) => ({ ...p, [c.id]: true }));
       onChange?.();
     } catch (e) {
@@ -774,6 +779,7 @@ export function DuplicateCopies({ copies, onChange, reason, pinned }) {
               <span className={c.track_file_count < c.track_count ? 'text-amber-400/80' : ''}>
                 {c.track_file_count}/{c.track_count} pistas
               </span>
+              {c.discs > 0 && <span className="text-sky-400/80">caja de {c.discs} discos</span>}
               <span>{fmtBytes(c.size_bytes)}</span>
               {!c.matched && <span className="text-neutral-500">sin identificar</span>}
             </div>
@@ -788,24 +794,26 @@ export function DuplicateCopies({ copies, onChange, reason, pinned }) {
           ) : dismissed[c.id] ? (
             <span className="text-xs text-neutral-500 inline-flex items-center gap-2 shrink-0 self-center">
               descartado
-              <button onClick={() => undo(c.id)} disabled={busy === c.id} className="underline hover:text-gold-400 disabled:opacity-50">
+              <button onClick={() => undo(c)} disabled={busy === c.id} className="underline hover:text-gold-400 disabled:opacity-50">
                 deshacer
               </button>
             </span>
           ) : (
             !c.best && (
               <div className="flex flex-col items-end gap-1 shrink-0">
-                <button
-                  onClick={() => prefer(c.id)}
-                  disabled={busy != null}
-                  title="Marcar esta copia como la mejor (se conserva y las demás se pueden descartar)"
-                  className="text-[11px] px-2 py-1 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50 inline-flex items-center gap-1"
-                >
-                  <Star size={12} /> Marcar como la mejor
-                </button>
-                <Button variant="default" disabled={busy === c.id} onClick={() => dismiss(c.id)}>
+                {!c.discs && (
+                  <button
+                    onClick={() => prefer(c.id)}
+                    disabled={busy != null}
+                    title="Marcar esta copia como la mejor (se conserva y las demás se pueden descartar)"
+                    className="text-[11px] px-2 py-1 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50 inline-flex items-center gap-1"
+                  >
+                    <Star size={12} /> Marcar como la mejor
+                  </button>
+                )}
+                <Button variant="default" disabled={busy === c.id} onClick={() => dismiss(c)}>
                   <span className="inline-flex items-center gap-1.5">
-                    <X size={13} /> {busy === c.id ? '…' : 'Descartar'}
+                    <X size={13} /> {busy === c.id ? '…' : c.discs ? 'Descartar caja' : 'Descartar'}
                   </span>
                 </Button>
                 <button

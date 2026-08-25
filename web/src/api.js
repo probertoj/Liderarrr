@@ -119,6 +119,7 @@ export const api = {
   dismissSuggestion: (name) => req('/suggestions/dismiss', { method: 'POST', body: { name } }),
   // novedades externas (Deezer/Spotify que MB aún no tiene)
   newReleases: (includeOwned) => req(`/newreleases${includeOwned ? '?includeOwned=1' : ''}`),
+  newSongs: (days, includeOwned) => req(`/newsongs?days=${Number.isFinite(days) ? days : 7}${includeOwned ? '&includeOwned=1' : ''}`),
   refreshNewReleases: () => req('/newreleases/refresh', { method: 'POST' }),
   dismissNewRelease: (id) => req(`/newreleases/${id}/dismiss`, { method: 'POST' }),
   spotifyAlbum: (artist, title) => req(`/spotify/album?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`),

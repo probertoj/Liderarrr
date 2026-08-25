@@ -728,6 +728,7 @@ export default function Calendar() {
   const [curators, setCurators] = useState([]);
   const [unowned, setUnowned] = useState(false);
   const [novIncludeOwned, setNovIncludeOwned] = useState(false);
+  const [songDays, setSongDays] = useState(7); // ventana de «Canciones nuevas» (singles)
 
   const loadLabels = () => api.trackedLabels().then(setLabels).catch(() => {});
   const loadCurators = () => api.curators().then(setCurators).catch(() => {});
@@ -745,11 +746,13 @@ export default function Calendar() {
             ? api.radar(since, unowned)
             : view === 'novedades'
               ? api.newReleases(novIncludeOwned)
-              : api.upcoming(all);
+              : view === 'canciones'
+                ? api.newSongs(songDays, novIncludeOwned)
+                : api.upcoming(all);
     load.then(setRows).catch((e) => setErr(e.message));
     if (view === 'labels') loadLabels();
     if (view === 'radar') loadCurators();
-  }, [view, all, since, unowned, novIncludeOwned]);
+  }, [view, all, since, unowned, novIncludeOwned, songDays]);
 
   const lidarrOn = useLidarrEnabled();
 
@@ -832,11 +835,11 @@ export default function Calendar() {
     d.setUTCDate(d.getUTCDate() - day);
     return d.toISOString().slice(0, 10);
   };
+  const isFeed = view === 'novedades' || view === 'canciones'; // agrupan por semana + fila externa
   const months = {};
   for (const r of rows || []) {
     if (view === 'radar' && r.is_upcoming) continue; // van en radarUpcoming
-    const key =
-      view === 'novedades' ? weekKey(r.release_date) : (r.first_release || r.release_date || '????').slice(0, 7);
+    const key = isFeed ? weekKey(r.release_date) : (r.first_release || r.release_date || '????').slice(0, 7);
     (months[key] ||= []).push(r);
   }
   const monthKeys = Object.keys(months).sort((a, b) => (view === 'upcoming' ? a.localeCompare(b) : b.localeCompare(a)));
@@ -849,7 +852,7 @@ export default function Calendar() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) return 'Fecha por confirmar';
     return `Semana del ${new Date(k + 'T00:00:00Z').toLocaleDateString('es', { day: 'numeric', month: 'long', timeZone: 'UTC' })}`;
   };
-  const fmtGroup = (k) => (view === 'novedades' ? fmtWeek(k) : fmtMonth(k));
+  const fmtGroup = (k) => (isFeed ? fmtWeek(k) : fmtMonth(k));
 
   const tab = (id, label) => (
     <button
@@ -880,7 +883,7 @@ export default function Calendar() {
     setNovMsg(null);
     try {
       const r = await api.refreshNewReleases();
-      setRows(await api.newReleases(novIncludeOwned));
+      setRows(await (view === 'canciones' ? api.newSongs(songDays, novIncludeOwned) : api.newReleases(novIncludeOwned)));
       setNovMsg(
         r.seeds === 0
           ? 'No sigues a ningún artista todavía: sigue a alguien para ver sus novedades.'
@@ -920,6 +923,7 @@ export default function Calendar() {
         {tab('upcoming', 'Próximos')}
         {tab('recent', 'Estrenados recientemente')}
         {tab('novedades', 'Novedades de Spotify')}
+        {tab('canciones', '🎵 Canciones nuevas')}
         {tab('labels', 'De tus sellos')}
         {tab('radar', 'Radar')}
         {(view === 'upcoming' || view === 'recent') && (
@@ -940,6 +944,29 @@ export default function Calendar() {
             Mostrar también los que ya tengo
           </label>
         )}
+        {view === 'canciones' && (
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
+            {[
+              { label: 'Hoy', d: 0 },
+              { label: 'Últimos 7 días', d: 7 },
+              { label: 'Últimos 30 días', d: 30 },
+            ].map((o) => (
+              <button
+                key={o.d}
+                onClick={() => setSongDays(o.d)}
+                className={`text-xs px-2 py-1 rounded-lg border ${
+                  songDays === o.d ? 'border-gold-500/50 bg-gold-500/10 text-gold-300' : 'border-ink-800 bg-ink-850 text-neutral-500'
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+            <label className="flex items-center gap-2 text-sm text-neutral-400 cursor-pointer">
+              <input type="checkbox" checked={novIncludeOwned} onChange={(e) => setNovIncludeOwned(e.target.checked)} />
+              Incluir las que ya tengo
+            </label>
+          </div>
+        )}
       </div>
 
       {view === 'mes' && <MonthCalendar onSearch={setSearch} />}
@@ -954,6 +981,24 @@ export default function Calendar() {
             <p className="text-xs text-neutral-500 min-w-0 flex-1">
               Estrenos recientes (últimos ~6 meses) de tus artistas seguidos en Deezer/Spotify que no tienes, semana a
               semana. Se llenan solos en el refresco; búscalos ahora si quieres.
+            </p>
+            <button
+              onClick={refreshNov}
+              disabled={novBusy}
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+            >
+              <RefreshCw size={13} className={novBusy ? 'animate-spin' : ''} /> {novBusy ? 'Buscando…' : 'Buscar novedades ahora'}
+            </button>
+          </div>
+          {novMsg && <p className="text-xs text-gold-300/90 mt-2">{novMsg}</p>}
+        </div>
+      )}
+      {view === 'canciones' && (
+        <div className="card p-3 mb-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-xs text-neutral-500 min-w-0 flex-1">
+              Singles (canciones sueltas) recién publicados por tus artistas seguidos en Deezer/Spotify. Se recogen en el
+              refresco; búscalos ahora si quieres. Elige la ventana de días arriba.
             </p>
             <button
               onClick={refreshNov}
@@ -1012,7 +1057,9 @@ export default function Calendar() {
             ? curators.length === 0
               ? 'Aún no sigues ningún curador. Añade uno arriba (p. ej. calltheranger) para empezar.'
               : 'Nada en el radar en esta ventana. Amplía el rango o sigue a más curadores.'
-            : view === 'novedades'
+            : view === 'canciones'
+              ? 'Sin canciones nuevas en esta ventana. Los singles de tus artistas seguidos se recogen en el refresco (Deezer/Spotify): pulsa «Identificar y sincronizar» o espera al ciclo nocturno. Amplía la ventana de días si quieres.'
+              : view === 'novedades'
               ? 'Sin novedades. Se buscan estrenos recientes de tus artistas seguidos en Deezer/Spotify en el refresco: pulsa «Identificar y sincronizar» (o espera al ciclo nocturno). Requiere seguir a algún artista.'
               : view === 'labels'
                 ? labels.length === 0
@@ -1056,7 +1103,7 @@ export default function Calendar() {
                         onQueue={() => pollLidarrQueue(setQueue)}
                       />
                     ))
-                  : view === 'novedades'
+                  : isFeed
                     ? months[month].map((r) => (
                         <ExternalReleaseRow
                           key={r.id}

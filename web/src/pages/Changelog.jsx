@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.18',
+    title: 'Canciones nuevas, copias de cajas y navegación',
+    items: [
+      'Lanzamientos: nueva pestaña «🎵 Canciones nuevas» con los singles que sacan tus artistas seguidos, con filtro Hoy / Últimos 7 días / Últimos 30 días. (La vista de discos sigue mostrando solo álbumes.)',
+      'Cajas multidisco: las distintas copias del mismo disco (una carpeta con todo, o en varios CDs) se reconocen como copias en «Copias de este disco» y se pueden descartar de una vez; ya no aparecen como ediciones distintas.',
+      'Discoteca: al buscar, entrar a un disco y darle «atrás» en el navegador, vuelves a tu búsqueda en vez de a la lista completa.',
+    ],
+  },
+  {
     version: '0.9.17',
     title: 'Multidiscos, copias y móvil',
     items: [

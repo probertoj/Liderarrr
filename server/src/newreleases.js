@@ -58,7 +58,10 @@ async function deezerArtistAlbums(artistId) {
   }
 }
 
-const KEEP_TYPES = new Set(['album', 'ep']); // fuera singles y recopilatorios: buscamos discos
+// Se guardan discos (album/ep) Y singles (canciones nuevas, vista aparte). Fuera
+// recopilatorios y demás. La vista de discos excluye 'single' (ver externalNewReleases).
+const STORE_TYPES = new Set(['album', 'ep', 'single']);
+const SINGLE_RETENTION_DAYS = 45; // los singles caducan antes que los discos (hay muchos)
 
 const upsert = db.prepare(
   `INSERT INTO external_releases
@@ -129,7 +132,7 @@ export async function refreshExternalReleases({ months = 6, maxArtists = 500 } =
 
     for (const c of candidates) {
       const type = String(c.record_type || 'album').toLowerCase();
-      if (!KEEP_TYPES.has(type)) continue;
+      if (!STORE_TYPES.has(type)) continue;
       const date = (c.release_date || '').slice(0, 10);
       if (!date || date < cutoff || date === '0000-00-00') continue;
       const mk = matchKey(s.name, c.title);
@@ -156,11 +159,14 @@ export async function refreshExternalReleases({ months = 6, maxArtists = 500 } =
 
   // poda: fuera solo lo más viejo que la ventana (los que ya tienes se conservan, para la
   // opción «mostrar los que ya tengo»; lo que MB alcanza deja de ser «adelantada» vía upsert)
-  const stored = db.prepare('SELECT id, release_date FROM external_releases').all();
+  const singleCutoff = new Date(Date.now() - SINGLE_RETENTION_DAYS * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const stored = db.prepare('SELECT id, release_date, record_type FROM external_releases').all();
   const del = db.prepare('DELETE FROM external_releases WHERE id = ?');
   const prune = db.transaction(() => {
     for (const r of stored) {
-      if (r.release_date && r.release_date < cutoff) del.run(r.id);
+      if (!r.release_date) continue;
+      const limit = r.record_type === 'single' ? singleCutoff : cutoff; // singles caducan antes
+      if (r.release_date < limit) del.run(r.id);
     }
   });
   prune();
@@ -180,10 +186,29 @@ export function externalNewReleases({ limit = 200, includeOwned = false } = {}) 
       `SELECT e.id, e.source, e.artist_id, e.artist, e.title, e.release_date, e.record_type, e.cover, e.url, e.ahead,
         (SELECT 1 FROM tracked_artists ta WHERE ta.artist_id = e.artist_id) AS tracked
        FROM external_releases e
-       WHERE e.dismissed = 0
+       WHERE e.dismissed = 0 AND e.record_type != 'single'
        ORDER BY e.release_date DESC, e.artist COLLATE NOCASE`
     )
     .all()
+    .map((r) => ({ ...r, tracked: !!r.tracked, ahead: !!r.ahead, owned: owned(r.artist_id, r.artist, r.title) }))
+    .filter((r) => includeOwned || !r.owned)
+    .slice(0, limit);
+}
+
+// Canciones nuevas (singles) de tus artistas seguidos en los últimos `days` días. Vista
+// aparte de los discos (Lanzamientos). Más recientes primero.
+export function externalNewSongs({ days = 7, includeOwned = false, limit = 300 } = {}) {
+  const since = new Date(Date.now() - Math.max(0, Number(days) || 0) * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const owned = buildOwnedCheck();
+  return db
+    .prepare(
+      `SELECT e.id, e.source, e.artist_id, e.artist, e.title, e.release_date, e.record_type, e.cover, e.url, e.ahead,
+        (SELECT 1 FROM tracked_artists ta WHERE ta.artist_id = e.artist_id) AS tracked
+       FROM external_releases e
+       WHERE e.dismissed = 0 AND e.record_type = 'single' AND e.release_date >= @since
+       ORDER BY e.release_date DESC, e.artist COLLATE NOCASE`
+    )
+    .all({ since })
     .map((r) => ({ ...r, tracked: !!r.tracked, ahead: !!r.ahead, owned: owned(r.artist_id, r.artist, r.title) }))
     .filter((r) => includeOwned || !r.owned)
     .slice(0, limit);
