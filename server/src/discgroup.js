@@ -231,6 +231,23 @@ export function combineCandidates(albumId) {
 // Trata un disc_group como UN box set: lo identifica contra MB (un release-group / release
 // con N medios) y mide el completismo a nivel de caja (discos presentes / disc_total).
 
+// Quita sufijos de DISCO del título de una carpeta de caja para buscar el título REAL de la
+// caja en MB: "… CD1", "… (Disc 2)", "… Disco 3", "… (1)". Repetible (puede haber varios).
+// Conservador: solo marcadores claros de disco; NO toca números sueltos (evita romper títulos
+// como "M83" o "1984"). Si quitarlo lo deja vacío, devuelve el original.
+export function stripDiscSuffix(title) {
+  let t = String(title || '').trim();
+  for (;;) {
+    const n = t
+      .replace(/[\s._-]*[([]?\s*(?:cd|disco?|dis[ck])\s*\.?\s*\d+\s*[)\]]?\s*$/i, '') // CD1 · (Disc 2) · Disco 3
+      .replace(/\s*[([]\s*\d{1,2}\s*[)\]]\s*$/i, '') // (1) · [2]
+      .trim();
+    if (n === t || !n) break;
+    t = n;
+  }
+  return t || String(title || '').trim();
+}
+
 // Nº de disco representativo de una carpeta (moda de tracks.disc).
 function folderDiscNo(albumId) {
   const r = db.prepare('SELECT disc, COUNT(*) c FROM tracks WHERE album_id=? GROUP BY disc ORDER BY c DESC LIMIT 1').get(albumId);
@@ -271,7 +288,7 @@ export async function identifyBox(discGroup) {
   if (members.length < 2) throw new Error('Este álbum no es una caja multidisco.');
   const artist = members.find((m) => String(m.album_artist || '').trim())?.album_artist || '';
   const rep = members.slice().sort((a, b) => (b.track_file_count || 0) - (a.track_file_count || 0))[0];
-  const title = mb.cleanAlbumTitle(rep.title, artist);
+  const title = mb.cleanAlbumTitle(stripDiscSuffix(rep.title), artist);
   const rg = await mb.searchReleaseGroup(artist, title).catch(() => null);
   if (!rg || (rg.score || 0) < 80) throw new Error('No encontré esta caja en MusicBrainz con seguridad. Puedes fijarla a mano en cada disco.');
 

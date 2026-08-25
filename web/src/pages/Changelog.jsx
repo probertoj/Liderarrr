@@ -15,6 +15,8 @@ const RELEASES = [
       'Lanzamientos: nueva pestaña «🎵 Canciones nuevas» con los singles que sacan tus artistas seguidos, con filtro Hoy / Últimos 7 días / Últimos 30 días. (La vista de discos sigue mostrando solo álbumes.)',
       'Cajas multidisco: las distintas copias del mismo disco (una carpeta con todo, o en varios CDs) se reconocen como copias en «Copias de este disco» y se pueden descartar de una vez; ya no aparecen como ediciones distintas.',
       'Discoteca: al buscar, entrar a un disco y darle «atrás» en el navegador, vuelves a tu búsqueda en vez de a la lista completa.',
+      'En Lanzamientos y Canciones nuevas, botón directo a Spotify/Deezer junto a Buscar/Descargar.',
+      'Identificar cajas: se limpian del título los sufijos de disco de la carpeta («CD1», «(Disc 2)»…), así se identifican cajas que antes fallaban.',
     ],
   },
   {

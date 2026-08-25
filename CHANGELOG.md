@@ -21,6 +21,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   ventana **Hoy / Últimos 7 días / Últimos 30 días**. Antes los singles se descartaban; ahora
   se guardan (`record_type='single'`, retención 45 días) pero **no** ensucian la vista de
   discos (esa sigue mostrando solo álbumes/EPs). Endpoint `GET /api/newsongs?days=N`.
+- **Botón a Spotify/Deezer** en las filas de Lanzamientos y «Canciones nuevas»: el enlace a
+  la fuente ahora es un botón etiquetado (p. ej. «Spotify»), junto a «Buscar»/«Descargar».
+
+### Mejorado
+- **Identificar cajas**: al buscar una caja en MusicBrainz se quitan del título los sufijos de
+  disco de la carpeta («… CD1», «… (Disc 2)», «… Disco 3», «… (1)»), así se identifican cajas
+  que antes fallaban (p. ej. *Los Amaya … CD1*, *Steve McQueen (CD 1)*, *OK Computer (2)*).
+  Conservador: no toca números que son parte del título («M83», «1984», «Blade Runner 2049»).
 
 ### Cambiado
 - **Copias de una caja multidisco**: las distintas representaciones de la MISMA release
