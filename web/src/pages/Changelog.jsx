@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.23',
+    title: 'Calendario «Mes» con filtros por fuente (singles y Descubre incluidos)',
+    items: [
+      'La vista «📅 Mes» ahora te deja elegir qué fuentes ver: pulsa cada etiqueta de la leyenda (Próximo, Estreno, Sello, Spotify, Canción, Radar, Descubre) para mostrarla u ocultarla. Tu elección se recuerda.',
+      'Se añaden al calendario dos fuentes que antes no estaban: las «🎵 Canciones nuevas» (singles) y el radar «🌐 Descubre» (similares y de tus sellos). Los singles vienen activados; Descubre viene desactivado (para no llenar el mes de artistas que no tienes), pero puedes activarlo con un clic.',
+      'En el detalle del día, los eventos de Descubre muestran su porqué («En tu sello X», «Parecido a Y»).',
+    ],
+  },
+  {
     version: '0.9.22',
     title: 'El radar «Descubre» también mira tus sellos seguidos',
     items: [

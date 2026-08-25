@@ -11,6 +11,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.23] — 2026-08-25
+
+**Calendario «Mes» con filtros por fuente (incluye singles y Descubre).**
+
+### Añadido
+- La vista **«📅 Mes»** incorpora dos fuentes que faltaban: **singles** («Canciones nuevas»,
+  `api.newSongs`) y el radar **«Descubre»** (`api.globalReleases`). Antes solo mostraba
+  álbumes/EPs (Próximos, Estrenados, Sellos, Radar, Novedades de Spotify —que excluye singles).
+- **Filtros por fuente**: la leyenda pasa a ser una fila de **toggles** (Próximo, Estreno,
+  Sello, Spotify, Canción, Radar, Descubre); cada uno muestra/oculta su tipo y la elección se
+  **persiste** en `localStorage`. Por defecto: todo activado menos «Descubre» (opt-in, para no
+  llenar el mes de artistas que no tienes).
+- El detalle del día muestra la razón de afinidad de los eventos de Descubre («En tu sello X»,
+  «Parecido a Y»).
+
+---
+
 ## [0.9.22] — 2026-08-25
 
 **«Descubre» suma los artistas de tus sellos seguidos.**

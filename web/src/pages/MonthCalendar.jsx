@@ -13,10 +13,16 @@ const KIND = {
   upcoming: { label: 'Próximo', dot: '#0ea5e9' },
   recent: { label: 'Estreno', dot: '#b9852f' },
   label: { label: 'Sello', dot: '#d97706' },
-  radar: { label: 'Radar', dot: '#8b5cf6' },
   novedad: { label: 'Spotify', dot: '#10b981' },
+  single: { label: 'Canción', dot: '#ec4899' },
+  radar: { label: 'Radar', dot: '#8b5cf6' },
+  descubre: { label: 'Descubre', dot: '#2dd4bf' },
 };
-const KIND_ORDER = ['upcoming', 'recent', 'label', 'novedad', 'radar'];
+const KIND_ORDER = ['upcoming', 'recent', 'label', 'novedad', 'single', 'radar', 'descubre'];
+// qué fuentes van marcadas por defecto: lo tuyo sí; el descubrimiento (artistas que no son
+// tuyos) es opt-in para no llenar el calendario de ruido.
+const DEFAULT_ON = { upcoming: true, recent: true, label: true, novedad: true, single: true, radar: true, descubre: false };
+const SOURCES_KEY = 'liderarrr:calendar:sources';
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
@@ -27,7 +33,7 @@ const monthsAgoIso = (n) => iso(new Date(Date.now() - n * 30 * 86400000));
 // Normaliza y deduplica los eventos de todas las fuentes. Un mismo disco puede venir de
 // varias fuentes: se funde en uno solo (mayor prioridad manda la fecha; se acumulan las
 // «kinds» para pintar varios puntitos).
-function mergeEvents({ upcoming, recent, labels, radar, novedades }) {
+function mergeEvents({ upcoming, recent, labels, radar, novedades, singles, descubre }) {
   const byKey = new Map();
   const add = (date, artist, title, kind, extra = {}) => {
     const d = (date || '').slice(0, 10);
@@ -47,7 +53,9 @@ function mergeEvents({ upcoming, recent, labels, radar, novedades }) {
   for (const r of recent || []) add(r.first_release, r.artist, r.title, 'recent', { rg_mbid: r.rg_mbid, artist_id: r.artist_id, is_owned: r.is_owned });
   for (const r of labels || []) add(r.first_release, r.artist, r.title, 'label', { rg_mbid: r.rg_mbid, artist_id: r.artist_id, labels: r.labels, is_owned: r.is_owned });
   for (const r of novedades || []) add(r.release_date, r.artist, r.title, 'novedad', { artist_id: r.artist_id, url: r.url, source: r.source, ahead: r.ahead });
+  for (const r of singles || []) add(r.release_date, r.artist, r.title, 'single', { artist_id: r.artist_id, url: r.url, source: r.source, record_type: r.record_type });
   for (const r of radar || []) add(r.release_date, r.artist, r.title, 'radar', { url: r.url });
+  for (const r of descubre || []) add(r.release_date, r.artist, r.title, 'descubre', { url: r.url, source: r.source, reason: r.reason });
   // primary kind = el de mayor prioridad presente (para el color principal del punto)
   const evs = [...byKey.values()];
   for (const e of evs) e.primary = KIND_ORDER.find((k) => e.kinds.includes(k)) || e.kinds[0];
@@ -63,6 +71,25 @@ export default function MonthCalendar({ onSearch }) {
   });
   const [selected, setSelected] = useState(iso(new Date()));
   const [grab, setGrab] = useState({}); // key -> 'busy' | 'done'
+  // qué fuentes mostrar (elección del usuario, persistida). Se parte de DEFAULT_ON y se
+  // fusiona con lo guardado, para que fuentes nuevas aparezcan con su valor por defecto.
+  const [enabled, setEnabled] = useState(() => {
+    try {
+      return { ...DEFAULT_ON, ...(JSON.parse(localStorage.getItem(SOURCES_KEY) || '{}')) };
+    } catch {
+      return { ...DEFAULT_ON };
+    }
+  });
+  const toggleSource = (k) =>
+    setEnabled((p) => {
+      const next = { ...p, [k]: !p[k] };
+      try {
+        localStorage.setItem(SOURCES_KEY, JSON.stringify(next));
+      } catch {
+        /* sin persistencia si el navegador no deja */
+      }
+      return next;
+    });
 
   useEffect(() => {
     const since = monthsAgoIso(14); // ventana amplia; navegar de mes solo re-agrupa
@@ -72,20 +99,28 @@ export default function MonthCalendar({ onSearch }) {
       api.labelReleases(since).catch(() => []),
       api.radar(since, false).catch(() => []),
       api.newReleases().catch(() => []),
+      api.newSongs(400, false).catch(() => []), // singles (retención 45 d en el servidor)
+      api.globalReleases(45, false, false).catch(() => []), // descubrimiento por afinidad
     ])
-      .then(([upcoming, recent, labels, radar, novedades]) =>
-        setEvents(mergeEvents({ upcoming, recent, labels, radar, novedades }))
+      .then(([upcoming, recent, labels, radar, novedades, singles, descubre]) =>
+        setEvents(mergeEvents({ upcoming, recent, labels, radar, novedades, singles, descubre }))
       )
       .catch((e) => setErr(e.message));
   }, []);
 
-  // agrupa por día (YYYY-MM-DD) — se recalcula solo si cambian los eventos
+  // agrupa por día (YYYY-MM-DD), mostrando solo los tipos activados. Un evento con varias
+  // fuentes se ve si AL MENOS una está activada; sus puntitos reflejan las activadas.
   const byDay = useMemo(() => {
     const m = {};
-    for (const e of events || []) (m[e.date] ||= []).push(e);
+    for (const e of events || []) {
+      const kinds = e.kinds.filter((k) => enabled[k]);
+      if (!kinds.length) continue;
+      const primary = KIND_ORDER.find((k) => kinds.includes(k)) || kinds[0];
+      (m[e.date] ||= []).push({ ...e, kinds, primary });
+    }
     for (const k of Object.keys(m)) m[k].sort((a, b) => KIND_ORDER.indexOf(a.primary) - KIND_ORDER.indexOf(b.primary));
     return m;
-  }, [events]);
+  }, [events, enabled]);
 
   // celdas de la rejilla: 6 semanas (42 días) desde el lunes de la 1ª semana del mes
   const cells = useMemo(() => {
@@ -154,13 +189,27 @@ export default function MonthCalendar({ onSearch }) {
         </h2>
       </div>
 
-      {/* leyenda de fuentes */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-xs text-neutral-500">
-        {KIND_ORDER.map((k) => (
-          <span key={k} className="inline-flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full" style={{ background: KIND[k].dot }} /> {KIND[k].label}
-          </span>
-        ))}
+      {/* filtros de fuentes: pulsa para mostrar/ocultar cada tipo (se recuerda tu elección) */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {KIND_ORDER.map((k) => {
+          const on = !!enabled[k];
+          return (
+            <button
+              key={k}
+              onClick={() => toggleSource(k)}
+              title={on ? 'Ocultar' : 'Mostrar'}
+              className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg border transition ${
+                on ? 'border-ink-700 bg-ink-850 text-neutral-300' : 'border-ink-800 bg-ink-900 text-neutral-600 opacity-60'
+              }`}
+            >
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ background: on ? KIND[k].dot : 'transparent', border: on ? 'none' : `1px solid ${KIND[k].dot}` }}
+              />
+              {KIND[k].label}
+            </button>
+          );
+        })}
       </div>
 
       {/* rejilla */}
@@ -247,6 +296,7 @@ export default function MonthCalendar({ onSearch }) {
                     </div>
                     <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
                       <span>{e.kinds.map((k) => KIND[k].label).join(' · ')}</span>
+                      {e.reason && <span className="text-sky-400/80">{e.reason}</span>}
                       {e.ahead && <span className="text-amber-400/80" title="MusicBrainz aún no lo lista">⚡ MB no lo tiene</span>}
                       {e.is_owned && <span className="text-emerald-400/70">ya lo tienes</span>}
                     </div>
