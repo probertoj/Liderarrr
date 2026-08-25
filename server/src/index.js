@@ -49,6 +49,7 @@ import {
   externalRefreshStatus,
   dismissExternalRelease,
 } from './newreleases.js';
+import { globalReleases, refreshGlobalReleases, dismissGlobalRelease } from './globalradar.js';
 import { spotifyTest, spotifyAlbumUrl } from './spotify.js';
 import { notifyTest } from './notify.js';
 import { wrappedImageSvg } from './wrappedimage.js';
@@ -448,6 +449,23 @@ app.post('/api/newreleases/refresh', async () => {
 });
 app.get('/api/newreleases/refresh/status', async () => externalRefreshStatus);
 app.post('/api/newreleases/:id/dismiss', async (req) => dismissExternalRelease(req.params.id));
+
+// --- radar de descubrimiento (novedades globales, por afinidad) -------------
+app.get('/api/globalreleases', async (req) =>
+  globalReleases({
+    days: req.query?.days == null || req.query.days === '' ? 14 : Math.max(0, Number(req.query.days) || 0),
+    includeAll: req.query?.all === '1',
+    includeOwned: req.query?.includeOwned === '1',
+  })
+);
+app.post('/api/globalreleases/refresh', async (req, reply) => {
+  try {
+    return await refreshGlobalReleases();
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/globalreleases/:id/dismiss', async (req) => dismissGlobalRelease(req.params.id));
 // URL del álbum concreto en Spotify (enlace directo desde la ficha; null si no hay)
 app.get('/api/spotify/album', async (req) => ({ url: await spotifyAlbumUrl(req.query?.artist, req.query?.title) }));
 

@@ -10,6 +10,8 @@ import { refreshAllCurators } from './radar.js';
 import { runAutoImport, autoImportEnabled, autoImportStatus } from './autoimport.js';
 import { runAutoGrab, autoGrabConfig, autoGrabStatus } from './autograb.js';
 import { refreshExternalReleases } from './newreleases.js';
+import { refreshGlobalReleases } from './globalradar.js';
+import { spotifyConfigured } from './spotify.js';
 import { refreshArtistSuggestions } from './suggest.js';
 import { lastfmConfigured } from './lastfm.js';
 import { sendNotification } from './notify.js';
@@ -130,6 +132,18 @@ function buildSteps() {
           sendNotification('Liderarr', `${n} ${n === 1 ? 'novedad nueva' : 'novedades nuevas'} de tu colección en «Lanzamientos»`).catch(() => {});
         }
         return `${r.count} novedades (${r.added} nuevas) de ${r.seeds} artistas`;
+      },
+    },
+    {
+      // solo trae y guarda el feed global; la afinidad se calcula EN VIVO al leer (usa tu
+      // colección y las sugerencias «similares» del momento), así que el orden aquí da igual.
+      key: 'globalradar',
+      label: 'Radar de descubrimiento (novedades globales de Spotify)',
+      enabled: () => spotifyConfigured(),
+      run: async () => {
+        const r = await refreshGlobalReleases();
+        if (r.skipped) return r.skipped;
+        return `${r.count} novedades globales (${r.added} nuevas)`;
       },
     },
     {

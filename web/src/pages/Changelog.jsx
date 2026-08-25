@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.20',
+    title: 'Radar de descubrimiento (novedades globales por afinidad)',
+    items: [
+      'Nueva pestaña «🌐 Descubre» en Lanzamientos: novedades globales de Spotify de CUALQUIER artista, no solo los tuyos, ordenadas por afinidad contigo.',
+      'Se agrupan en tres niveles: primero lo de artistas que sigues o tienes en la colección, luego lo parecido a lo que escuchas (similares de Last.fm), y —si marcas «También sin relación»— el feed entero para descubrir grupos nuevos.',
+      'Ventana Hoy / 7 / 14 / 30 días, oculta por defecto lo que ya tienes, y cada novedad trae enlace a Spotify + botones Buscar/Descargar. Se llena en el refresco nocturno o con «Buscar novedades ahora».',
+    ],
+  },
+  {
     version: '0.9.19',
     title: 'Canciones nuevas de toda tu colección',
     items: [

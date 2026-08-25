@@ -11,6 +11,28 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.20] — 2026-08-25
+
+**Radar de descubrimiento: novedades globales por afinidad («otros grupos»).**
+
+### Añadido
+- **Nueva pestaña «🌐 Descubre»** en Lanzamientos: el feed editorial **New Releases** de
+  Spotify, de **cualquier** artista (no solo los tuyos), ordenado por **afinidad** contigo.
+- **Tres niveles de afinidad** (calculados EN VIVO al leer, no guardados): _De artistas que
+  sigues o tienes_ (100/90), _Parecido a lo que escuchas_ (50, vía similares de Last.fm en
+  `artist_suggestions`), y _Descubrimiento sin relación directa_ (0, oculto salvo que marques
+  «También sin relación»). Cada fila explica el porqué («Sigues a X», «Parecido a Y»).
+- Ventana Hoy / 7 / 14 / 30 días; oculta por defecto lo que ya tienes; enlace a Spotify +
+  Buscar/Descargar/Descartar por fila.
+- Backend: tabla `global_releases`, módulo `globalradar.js`
+  (`refreshGlobalReleases`/`globalReleases`/`dismissGlobalRelease`), `spotifyNewReleases()` en
+  `spotify.js` (pagina el feed, con todos los artistas acreditados para cruzar afinidad),
+  rutas `GET/POST /api/globalreleases[...]`, y nuevo paso nocturno en `refresh.js` (si Spotify
+  está configurado). Deezer no tiene feed global fiable (su API editorial devuelve 0), así que
+  la fuente es Spotify.
+
+---
+
 ## [0.9.19] — 2026-08-25
 
 **Canciones nuevas de toda tu colección (no solo los seguidos).**

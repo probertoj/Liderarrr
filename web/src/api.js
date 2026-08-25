@@ -122,6 +122,12 @@ export const api = {
   newSongs: (days, includeOwned) => req(`/newsongs?days=${Number.isFinite(days) ? days : 7}${includeOwned ? '&includeOwned=1' : ''}`),
   refreshNewReleases: () => req('/newreleases/refresh', { method: 'POST' }),
   refreshNewReleasesStatus: () => req('/newreleases/refresh/status'),
+  globalReleases: (days, all, includeOwned) =>
+    req(
+      `/globalreleases?days=${Number.isFinite(days) ? days : 14}${all ? '&all=1' : ''}${includeOwned ? '&includeOwned=1' : ''}`
+    ),
+  refreshGlobalReleases: () => req('/globalreleases/refresh', { method: 'POST' }),
+  dismissGlobalRelease: (id) => req(`/globalreleases/${id}/dismiss`, { method: 'POST' }),
   dismissNewRelease: (id) => req(`/newreleases/${id}/dismiss`, { method: 'POST' }),
   spotifyAlbum: (artist, title) => req(`/spotify/album?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`),
   searchArtistMb: (q) => req(`/artists/search-mb?q=${encodeURIComponent(q)}`),

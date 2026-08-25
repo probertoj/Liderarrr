@@ -139,6 +139,7 @@ function ExternalReleaseRow({ r, added, busy, onAdd, onSearch, onDismiss }) {
           {r.ahead && (
             <span className="text-amber-400/80" title="MusicBrainz aún no lo lista">⚡ MB no lo tiene</span>
           )}
+          {r.reason && <span className="text-sky-400/80">{r.reason}</span>}
           {r.owned && <span className="text-emerald-400/70">ya lo tienes</span>}
         </div>
       </div>
@@ -735,6 +736,8 @@ export default function Calendar() {
   const [unowned, setUnowned] = useState(false);
   const [novIncludeOwned, setNovIncludeOwned] = useState(false);
   const [songDays, setSongDays] = useState(7); // ventana de «Canciones nuevas» (singles)
+  const [discoverDays, setDiscoverDays] = useState(14); // ventana del radar de descubrimiento
+  const [discoverAll, setDiscoverAll] = useState(false); // mostrar también lo sin relación contigo
 
   const loadLabels = () => api.trackedLabels().then(setLabels).catch(() => {});
   const loadCurators = () => api.curators().then(setCurators).catch(() => {});
@@ -754,11 +757,13 @@ export default function Calendar() {
               ? api.newReleases(novIncludeOwned)
               : view === 'canciones'
                 ? api.newSongs(songDays, novIncludeOwned)
-                : api.upcoming(all);
+                : view === 'descubre'
+                  ? api.globalReleases(discoverDays, discoverAll, novIncludeOwned)
+                  : api.upcoming(all);
     load.then(setRows).catch((e) => setErr(e.message));
     if (view === 'labels') loadLabels();
     if (view === 'radar') loadCurators();
-  }, [view, all, since, unowned, novIncludeOwned, songDays]);
+  }, [view, all, since, unowned, novIncludeOwned, songDays, discoverDays, discoverAll]);
 
   const lidarrOn = useLidarrEnabled();
 
@@ -814,6 +819,26 @@ export default function Calendar() {
   const dismissExternal = async (r) => {
     setRows((p) => (p || []).filter((x) => x.id !== r.id));
     api.dismissNewRelease(r.id).catch(() => {});
+  };
+  const dismissGlobal = async (r) => {
+    setRows((p) => (p || []).filter((x) => x.id !== r.id));
+    api.dismissGlobalRelease(r.id).catch(() => {});
+  };
+  // Radar de descubrimiento: trae el feed global de Spotify (rápido, ~pocas llamadas).
+  const [discBusy, setDiscBusy] = useState(false);
+  const [discMsg, setDiscMsg] = useState(null);
+  const refreshDiscover = async () => {
+    setDiscBusy(true);
+    setDiscMsg(null);
+    try {
+      const r = await api.refreshGlobalReleases();
+      setRows(await api.globalReleases(discoverDays, discoverAll, novIncludeOwned));
+      setDiscMsg(r.skipped ? r.skipped : `${r.count} novedades globales (${r.added} nuevas).`);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setDiscBusy(false);
+    }
   };
 
   const SINCE_PRESETS = [
@@ -943,7 +968,11 @@ export default function Calendar() {
                       ? 'en el radar'
                       : view === 'novedades'
                         ? 'novedades de tus artistas (⚡ = MusicBrainz aún no las tiene)'
-                        : 'estrenados en la ventana'
+                        : view === 'descubre'
+                          ? 'novedades globales por afinidad'
+                          : view === 'canciones'
+                            ? 'singles en la ventana'
+                            : 'estrenados en la ventana'
               }`
             : ''
         }
@@ -955,6 +984,7 @@ export default function Calendar() {
         {tab('recent', 'Estrenados recientemente')}
         {tab('novedades', 'Novedades de Spotify')}
         {tab('canciones', '🎵 Canciones nuevas')}
+        {tab('descubre', '🌐 Descubre')}
         {tab('labels', 'De tus sellos')}
         {tab('radar', 'Radar')}
         {(view === 'upcoming' || view === 'recent') && (
@@ -992,6 +1022,34 @@ export default function Calendar() {
                 {o.label}
               </button>
             ))}
+            <label className="flex items-center gap-2 text-sm text-neutral-400 cursor-pointer">
+              <input type="checkbox" checked={novIncludeOwned} onChange={(e) => setNovIncludeOwned(e.target.checked)} />
+              Incluir las que ya tengo
+            </label>
+          </div>
+        )}
+        {view === 'descubre' && (
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
+            {[
+              { label: 'Hoy', d: 0 },
+              { label: '7 días', d: 7 },
+              { label: '14 días', d: 14 },
+              { label: '30 días', d: 30 },
+            ].map((o) => (
+              <button
+                key={o.d}
+                onClick={() => setDiscoverDays(o.d)}
+                className={`text-xs px-2 py-1 rounded-lg border ${
+                  discoverDays === o.d ? 'border-gold-500/50 bg-gold-500/10 text-gold-300' : 'border-ink-800 bg-ink-850 text-neutral-500'
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+            <label className="flex items-center gap-2 text-sm text-neutral-400 cursor-pointer">
+              <input type="checkbox" checked={discoverAll} onChange={(e) => setDiscoverAll(e.target.checked)} />
+              También sin relación
+            </label>
             <label className="flex items-center gap-2 text-sm text-neutral-400 cursor-pointer">
               <input type="checkbox" checked={novIncludeOwned} onChange={(e) => setNovIncludeOwned(e.target.checked)} />
               Incluir las que ya tengo
@@ -1043,6 +1101,25 @@ export default function Calendar() {
           {novMsg && <p className="text-xs text-gold-300/90 mt-2">{novMsg}</p>}
         </div>
       )}
+      {view === 'descubre' && (
+        <div className="card p-3 mb-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-xs text-neutral-500 min-w-0 flex-1">
+              Novedades globales de Spotify de <em>cualquier</em> artista, ordenadas por afinidad contigo: primero lo de
+              artistas que sigues o tienes, luego lo parecido a lo que escuchas (similares de Last.fm). Marca «También sin
+              relación» para ver el feed entero (descubrimiento puro). Se actualiza en el refresco nocturno.
+            </p>
+            <button
+              onClick={refreshDiscover}
+              disabled={discBusy}
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+            >
+              <RefreshCw size={13} className={discBusy ? 'animate-spin' : ''} /> {discBusy ? 'Buscando…' : 'Buscar novedades ahora'}
+            </button>
+          </div>
+          {discMsg && <p className="text-xs text-gold-300/90 mt-2">{discMsg}</p>}
+        </div>
+      )}
 
       {showSince && (
         <div className="flex flex-wrap gap-2 mb-4">
@@ -1091,6 +1168,8 @@ export default function Calendar() {
               : 'Nada en el radar en esta ventana. Amplía el rango o sigue a más curadores.'
             : view === 'canciones'
               ? 'Sin singles nuevos en esta ventana. Se recogen por rotación de toda tu colección (Deezer/Spotify): pulsa «Buscar novedades ahora» arriba para avanzar el barrido, amplía la ventana de días, o espera al ciclo nocturno. Ojo: las canciones que salen dentro de un álbum recién estrenado aparecen en «Estrenados recientemente», no aquí.'
+              : view === 'descubre'
+              ? 'Nada relevante para ti en esta ventana. Pulsa «Buscar novedades ahora», amplía la ventana de días, o marca «También sin relación» para ver el feed global entero. (Necesita Spotify configurado y, para las recomendaciones «parecido a», tener sugerencias de Last.fm.)'
               : view === 'novedades'
               ? 'Sin novedades. Se buscan estrenos recientes de tus artistas seguidos en Deezer/Spotify en el refresco: pulsa «Identificar y sincronizar» (o espera al ciclo nocturno). Requiere seguir a algún artista.'
               : view === 'labels'
@@ -1100,6 +1179,39 @@ export default function Calendar() {
                 : view === 'recent'
                 ? 'Nada estrenado en esa ventana entre tus artistas. Amplía el rango o sigue a más artistas.'
                 : 'Nada anunciado por ahora. Sigue a más artistas o recalcula discografías en «Huecos».'}
+        </div>
+      ) : view === 'descubre' ? (
+        <div className="space-y-6">
+          {[
+            { min: 90, label: 'De artistas que sigues o tienes' },
+            { min: 50, max: 89, label: 'Parecido a lo que escuchas' },
+            { min: 0, max: 49, label: 'Descubrimiento (sin relación directa)' },
+          ]
+            .map((tier) => ({
+              ...tier,
+              items: (rows || []).filter((r) => r.affinity >= tier.min && (tier.max == null || r.affinity <= tier.max)),
+            }))
+            .filter((tier) => tier.items.length > 0)
+            .map((tier) => (
+              <div key={tier.label}>
+                <h2 className="text-sm text-gold-400/80 mb-2">
+                  {tier.label} <span className="text-neutral-600">· {tier.items.length}</span>
+                </h2>
+                <div className="space-y-1.5">
+                  {tier.items.map((r) => (
+                    <ExternalReleaseRow
+                      key={r.id}
+                      r={r}
+                      added={added}
+                      busy={busy}
+                      onAdd={addExternal}
+                      onSearch={setSearch}
+                      onDismiss={dismissGlobal}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
         </div>
       ) : (
         <div className="space-y-6">

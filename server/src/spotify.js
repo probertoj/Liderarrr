@@ -93,6 +93,49 @@ export async function spotifyAlbumUrl(artist, title) {
   return out.url || null;
 }
 
+// NOVEDADES GLOBALES (radar de descubrimiento): el feed editorial «New Releases» de Spotify,
+// de CUALQUIER artista (no solo los tuyos). Álbumes y singles con fecha, carátula, enlace y
+// TODOS los artistas acreditados (para cruzar afinidad). Pagina hasta `pages` × 50. País por
+// defecto España; si Spotify lo rechaza, reintenta sin país. Vacío si no está configurado.
+export async function spotifyNewReleases({ pages = 5, country = 'ES' } = {}) {
+  if (!spotifyConfigured()) return [];
+  const out = [];
+  const seen = new Set();
+  const q = (offset) => `/browse/new-releases?limit=50&offset=${offset}${country ? `&country=${country}` : ''}`;
+  for (let i = 0; i < pages; i++) {
+    let data;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      data = await spFetch(q(i * 50));
+    } catch {
+      if (country && i === 0) {
+        // algunos tokens rechazan el país: reintenta el feed sin país una vez
+        country = '';
+        i--;
+        continue;
+      }
+      break;
+    }
+    const items = data.albums?.items || [];
+    if (!items.length) break;
+    for (const al of items) {
+      if (!al?.id || seen.has(al.id)) continue;
+      seen.add(al.id);
+      out.push({
+        source: 'spotify',
+        title: al.name,
+        artists: (al.artists || []).map((a) => a.name).filter(Boolean),
+        release_date: al.release_date || null, // YYYY | YYYY-MM | YYYY-MM-DD
+        record_type: al.album_type || 'album', // album | single | compilation
+        cover: al.images?.[0]?.url || null,
+        url: al.external_urls?.spotify || null,
+      });
+    }
+    if (!data.albums?.next) break;
+  }
+  return out;
+}
+
 // Discografía reciente de un artista (por nombre). Devuelve álbumes/EP/singles con fecha,
 // carátula y enlace. Vacío si no está configurado o no se encuentra.
 export async function spotifyArtistAlbums(name) {

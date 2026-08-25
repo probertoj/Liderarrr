@@ -467,6 +467,27 @@ CREATE TABLE IF NOT EXISTS external_releases (
   UNIQUE(artist_id, match_key)
 );
 CREATE INDEX IF NOT EXISTS idx_extrel_artist ON external_releases(artist_id);
+
+-- Radar de descubrimiento (0.9.20): novedades GLOBALES del feed editorial de Spotify, de
+-- CUALQUIER artista (no solo los tuyos). La afinidad (si el artista es tuyo o parecido a lo
+-- que te gusta) se calcula EN VIVO al leer, no se guarda; aquí solo el crudo del feed. artist
+-- = artista principal; artists_json = todos los acreditados (para cruzar afinidad).
+CREATE TABLE IF NOT EXISTS global_releases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source TEXT,               -- spotify
+  artist TEXT,               -- artista principal (para mostrar)
+  artists_json TEXT,         -- JSON: todos los artistas acreditados
+  title TEXT,
+  match_key TEXT,            -- matchKey(artista principal, título): dedup
+  release_date TEXT,         -- YYYY-MM-DD
+  record_type TEXT,          -- album | ep | single
+  cover TEXT,
+  url TEXT,
+  first_seen INTEGER,
+  dismissed INTEGER DEFAULT 0,
+  UNIQUE(source, match_key)
+);
+CREATE INDEX IF NOT EXISTS idx_globalrel_date ON global_releases(release_date);
 `);
 
 // --- migraciones ligeras ----------------------------------------------------
