@@ -42,7 +42,13 @@ import {
 } from './tracked.js';
 import { gaps, upcoming, recentlyReleased, dismissGap, undismissGap, dismissedList } from './discover.js';
 import { similarSuggestions, refreshArtistSuggestions, dismissSuggestion, followSuggestion } from './suggest.js';
-import { externalNewReleases, externalNewSongs, refreshExternalReleases, dismissExternalRelease } from './newreleases.js';
+import {
+  externalNewReleases,
+  externalNewSongs,
+  refreshExternalReleases,
+  externalRefreshStatus,
+  dismissExternalRelease,
+} from './newreleases.js';
 import { spotifyTest, spotifyAlbumUrl } from './spotify.js';
 import { notifyTest } from './notify.js';
 import { wrappedImageSvg } from './wrappedimage.js';
@@ -434,13 +440,13 @@ app.get('/api/newsongs', async (req) => {
   const days = raw == null || raw === '' ? 7 : Math.max(0, Number(raw) || 0);
   return externalNewSongs({ days, includeOwned: req.query?.includeOwned === '1' });
 });
-app.post('/api/newreleases/refresh', async (req, reply) => {
-  try {
-    return await refreshExternalReleases();
-  } catch (err) {
-    return reply.code(400).send({ error: String(err.message || err) });
-  }
+// El barrido cruza TODA la colección (miles de artistas) y tarda minutos: se lanza en
+// segundo plano y la UI sigue el progreso por /status. Si ya hay uno en marcha, no duplica.
+app.post('/api/newreleases/refresh', async () => {
+  if (!externalRefreshStatus.running) refreshExternalReleases().catch((e) => console.error('newreleases', e));
+  return { ...externalRefreshStatus, started: true };
 });
+app.get('/api/newreleases/refresh/status', async () => externalRefreshStatus);
 app.post('/api/newreleases/:id/dismiss', async (req) => dismissExternalRelease(req.params.id));
 // URL del álbum concreto en Spotify (enlace directo desde la ficha; null si no hay)
 app.get('/api/spotify/album', async (req) => ({ url: await spotifyAlbumUrl(req.query?.artist, req.query?.title) }));

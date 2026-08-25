@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarClock, Plus, Check, Loader2, ExternalLink, Search, Star, Tag, X, RefreshCw, Radio } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
@@ -880,26 +880,51 @@ export default function Calendar() {
       setErr(e.message);
     }
   };
-  // Novedades de Spotify: se llenan en el refresco, pero se pueden buscar al momento aquí,
-  // con feedback (cuántas y de cuántos artistas), para no tener que lanzar el ciclo entero.
+  // Novedades de Spotify / Canciones nuevas: se llenan en el refresco. El barrido cruza TODA
+  // la colección (miles de artistas) y tarda minutos, así que se lanza en segundo plano y se
+  // sigue el progreso por sondeo, recargando la lista según avanza (por rotación van
+  // apareciendo). No bloquea la UI.
   const [novBusy, setNovBusy] = useState(false);
   const [novMsg, setNovMsg] = useState(null);
+  const novPoll = useRef(null);
+  useEffect(() => () => clearInterval(novPoll.current), []); // limpia el sondeo al desmontar
+  const reloadNovRows = async () => {
+    try {
+      setRows(await (view === 'canciones' ? api.newSongs(songDays, novIncludeOwned) : api.newReleases(novIncludeOwned)));
+    } catch {
+      /* recarga best-effort mientras barre */
+    }
+  };
   const refreshNov = async () => {
     setNovBusy(true);
-    setNovMsg(null);
+    setNovMsg('Barriendo tu colección en Deezer/Spotify…');
     try {
-      const r = await api.refreshNewReleases();
-      setRows(await (view === 'canciones' ? api.newSongs(songDays, novIncludeOwned) : api.newReleases(novIncludeOwned)));
-      setNovMsg(
-        r.seeds === 0
-          ? 'No sigues a ningún artista todavía: sigue a alguien para ver sus novedades.'
-          : `${r.count} novedades de ${r.seeds} artistas seguidos${r.count === 0 ? ' (nada reciente que no tengas ya)' : ''}.`
-      );
+      await api.refreshNewReleases(); // arranca en segundo plano y vuelve al instante
     } catch (e) {
       setErr(e.message);
-    } finally {
       setNovBusy(false);
+      return;
     }
+    clearInterval(novPoll.current);
+    novPoll.current = setInterval(async () => {
+      let st;
+      try {
+        st = await api.refreshNewReleasesStatus();
+      } catch {
+        return;
+      }
+      if (st.total) setNovMsg(`Barriendo tu colección… ${st.done}/${st.total} artistas · ${st.added} novedades nuevas`);
+      await reloadNovRows();
+      if (!st.running) {
+        clearInterval(novPoll.current);
+        setNovBusy(false);
+        setNovMsg(
+          st.seeds === 0
+            ? 'No tienes artistas en la colección todavía.'
+            : `${st.count} novedades de ${st.seeds} artistas${st.count === 0 ? ' (nada reciente que no tengas ya)' : ''}.`
+        );
+      }
+    }, 2500);
   };
 
   return (
@@ -1003,8 +1028,9 @@ export default function Calendar() {
         <div className="card p-3 mb-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-xs text-neutral-500 min-w-0 flex-1">
-              Singles (canciones sueltas) recién publicados por tus artistas seguidos en Deezer/Spotify. Se recogen en el
-              refresco; búscalos ahora si quieres. Elige la ventana de días arriba.
+              Singles (canciones sueltas) recién publicados por los artistas de tu colección (los sigas o no) en
+              Deezer/Spotify. Se recogen en el refresco, que barre la colección por rotación (varias pasadas la cubren
+              entera); búscalos ahora si quieres. Elige la ventana de días arriba.
             </p>
             <button
               onClick={refreshNov}
@@ -1064,7 +1090,7 @@ export default function Calendar() {
               ? 'Aún no sigues ningún curador. Añade uno arriba (p. ej. calltheranger) para empezar.'
               : 'Nada en el radar en esta ventana. Amplía el rango o sigue a más curadores.'
             : view === 'canciones'
-              ? 'Sin canciones nuevas en esta ventana. Los singles de tus artistas seguidos se recogen en el refresco (Deezer/Spotify): pulsa «Identificar y sincronizar» o espera al ciclo nocturno. Amplía la ventana de días si quieres.'
+              ? 'Sin singles nuevos en esta ventana. Se recogen por rotación de toda tu colección (Deezer/Spotify): pulsa «Buscar novedades ahora» arriba para avanzar el barrido, amplía la ventana de días, o espera al ciclo nocturno. Ojo: las canciones que salen dentro de un álbum recién estrenado aparecen en «Estrenados recientemente», no aquí.'
               : view === 'novedades'
               ? 'Sin novedades. Se buscan estrenos recientes de tus artistas seguidos en Deezer/Spotify en el refresco: pulsa «Identificar y sincronizar» (o espera al ciclo nocturno). Requiere seguir a algún artista.'
               : view === 'labels'

@@ -9,6 +9,16 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.19',
+    title: 'Canciones nuevas de toda tu colección',
+    items: [
+      'Canciones nuevas: el radar de singles ya no mira solo a tus artistas SEGUIDOS, sino a TODOS los de tu colección (los sigas o no). Antes, un single de un artista que tienes pero no seguías —p. ej. una novedad de Olivia Rodrigo— no aparecía nunca.',
+      'Como la colección puede tener miles de artistas, el barrido es por rotación (varias pasadas la cubren entera) y cachea el id de Deezer de cada artista para no re-buscarlo cada vez. Los seguidos se miran en cada pasada.',
+      '«Buscar novedades ahora» ya no bloquea: lanza el barrido en segundo plano y muestra el progreso (artistas sondeados y novedades encontradas) mientras la lista se va rellenando.',
+      'Recordatorio en la propia pestaña: las canciones que salen dentro de un álbum recién estrenado aparecen en «Estrenados recientemente», no en «Canciones nuevas» (que es solo para singles sueltos).',
+    ],
+  },
+  {
     version: '0.9.18',
     title: 'Canciones nuevas, copias de cajas y navegación',
     items: [

@@ -116,14 +116,18 @@ function buildSteps() {
     },
     {
       key: 'newreleases',
-      label: 'Novedades en Deezer/Spotify que MusicBrainz aún no tiene',
-      enabled: () => !!db.prepare("SELECT 1 FROM tracked_artists WHERE facet = 'artist' LIMIT 1").get(),
+      // barre estrenos/singles de TODA la colección (seguidos + artistas con álbumes), por
+      // rotación; se activa si sigues a alguien O si tienes algún artista en la biblioteca.
+      label: 'Novedades y singles de tu colección (Deezer/Spotify)',
+      enabled: () =>
+        !!db.prepare("SELECT 1 FROM tracked_artists WHERE facet = 'artist' LIMIT 1").get() ||
+        !!db.prepare("SELECT 1 FROM albums WHERE match_state != 'dismissed' LIMIT 1").get(),
       run: async () => {
         const r = await refreshExternalReleases();
         // aviso solo en el ciclo nocturno (en el manual el usuario ya está delante)
         if (r.added > 0 && refreshStatus.trigger === 'nightly') {
           const n = r.added;
-          sendNotification('Liderarr', `${n} ${n === 1 ? 'novedad nueva' : 'novedades nuevas'} de tus artistas en «Novedades de Spotify»`).catch(() => {});
+          sendNotification('Liderarr', `${n} ${n === 1 ? 'novedad nueva' : 'novedades nuevas'} de tu colección en «Lanzamientos»`).catch(() => {});
         }
         return `${r.count} novedades (${r.added} nuevas) de ${r.seeds} artistas`;
       },

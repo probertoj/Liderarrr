@@ -505,6 +505,15 @@ ensureColumn('albums', 'disc_group_manual', 'disc_group_manual INTEGER DEFAULT 0
 // copyScore automático. 1 = la marcaste tú (útil cuando las copias empatan en calidad).
 ensureColumn('albums', 'preferred_copy', 'preferred_copy INTEGER DEFAULT 0');
 
+// (0.9.19) Radar de singles de TODA la colección (no solo seguidos): para no re-buscar el
+// id de Deezer de cada artista en cada refresco, se cachea aquí. -1 = buscado y no hallado
+// (se reintenta pasado un tiempo). ext_checked_at = última vez que se sondeó su discografía
+// externa (Deezer/Spotify): permite un barrido rotatorio de la colección, sondeando primero
+// a los que llevan más tiempo sin mirarse, sin machacar la API en una sola pasada.
+ensureColumn('artists', 'deezer_id', 'deezer_id INTEGER');
+ensureColumn('artists', 'deezer_checked_at', 'deezer_checked_at INTEGER');
+ensureColumn('artists', 'ext_checked_at', 'ext_checked_at INTEGER');
+
 // Identidad de CAJA multidisco en MusicBrainz: una fila por disc_group identificado. Permite
 // tratar la caja como una unidad (un release-group / release) y medir el completismo a nivel
 // de caja (discos presentes / disc_total). disc_total viene del release de MB (nº de medios)

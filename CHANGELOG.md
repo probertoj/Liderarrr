@@ -11,6 +11,37 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.19] — 2026-08-25
+
+**Canciones nuevas de toda tu colección (no solo los seguidos).**
+
+### Cambiado
+- **El radar de «Canciones nuevas» cubre ahora TODA tu colección**, no solo los artistas
+  que sigues. Antes, `refreshExternalReleases` sembraba únicamente desde `tracked_artists`,
+  así que un single de un artista que tienes en la biblioteca pero no seguías (p. ej. una
+  novedad de Olivia Rodrigo) no aparecía jamás. Ahora la semilla es **seguidos ∪ colección**
+  (artistas con álbumes no descartados).
+- Como la colección puede tener **miles** de artistas, el barrido es **por rotación**: cada
+  pasada sondea a los seguidos (siempre) más un lote de la colección ordenado por «el que
+  lleva más tiempo sin mirarse» (`artists.ext_checked_at`), con throttle para respetar el
+  límite de Deezer. Varias pasadas (nocturnas o manuales) cubren la colección entera.
+
+### Añadido
+- **Caché del id de Deezer por artista** (`artists.deezer_id`, `deezer_checked_at`): se
+  resuelve una vez y se reutiliza, en vez de re-buscar en cada refresco. `-1` marca «buscado
+  y no hallado» y se reintenta pasado un mes.
+- **Refresco de novedades no bloqueante**: `POST /api/newreleases/refresh` lanza el barrido
+  en segundo plano y devuelve al instante; nuevo `GET /api/newreleases/refresh/status` con
+  progreso (artistas sondeados, novedades nuevas). El botón «Buscar novedades ahora» sigue el
+  avance y va rellenando la lista.
+
+### Notas
+- Las canciones que salen **dentro de un álbum** recién estrenado se clasifican como `album`
+  en Deezer/Spotify y aparecen en «Estrenados recientemente», no en «Canciones nuevas» (que
+  es solo para singles sueltos). Se aclara en el texto de la pestaña.
+
+---
+
 ## [0.9.18] — 2026-08-25
 
 **Canciones nuevas (singles), copias de cajas y navegación.**

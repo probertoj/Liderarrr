@@ -121,6 +121,7 @@ export const api = {
   newReleases: (includeOwned) => req(`/newreleases${includeOwned ? '?includeOwned=1' : ''}`),
   newSongs: (days, includeOwned) => req(`/newsongs?days=${Number.isFinite(days) ? days : 7}${includeOwned ? '&includeOwned=1' : ''}`),
   refreshNewReleases: () => req('/newreleases/refresh', { method: 'POST' }),
+  refreshNewReleasesStatus: () => req('/newreleases/refresh/status'),
   dismissNewRelease: (id) => req(`/newreleases/${id}/dismiss`, { method: 'POST' }),
   spotifyAlbum: (artist, title) => req(`/spotify/album?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`),
   searchArtistMb: (q) => req(`/artists/search-mb?q=${encodeURIComponent(q)}`),
