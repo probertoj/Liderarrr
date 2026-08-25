@@ -1127,10 +1127,10 @@ export default function Calendar() {
         <div className="card p-3 mb-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-xs text-neutral-500 min-w-0 flex-1">
-              Descubrimiento: estrenos recientes de artistas <em>parecidos</em> a lo que escuchas (similares de Last.fm,
-              vía Deezer) que aún no tienes, más el feed «New Releases» de Spotify cuando está disponible. Ordenado por
-              afinidad. Marca «También sin relación» para ver también lo global sin relación directa. Se actualiza en el
-              refresco nocturno o aquí.
+              Descubrimiento: estrenos recientes (vía Deezer) de artistas <em>parecidos</em> a lo que escuchas (similares
+              de Last.fm) y de artistas de tus <em>sellos seguidos</em>, que aún no tienes; más el feed «New Releases» de
+              Spotify cuando está disponible. Ordenado por afinidad. Marca «También sin relación» para ver lo global sin
+              relación directa. Se actualiza en el refresco nocturno o aquí.
             </p>
             <button
               onClick={refreshDiscover}
@@ -1207,7 +1207,8 @@ export default function Calendar() {
         <div className="space-y-6">
           {[
             { min: 90, label: 'De artistas que sigues o tienes' },
-            { min: 50, max: 89, label: 'Parecido a lo que escuchas' },
+            { min: 70, max: 89, label: 'De tus sellos seguidos' },
+            { min: 50, max: 69, label: 'Parecido a lo que escuchas' },
             { min: 0, max: 49, label: 'Descubrimiento (sin relación directa)' },
           ]
             .map((tier) => ({

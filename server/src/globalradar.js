@@ -90,13 +90,28 @@ export async function refreshGlobalReleases({ windowDays = RETENTION_DAYS, throt
   const store = storeRow(now);
   let added = 0;
 
-  const sims = db.prepare("SELECT name FROM artist_suggestions WHERE dismissed = 0 AND name IS NOT NULL").all();
+  // Semillas de descubrimiento (por nombre, sin duplicar): artistas SIMILARES (Last.fm) +
+  // artistas de tus SELLOS seguidos (por su catálogo cacheado). De ambos sondeamos sus
+  // estrenos recientes en Deezer; el nivel de afinidad («parecido», «de tu sello») se decide
+  // al leer. Sondear a un artista que además ya tienes/sigues no molesta: su estreno saldrá
+  // en el nivel alto y, si ya lo tienes, se oculta por defecto.
+  const seedNames = new Map(); // normName -> nombre a mostrar
+  for (const r of db.prepare("SELECT name FROM artist_suggestions WHERE dismissed = 0 AND name IS NOT NULL").all()) {
+    seedNames.set(normName(r.name), r.name);
+  }
+  for (const r of db
+    .prepare("SELECT DISTINCT artist_credit AS name FROM label_release_groups WHERE artist_credit IS NOT NULL AND artist_credit != ''")
+    .all()) {
+    const k = normName(r.name);
+    if (!seedNames.has(k)) seedNames.set(k, r.name);
+  }
+  const seeds = [...seedNames.values()];
   Object.assign(globalRefreshStatus, {
     running: true,
     startedAt: now,
     finishedAt: null,
     done: 0,
-    total: sims.length,
+    total: seeds.length,
     added: 0,
     count: 0,
     spotify: null,
@@ -104,8 +119,9 @@ export async function refreshGlobalReleases({ windowDays = RETENTION_DAYS, throt
   });
 
   try {
-    // 1) SIMILARES → sus estrenos recientes en Deezer
-    for (const s of sims) {
+    // 1) SIMILARES + ARTISTAS DE TUS SELLOS → sus estrenos recientes en Deezer
+    for (const name of seeds) {
+      const s = { name };
       // eslint-disable-next-line no-await-in-loop
       const dzId = await cachedDeezerId(s.name);
       // eslint-disable-next-line no-await-in-loop
@@ -161,7 +177,7 @@ export async function refreshGlobalReleases({ windowDays = RETENTION_DAYS, throt
     db.prepare('DELETE FROM global_releases WHERE release_date < ?').run(cutoff);
     const count = db.prepare('SELECT COUNT(*) n FROM global_releases WHERE dismissed = 0').get().n;
     globalRefreshStatus.count = count;
-    return { count, added, seeds: sims.length, spotify: globalRefreshStatus.spotify };
+    return { count, added, seeds: seeds.length, spotify: globalRefreshStatus.spotify };
   } catch (err) {
     globalRefreshStatus.lastError = String(err.message || err);
     throw err;
@@ -207,6 +223,24 @@ function buildAffinity() {
     /* sin sugerencias todavía */
   }
 
+  // artistas de tus SELLOS seguidos (por su catálogo cacheado) -> nombre del sello, para
+  // resaltar sus estrenos aunque no sigas al artista.
+  const labelArtists = new Map(); // normName -> nombre del sello
+  try {
+    for (const r of db
+      .prepare(
+        `SELECT lrg.artist_credit AS artist, tl.name AS label
+           FROM label_release_groups lrg JOIN tracked_labels tl ON tl.label_mbid = lrg.label_mbid
+          WHERE lrg.artist_credit IS NOT NULL AND lrg.artist_credit != ''`
+      )
+      .all()) {
+      const k = normName(r.artist);
+      if (!labelArtists.has(k)) labelArtists.set(k, r.label);
+    }
+  } catch {
+    /* sin sellos seguidos */
+  }
+
   // ¿ya lo tienes? (para poder ocultar lo que ya está en tu disco)
   const ownedKeys = new Set(
     db
@@ -215,20 +249,25 @@ function buildAffinity() {
       .map((r) => matchKey(r.album_artist, r.title))
   );
 
-  return { mine, similar, ownedKeys };
+  return { mine, similar, labelArtists, ownedKeys };
 }
 
-// Puntúa una novedad por afinidad. 100 sigues · 90 la tienes · 50 parecido · 0 sin relación.
+// Puntúa una novedad por afinidad, quedándose con la mejor señal entre sus artistas:
+// 100 sigues · 90 la tienes · 70 en tu sello seguido · 50 parecido · 0 sin relación.
 function scoreRelease(artists, aff) {
   let best = { score: 0, reason: null };
+  const bump = (score, reason) => {
+    if (score > best.score) best = { score, reason };
+  };
   for (const name of artists) {
     const k = normName(name);
     const m = aff.mine.get(k);
-    if (m?.followed && best.score < 100) best = { score: 100, reason: `Sigues a ${m.name}` };
-    else if (m && best.score < 90) best = { score: 90, reason: `Tienes a ${m.name} en tu colección` };
-    else if (aff.similar.has(k) && best.score < 50) {
+    if (m?.followed) bump(100, `Sigues a ${m.name}`);
+    else if (m) bump(90, `Tienes a ${m.name} en tu colección`);
+    if (aff.labelArtists.has(k)) bump(70, `En tu sello ${aff.labelArtists.get(k)}`);
+    if (aff.similar.has(k)) {
       const reasons = aff.similar.get(k) || [];
-      best = { score: 50, reason: reasons.length ? `Parecido a ${reasons[0]}` : 'Parecido a lo que escuchas' };
+      bump(50, reasons.length ? `Parecido a ${reasons[0]}` : 'Parecido a lo que escuchas');
     }
   }
   return best;

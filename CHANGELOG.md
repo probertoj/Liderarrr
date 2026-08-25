@@ -11,6 +11,25 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.22] — 2026-08-25
+
+**«Descubre» suma los artistas de tus sellos seguidos.**
+
+### Añadido
+- El radar de descubrimiento añade una **fuente**: los artistas del catálogo de tus **sellos
+  seguidos** (`label_release_groups.artist_credit`). Se sondean sus estrenos recientes en
+  Deezer igual que los similares, aunque no sigas al artista.
+- **Nuevo nivel de afinidad «De tus sellos seguidos»** (score 70, entre «sigues/tienes» 90 y
+  «parecido» 50), con la razón «En tu sello {nombre}». Si un artista es similar Y de un sello,
+  gana el sello.
+
+### Técnico
+- `globalradar.js`: `buildAffinity()` añade `labelArtists` (normName → nombre de sello);
+  `scoreRelease()` reescrito para quedarse con la mejor señal; las semillas del barrido son
+  ahora `artist_suggestions ∪ label_release_groups.artist_credit` (sin duplicar).
+
+---
+
 ## [0.9.21] — 2026-08-25
 
 **El radar «Descubre» ahora sí trae resultados: fuente vía Deezer.**

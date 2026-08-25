@@ -9,6 +9,14 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.22',
+    title: 'El radar «Descubre» también mira tus sellos seguidos',
+    items: [
+      'El radar «🌐 Descubre» añade una fuente: los estrenos recientes de artistas de tus SELLOS seguidos (vía Deezer), aunque no sigas al artista.',
+      'Nuevo nivel «De tus sellos seguidos» entre «sigues/tienes» y «parecido a lo que escuchas», con la razón «En tu sello X».',
+    ],
+  },
+  {
     version: '0.9.21',
     title: 'El radar «Descubre» ahora sí trae cosas (vía Deezer)',
     items: [
