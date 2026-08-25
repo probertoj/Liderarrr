@@ -11,6 +11,39 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.17] — 2026-08-25
+
+**Multidiscos (modelo Roon), copias y pulido de móvil.**
+
+### Añadido
+- **Multidiscos por DISCNUMBER**: la auto-agrupación de cajas ya no depende solo del nombre
+  de carpeta; ahora agrupa discos hermanos por sus **tags** (mismo álbum/artista + DISCTOTAL,
+  con números de disco distintos), completando cajas cuyo disco suelto no se llamaba «CD N»
+  (p. ej. «Coser i cantar (1)» + «(Disc 2)»). Salvaguarda anti-duplicados (dos «disc 1» =
+  copias, no se funden). No toca ficheros. (Medido sobre una biblioteca real: +119 discos
+  recuperados en 53 cajas, sin falsos.)
+- **Cajas identificadas como una unidad en MusicBrainz**: una caja multidisco se puede
+  identificar como **un release-group / release** de MB (botón «Identificar caja» en la
+  ficha) y muestra el completismo a nivel de caja: **«N de M discos»** (M = nº de medios de
+  la edición de MB, o el DISCTOTAL de las etiquetas). Nueva tabla `disc_boxes`. Cero falsos
+  (exige score≥80 en la búsqueda del RG).
+- **«Copias de este disco»**: ahora puedes **elegir a mano** cuál es la mejor con el botón
+  **«★ Marcar como la mejor»** (gana sobre el criterio automático; útil cuando las copias
+  empatan). Reversible con «usar la automática». Nueva columna `albums.preferred_copy` +
+  `POST /api/albums/:id/prefer`. Y una **explicación** de por qué una copia es la ★ mejor
+  (más completa → sin pérdida → más pistas → mayor tamaño; o «empatadas, elegida
+  automáticamente»).
+- **Nombres largos en táctil**: en móvil/tablet (sin hover) los títulos que se cortaban con
+  «…» ahora **se ajustan a varias líneas** para verlos enteros (`clamp-mobile` bajo
+  `@media (hover: none)`); en escritorio se siguen cortando, con tooltip al pasar el ratón.
+
+### Arreglado
+- **Móvil en horizontal**: el menú lateral ya se puede **ocultar**. El corte del shell pasa
+  de `md` (768px) a `lg` (1024px), así que el móvil apaisado —cuyo ancho supera 768px— usa
+  el drawer plegable (con hamburguesa) en vez de una barra fija imposible de cerrar.
+
+---
+
 ## [0.9.16] — 2026-08-25
 
 **AcoustID (huella de audio) más fino y seguro.** AcoustID **no** modifica tus ficheros:

@@ -9,6 +9,16 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.17',
+    title: 'Multidiscos, copias y móvil',
+    items: [
+      'Multidiscos: las cajas se auto-agrupan también por los tags DISCNUMBER (no solo por el nombre de carpeta), completando cajas cuyo disco suelto no se llamaba «CD N». Con salvaguarda para no fundir copias del mismo disco.',
+      'Una caja se puede identificar como UNA unidad en MusicBrainz («Identificar caja» en la ficha) y muestra «N de M discos» — así ves si te falta algún disco de la caja.',
+      'Copias de un disco: botón «★ Marcar como la mejor» para elegir a mano cuál conservar (cuando empatan), y una explicación de por qué una es la mejor.',
+      'Móvil: el menú lateral ya se puede ocultar en horizontal, y los nombres largos que se cortaban ahora se ven enteros al no caber (en pantallas táctiles).',
+    ],
+  },
+  {
     version: '0.9.16',
     title: 'AcoustID más fino y seguro',
     items: [

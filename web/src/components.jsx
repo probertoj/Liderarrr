@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Component } from 'react';
 import { Link } from 'react-router-dom';
-import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy } from 'lucide-react';
+import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy, Star } from 'lucide-react';
 import { api, coverUrl, artistPhotoUrl, fmtBytes } from './api.js';
 
 // ¿Lidarr configurado? La UI oculta sus caminos cuando no lo está (Lidarr es opcional:
@@ -663,10 +663,23 @@ export function SearchModal({ initialQuery, onClose }) {
 // Lista de copias de un disco con acciones (descartar / descartar y borrar). Reutilizable:
 // en el panel modal (al pinchar la insignia ×N en las parrillas) y como sección dentro de
 // la propia ficha del álbum. `onChange` avisa al contenedor tras una acción (para recargar).
-export function DuplicateCopies({ copies, onChange }) {
+export function DuplicateCopies({ copies, onChange, reason, pinned }) {
   const [busy, setBusy] = useState(null);
   const [dismissed, setDismissed] = useState({}); // id -> true (descartados esta sesión)
   const [deleted, setDeleted] = useState({}); // id -> true (borrados del disco, sin vuelta atrás)
+
+  // Marca a mano una copia como la mejor (o vuelve a la automática). Recarga al terminar.
+  const prefer = async (id, clear = false) => {
+    setBusy(id ?? 'auto');
+    try {
+      await (clear ? api.preferCopyAuto(id) : api.preferCopy(id));
+      onChange?.();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const dismiss = async (id) => {
     setBusy(id);
@@ -716,8 +729,24 @@ export function DuplicateCopies({ copies, onChange }) {
     }
   };
 
+  const bestId = copies.find((c) => c.best)?.id;
+
   return (
     <div className="space-y-1.5">
+      {reason && (
+        <p className="text-xs text-neutral-500">
+          <span className="text-emerald-400/90">★ mejor</span>: {reason}
+          {pinned && bestId != null && (
+            <button
+              onClick={() => prefer(bestId, true)}
+              disabled={busy != null}
+              className="ml-2 underline hover:text-gold-400 disabled:opacity-50"
+            >
+              usar la automática
+            </button>
+          )}
+        </p>
+      )}
       {copies.map((c) => (
         <div
           key={c.id}
@@ -766,6 +795,14 @@ export function DuplicateCopies({ copies, onChange }) {
           ) : (
             !c.best && (
               <div className="flex flex-col items-end gap-1 shrink-0">
+                <button
+                  onClick={() => prefer(c.id)}
+                  disabled={busy != null}
+                  title="Marcar esta copia como la mejor (se conserva y las demás se pueden descartar)"
+                  className="text-[11px] px-2 py-1 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50 inline-flex items-center gap-1"
+                >
+                  <Star size={12} /> Marcar como la mejor
+                </button>
                 <Button variant="default" disabled={busy === c.id} onClick={() => dismiss(c.id)}>
                   <span className="inline-flex items-center gap-1.5">
                     <X size={13} /> {busy === c.id ? '…' : 'Descartar'}
@@ -814,7 +851,7 @@ export function DuplicateGroupPanel({ group, onClose }) {
           <b className="font-normal text-red-400/90">elimina los ficheros del disco</b>: es irreversible, no va a la Papelera
           y, si esa copia está seedeando, puede romper el torrent.
         </p>
-        <DuplicateCopies copies={group.copies} />
+        <DuplicateCopies copies={group.copies} reason={group.bestReason} pinned={group.pinned} />
       </div>
     </div>
   );

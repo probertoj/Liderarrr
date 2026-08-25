@@ -31,7 +31,7 @@ function ReleaseRow({ r, added, busy, followed, onAdd, onFollow, onSearch, lidar
         className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
       />
       <div className="min-w-0 flex-1">
-        <div className="truncate">
+        <div className="truncate clamp-mobile" title={`${r.artist} — ${r.title}`}>
           {r.artist_id ? (
             <Link to={`/artista/${r.artist_id}`} className="hover:text-gold-400">
               {r.artist}
@@ -120,7 +120,7 @@ function ExternalReleaseRow({ r, added, busy, onAdd, onSearch, onDismiss }) {
         className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
       />
       <div className="min-w-0 flex-1">
-        <div className="truncate">
+        <div className="truncate clamp-mobile" title={`${r.artist} — ${r.title}`}>
           {r.artist_id ? (
             <Link to={`/artista/${r.artist_id}`} className="hover:text-gold-400">
               {r.artist}
@@ -384,13 +384,13 @@ function RadarRow({ r, onSearch, onFollowMbid, onQueue, lidarrOn }) {
         className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
       />
       <div className="min-w-0 flex-1">
-        <div className="truncate flex items-center gap-1.5">
+        <div className="truncate flex items-center gap-1.5" title={`${r.artist} — ${r.title}`}>
           {r.source === 'hipersonica' && r.type && (
             <span className={`text-[10px] px-1.5 py-0.5 rounded-full border shrink-0 ${TIER_STYLE[r.type] || 'border-ink-700 text-neutral-400'}`}>
               {r.type}
             </span>
           )}
-          <span className="truncate">
+          <span className="truncate clamp-mobile">
             <span>{r.artist}</span>
             <span className="text-neutral-500"> — {r.title}</span>
           </span>

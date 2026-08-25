@@ -876,6 +876,8 @@ function DupCopiesSection({ albumId, onChange }) {
       </p>
       <DuplicateCopies
         copies={group.copies}
+        reason={group.bestReason}
+        pinned={group.pinned}
         onChange={() => {
           load();
           onChange?.();
@@ -928,7 +930,25 @@ function OwnedEditionsSection({ albumId }) {
 function DiscBox({ album, onDone }) {
   const [modal, setModal] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [box, setBox] = useState(null); // info de caja (completismo N/M + MB)
+  const [ident, setIdent] = useState(false);
   const inBox = !!album.disc_group && album.discMembers?.length > 1;
+
+  useEffect(() => {
+    if (inBox) api.boxInfo(album.id).then(setBox).catch(() => setBox(null));
+    else setBox(null);
+  }, [album.id, inBox]);
+
+  const identify = async () => {
+    setIdent(true);
+    try {
+      setBox(await api.identifyBox(album.id));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setIdent(false);
+    }
+  };
 
   const separate = async () => {
     if (!window.confirm('¿Separar la caja multidisco? Cada disco vuelve a ser un álbum independiente.')) return;
@@ -971,6 +991,30 @@ function DiscBox({ album, onDone }) {
           ? 'Este disco es parte de una caja multidisco: la Discoteca la cuenta como un solo álbum.'
           : 'Combínalo con otros discos (un doble/triple que no se agrupó bien) para que la Discoteca los cuente como uno solo.'}
       </p>
+
+      {inBox && box && (
+        <div className="mt-3 flex items-center justify-between gap-3 text-sm flex-wrap">
+          <span className={box.complete ? 'text-emerald-400/90' : 'text-amber-400/90'}>
+            {box.present} de {box.total} discos{box.complete ? ' · caja completa' : ' · faltan discos'}
+          </span>
+          {box.identified ? (
+            <a
+              href={`https://musicbrainz.org/release-group/${box.rg_mbid}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-gold-400 hover:underline inline-flex items-center gap-1"
+            >
+              {box.title || 'la caja'} en MusicBrainz <ExternalLink size={11} />
+            </a>
+          ) : (
+            <Button onClick={identify} disabled={ident}>
+              <span className="inline-flex items-center gap-1.5">
+                {ident ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />} Identificar caja
+              </span>
+            </Button>
+          )}
+        </div>
+      )}
 
       {inBox && (
         <div className="mt-3 divide-y divide-ink-850/60">

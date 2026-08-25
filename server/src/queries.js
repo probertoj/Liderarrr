@@ -225,7 +225,7 @@ function sameAlbumRows(a) {
   const artistKey = String(a.album_artist || '').toLowerCase().trim();
   const rows = db
     .prepare(
-      `SELECT id, title, year, rg_mbid, album_artist, track_file_count, track_count, size_bytes, path,
+      `SELECT id, title, year, rg_mbid, album_artist, track_file_count, track_count, size_bytes, path, preferred_copy,
         (SELECT format FROM tracks WHERE album_id=albums.id AND format IS NOT NULL AND format<>'' GROUP BY format ORDER BY COUNT(*) DESC LIMIT 1) AS format,
         (SELECT CASE WHEN COUNT(*)>0 AND MIN(lossless)=1 THEN 1 ELSE 0 END FROM tracks WHERE album_id=albums.id) AS lossless
        FROM albums
@@ -245,10 +245,11 @@ export function albumDupGroup(albumId) {
   // original junto a la deluxe como si fueran duplicados a borrar.
   const copies = sameAlbumRows(a).filter((c) => editionKey(c) === key);
   if (copies.length < 2) return { title: a.title, copies: [] };
-  let best = copies[0];
-  for (const c of copies) if (copyScore(c) > copyScore(best)) best = c;
+  const best = pickBestCopy(copies);
   return {
     title: best.title,
+    pinned: !!best.preferred_copy,
+    bestReason: bestReason(best, copies),
     copies: copies
       .map((c) => ({
         id: c.id,
@@ -265,6 +266,43 @@ export function albumDupGroup(albumId) {
       }))
       .sort((x, y) => Number(y.best) - Number(x.best)),
   };
+}
+
+// La mejor copia: la que marcaste a mano (preferred_copy) gana; si no, la de mayor
+// copyScore (más completa → sin pérdida → más pistas → mayor tamaño).
+function pickBestCopy(copies) {
+  return copies.find((c) => c.preferred_copy) || copies.reduce((m, c) => (copyScore(c) > copyScore(m) ? c : m), copies[0]);
+}
+
+// Explica en una frase POR QUÉ una copia es la mejor: la marcaste tú, o el primer criterio
+// (en orden) por el que gana a la segunda mejor; si empatan en todo, lo dice claramente.
+function bestReason(best, copies) {
+  if (best.preferred_copy) return 'La marcaste tú como la mejor.';
+  const others = copies.filter((c) => c.id !== best.id);
+  if (!others.length) return null;
+  const ru = others.reduce((m, c) => (copyScore(c) > copyScore(m) ? c : m), others[0]);
+  const compl = (c) => (c.track_count ? c.track_file_count / c.track_count : 1);
+  if (compl(best) > compl(ru)) return `es la más completa (${best.track_file_count}/${best.track_count} pistas).`;
+  if (best.lossless && !ru.lossless) return 'es sin pérdida y la otra no.';
+  if ((best.track_file_count || 0) > (ru.track_file_count || 0)) return 'tiene más pistas.';
+  if ((best.size_bytes || 0) > (ru.size_bytes || 0)) return 'ocupa más espacio (suele indicar mejor calidad).';
+  return 'están empatadas en calidad; se eligió una automáticamente — puedes marcar otra como la mejor.';
+}
+
+// Marca A MANO una copia como la mejor dentro de su grupo de copias (misma edición): pone
+// preferred_copy=1 en ese álbum y 0 en el resto del grupo. clear=true vuelve a la automática.
+export function preferCopy(albumId, clear = false) {
+  const a = db.prepare('SELECT id, rg_mbid, album_artist, title, track_count, track_file_count FROM albums WHERE id = ?').get(albumId);
+  if (!a) throw new Error('Álbum no encontrado');
+  const key = editionKey(a);
+  const ids = sameAlbumRows(a)
+    .filter((c) => editionKey(c) === key)
+    .map((c) => c.id);
+  const upd = db.prepare('UPDATE albums SET preferred_copy = ? WHERE id = ?');
+  db.transaction(() => {
+    for (const id of ids) upd.run(clear ? 0 : id === albumId ? 1 : 0, id);
+  })();
+  return { ok: true };
 }
 
 // Otras EDICIONES del mismo álbum que tienes (deluxe/expandida/remaster/original…), cada
@@ -396,7 +434,7 @@ export function artistDetail(id) {
   const albums = db
     .prepare(
       `SELECT a.id, a.title, a.year, a.cover, a.match_state, a.track_file_count, a.track_count, a.rg_mbid,
-        a.size_bytes, a.path, a.primary_type, a.secondary_types,
+        a.size_bytes, a.path, a.primary_type, a.secondary_types, a.preferred_copy,
         (SELECT format FROM tracks WHERE album_id=a.id AND format IS NOT NULL AND format<>''
           GROUP BY format ORDER BY COUNT(*) DESC LIMIT 1) AS format,
         (SELECT CASE WHEN COUNT(*)>0 AND MIN(lossless)=1 THEN 1 ELSE 0 END FROM tracks WHERE album_id=a.id) AS lossless
@@ -418,14 +456,15 @@ export function artistDetail(id) {
   const duplicateGroups = [];
   for (const [key, copies] of groups) {
     if (copies.length < 2) continue;
-    let best = copies[0];
-    for (const c of copies) if (copyScore(c) > copyScore(best)) best = c;
+    const best = pickBestCopy(copies);
     // marca cada copia con su grupo y si es la representante (la mejor): la rejilla
     // muestra solo la representante con el badge ×N y despliega el grupo al pinchar.
     for (const c of copies) c.dup = { copies: copies.length, key, best: c.id === best.id };
     duplicateGroups.push({
       key,
       title: best.title,
+      pinned: !!best.preferred_copy,
+      bestReason: bestReason(best, copies),
       copies: copies
         .map((c) => ({
           id: c.id,

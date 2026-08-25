@@ -243,18 +243,18 @@ export default function App() {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-[100dvh] md:flex">
-      {/* Fondo oscuro en móvil: tocar fuera del drawer lo cierra. */}
+    <div className="min-h-[100dvh] lg:flex">
+      {/* Fondo oscuro en móvil/tablet: tocar fuera del drawer lo cierra. */}
       {open && (
         <div
           onClick={() => setOpen(false)}
-          className="md:hidden fixed inset-0 z-10 bg-black/60 backdrop-blur-sm"
+          className="lg:hidden fixed inset-0 z-10 bg-black/60 backdrop-blur-sm"
           aria-hidden="true"
         />
       )}
 
       <aside
-        className={`drawer fixed md:sticky top-0 z-20 h-[100dvh] w-72 max-w-[85vw] md:w-64 shrink-0 bg-ink-900 border-r border-ink-800 flex flex-col
+        className={`drawer fixed lg:sticky top-0 z-20 h-[100dvh] w-72 max-w-[85vw] lg:w-64 shrink-0 bg-ink-900 border-r border-ink-800 flex flex-col
           pt-[env(safe-area-inset-top)] ${open ? '' : 'drawer-closed'}`}
       >
         <div className="px-5 py-5 flex items-start justify-between gap-2">
@@ -265,7 +265,7 @@ export default function App() {
           {/* Cerrar (solo móvil): además del fondo y de elegir sección. */}
           <button
             onClick={() => setOpen(false)}
-            className="md:hidden -mr-1 -mt-1 p-2 rounded-lg text-neutral-500 hover:bg-ink-850 active:bg-ink-800"
+            className="lg:hidden -mr-1 -mt-1 p-2 rounded-lg text-neutral-500 hover:bg-ink-850 active:bg-ink-800"
             aria-label="Cerrar menú"
           >
             <X size={18} />
@@ -312,7 +312,7 @@ export default function App() {
         {/* Barra superior SOLO en móvil: abre el menú y muestra el logo. Sustituye a la
             hamburguesa flotante (que se solapaba con los títulos de página). Sticky y con
             hueco para el notch (safe-area-inset-top). */}
-        <header className="md:hidden sticky top-0 z-10 flex items-center gap-2 h-14 px-2 bg-ink-900/90 backdrop-blur border-b border-ink-800 pt-[env(safe-area-inset-top)] box-content">
+        <header className="lg:hidden sticky top-0 z-10 flex items-center gap-2 h-14 px-2 bg-ink-900/90 backdrop-blur border-b border-ink-800 pt-[env(safe-area-inset-top)] box-content">
           <button
             onClick={() => setOpen(true)}
             className="p-2 rounded-lg text-neutral-300 hover:bg-ink-850 active:bg-ink-800"

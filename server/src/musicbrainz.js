@@ -504,6 +504,7 @@ export async function releaseGroupReleases(rgMbid) {
       status: r.status || null,
       disambiguation: r.disambiguation || '',
       formats: [...new Set((r.media || []).map((m) => m.format).filter(Boolean))],
+      discs: (r.media || []).length, // nº de medios (discos) de esta edición — para cajas
       tracks: (r.media || []).reduce((n, m) => n + (m['track-count'] || 0), 0),
       label: (r['label-info'] || []).map((li) => li.label?.name).filter(Boolean)[0] || null,
       catno: (r['label-info'] || [])[0]?.['catalog-number'] || null,

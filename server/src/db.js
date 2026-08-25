@@ -501,6 +501,24 @@ ensureColumn('albums', 'title_manual', 'title_manual INTEGER DEFAULT 0');
 // discos en la UI, se marca para que la heurística de discgroup.js (regroupDiscs) no lo
 // pise en el siguiente escaneo. 1 = disc_group fijado a mano (aunque sea NULL = separado).
 ensureColumn('albums', 'disc_group_manual', 'disc_group_manual INTEGER DEFAULT 0');
+// (0.9.16) «Copias de este disco»: copia elegida A MANO como la mejor. Gana sobre el
+// copyScore automático. 1 = la marcaste tú (útil cuando las copias empatan en calidad).
+ensureColumn('albums', 'preferred_copy', 'preferred_copy INTEGER DEFAULT 0');
+
+// Identidad de CAJA multidisco en MusicBrainz: una fila por disc_group identificado. Permite
+// tratar la caja como una unidad (un release-group / release) y medir el completismo a nivel
+// de caja (discos presentes / disc_total). disc_total viene del release de MB (nº de medios)
+// o, si no, del DISCTOTAL de las etiquetas. Se rellena bajo demanda (identifyBox).
+db.exec(`
+CREATE TABLE IF NOT EXISTS disc_boxes (
+  disc_group TEXT PRIMARY KEY,
+  rg_mbid TEXT,
+  release_mbid TEXT,
+  disc_total INTEGER,
+  title TEXT,
+  artist TEXT,
+  identified_at INTEGER
+);`);
 
 // (0.8) release_groups pasa de clave rg_mbid único a clave COMPUESTA (rg_mbid, artist_id):
 // un mismo release-group puede estar acreditado a varios artistas (splits, colaboraciones)

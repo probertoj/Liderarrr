@@ -8,7 +8,7 @@ import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import { db, DATA_DIR, DB_PATH, getAllSettings, getSetting, setSetting, stageDatabaseImport } from './db.js';
 import { runScan, scanStatus } from './scanner.js';
-import { regroupDiscs, combineAlbums, uncombineAlbum, combineCandidates } from './discgroup.js';
+import { regroupDiscs, combineAlbums, uncombineAlbum, combineCandidates, boxInfo, identifyBox } from './discgroup.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch, matchByMbUrl } from './identify.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
 import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab, enqueueLidarrAdd, lidarrAddStatus, resumeAddQueue, lidarrConfig } from './lidarr.js';
@@ -252,6 +252,14 @@ app.get('/api/albums/:id/dup-group', async (req, reply) => {
   if (!g) return reply.code(404).send({ error: 'No encontrado' });
   return g;
 });
+// marcar A MANO una copia como la mejor (o volver a la automática con {clear:true})
+app.post('/api/albums/:id/prefer', async (req, reply) => {
+  try {
+    return q.preferCopy(Number(req.params.id), !!req.body?.clear);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 // otras EDICIONES del mismo disco que tienes (para enlazarlas desde la ficha)
 app.get('/api/albums/:id/editions-owned', async (req) => q.ownedEditions(Number(req.params.id)));
 
@@ -317,6 +325,21 @@ app.post('/api/albums/:id/uncombine', async (req, reply) => {
 app.get('/api/albums/:id/combine-candidates', async (req, reply) => {
   try {
     return combineCandidates(Number(req.params.id));
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// caja multidisco como una unidad de MusicBrainz: info (completismo N/M) e identificación
+app.get('/api/albums/:id/box', async (req, reply) => {
+  const a = db.prepare('SELECT disc_group FROM albums WHERE id = ?').get(Number(req.params.id));
+  if (!a) return reply.code(404).send({ error: 'No encontrado' });
+  return boxInfo(a.disc_group) || { identified: false, present: 0, total: 0 };
+});
+app.post('/api/albums/:id/box/identify', async (req, reply) => {
+  const a = db.prepare('SELECT disc_group FROM albums WHERE id = ?').get(Number(req.params.id));
+  if (!a?.disc_group) return reply.code(400).send({ error: 'Este álbum no es una caja multidisco.' });
+  try {
+    return await identifyBox(a.disc_group);
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
   }
