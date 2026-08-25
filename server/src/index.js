@@ -49,7 +49,7 @@ import {
   externalRefreshStatus,
   dismissExternalRelease,
 } from './newreleases.js';
-import { globalReleases, refreshGlobalReleases, dismissGlobalRelease } from './globalradar.js';
+import { globalReleases, refreshGlobalReleases, globalRefreshStatus, dismissGlobalRelease } from './globalradar.js';
 import { spotifyTest, spotifyAlbumUrl } from './spotify.js';
 import { notifyTest } from './notify.js';
 import { wrappedImageSvg } from './wrappedimage.js';
@@ -458,13 +458,12 @@ app.get('/api/globalreleases', async (req) =>
     includeOwned: req.query?.includeOwned === '1',
   })
 );
-app.post('/api/globalreleases/refresh', async (req, reply) => {
-  try {
-    return await refreshGlobalReleases();
-  } catch (err) {
-    return reply.code(400).send({ error: String(err.message || err) });
-  }
+// Barre los similares en Deezer (decenas de artistas): en segundo plano, con progreso.
+app.post('/api/globalreleases/refresh', async () => {
+  if (!globalRefreshStatus.running) refreshGlobalReleases().catch((e) => console.error('globalradar', e));
+  return { ...globalRefreshStatus, started: true };
 });
+app.get('/api/globalreleases/refresh/status', async () => globalRefreshStatus);
 app.post('/api/globalreleases/:id/dismiss', async (req) => dismissGlobalRelease(req.params.id));
 // URL del álbum concreto en Spotify (enlace directo desde la ficha; null si no hay)
 app.get('/api/spotify/album', async (req) => ({ url: await spotifyAlbumUrl(req.query?.artist, req.query?.title) }));

@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.21',
+    title: 'El radar «Descubre» ahora sí trae cosas (vía Deezer)',
+    items: [
+      'Arreglo del radar «🌐 Descubre»: Spotify ha restringido su feed «New Releases» (403 en apps nuevas), así que en 0.9.20 salía vacío. Ahora la fuente principal son los estrenos recientes de tus artistas PARECIDOS (similares de Last.fm) vía Deezer, que es fiable y sin límites.',
+      'Spotify queda como suplemento opcional: si su feed responde, se añade; si no, el radar funciona igual y te lo indica.',
+      'El barrido corre en segundo plano con progreso (artistas afines sondeados) y cachea el id de Deezer de cada similar para no re-buscar.',
+    ],
+  },
+  {
     version: '0.9.20',
     title: 'Radar de descubrimiento (novedades globales por afinidad)',
     items: [

@@ -1,6 +1,41 @@
-import { db } from './db.js';
+import { db, cacheRead, cacheWrite } from './db.js';
 import { matchKey, normName } from './matchkey.js';
 import { spotifyNewReleases, spotifyConfigured } from './spotify.js';
+import { deezerFindArtist } from './artistpix.js';
+import { deezerArtistAlbums } from './newreleases.js';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Estado del barrido global (para progreso en la UI, no bloquear la petición).
+export const globalRefreshStatus = {
+  running: false,
+  startedAt: null,
+  finishedAt: null,
+  done: 0,
+  total: 0,
+  added: 0,
+  count: 0,
+  spotify: null, // 'ok' | 'no configurado' | mensaje de error (p.ej. deprecado)
+  lastError: null,
+};
+
+// Id de Deezer de un artista SIMILAR (no está en tu biblioteca), cacheado 30 días —también
+// los «no hallado»— para no re-buscar en cada refresco. Guard por nombre normalizado.
+const DEEZER_ID_TTL = 30 * 24 * 3600 * 1000;
+async function cachedDeezerId(name) {
+  const key = `deezer:simartist:${normName(name)}`;
+  const cached = cacheRead(key, DEEZER_ID_TTL);
+  if (cached !== null) return cached.id; // incluye -1 (no hallado) cacheado
+  let id = -1;
+  try {
+    const d = await deezerFindArtist(name);
+    if (d?.id && normName(d.name) === normName(name)) id = d.id;
+  } catch {
+    return null; // fallo transitorio: no cachea
+  }
+  cacheWrite(key, { id });
+  return id;
+}
 
 // RADAR DE DESCUBRIMIENTO («otros grupos»): novedades GLOBALES del feed editorial de Spotify,
 // de cualquier artista, ordenadas por AFINIDAD contigo. No es un firehose: resalta primero lo
@@ -24,39 +59,116 @@ const upsert = db.prepare(
    WHERE global_releases.dismissed = 0`
 );
 
-// Trae y guarda el feed de novedades globales de Spotify. Devuelve cuántas hay tras la pasada.
-export async function refreshGlobalReleases({ pages = 5 } = {}) {
-  if (!spotifyConfigured()) return { count: 0, added: 0, skipped: 'Spotify no configurado' };
-  const items = await spotifyNewReleases({ pages });
+const storeRow = (now) => (source, artist, artists, title, date, type, cover, url) => {
+  if (!STORE_TYPES.has(type) || !artist) return 0;
+  if (!date || date.length < 10) return 0; // sin fecha completa no sirve para «hoy/ayer»
+  const info = upsert.run({
+    source,
+    artist,
+    artists_json: JSON.stringify(artists && artists.length ? artists : [artist]),
+    title,
+    match_key: matchKey(artist, title),
+    release_date: date,
+    record_type: type,
+    cover: cover || null,
+    url: url || null,
+    now,
+  });
+  return info.changes ? 1 : 0;
+};
+
+// Rellena el radar de descubrimiento. FUENTE PRINCIPAL: estrenos recientes de tus artistas
+// SIMILARES (los «similares de Last.fm» de artist_suggestions) vía Deezer —sin API key y
+// fiable, el mismo camino que «Canciones nuevas»—. FUENTE SECUNDARIA (opcional): el feed
+// editorial «New Releases» de Spotify, que Spotify ha ido restringiendo (403 en apps nuevas);
+// si falla, se anota y se sigue: el radar no depende de él. windowDays = cuánto hacia atrás
+// se recogen los estrenos (la UI luego filtra por su ventana de días).
+export async function refreshGlobalReleases({ windowDays = RETENTION_DAYS, throttleMs = 150, spotifyPages = 5 } = {}) {
+  if (globalRefreshStatus.running) return { ...globalRefreshStatus, busy: true };
   const now = Date.now();
+  const since = new Date(now - windowDays * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const store = storeRow(now);
   let added = 0;
-  for (const it of items) {
-    const type = String(it.record_type || 'album').toLowerCase();
-    if (!STORE_TYPES.has(type)) continue;
-    const artist = (it.artists && it.artists[0]) || it.artist || '';
-    if (!artist) continue;
-    const date = (it.release_date || '').slice(0, 10);
-    if (!date || date.length < 10) continue; // sin fecha completa no sirve para «hoy/ayer»
-    const mk = matchKey(artist, it.title);
-    const info = upsert.run({
-      source: 'spotify',
-      artist,
-      artists_json: JSON.stringify(it.artists || [artist]),
-      title: it.title,
-      match_key: mk,
-      release_date: date,
-      record_type: type,
-      cover: it.cover || null,
-      url: it.url || null,
-      now,
-    });
-    if (info.changes) added++;
+
+  const sims = db.prepare("SELECT name FROM artist_suggestions WHERE dismissed = 0 AND name IS NOT NULL").all();
+  Object.assign(globalRefreshStatus, {
+    running: true,
+    startedAt: now,
+    finishedAt: null,
+    done: 0,
+    total: sims.length,
+    added: 0,
+    count: 0,
+    spotify: null,
+    lastError: null,
+  });
+
+  try {
+    // 1) SIMILARES → sus estrenos recientes en Deezer
+    for (const s of sims) {
+      // eslint-disable-next-line no-await-in-loop
+      const dzId = await cachedDeezerId(s.name);
+      // eslint-disable-next-line no-await-in-loop
+      if (throttleMs) await sleep(throttleMs);
+      if (dzId && dzId > 0) {
+        let albums = [];
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          albums = await deezerArtistAlbums(dzId);
+        } catch {
+          /* Deezer caído para este artista */
+        }
+        // eslint-disable-next-line no-await-in-loop
+        if (throttleMs) await sleep(throttleMs);
+        for (const c of albums) {
+          const date = (c.release_date || '').slice(0, 10);
+          if (date && date >= since) {
+            added += store('deezer', s.name, [s.name], c.title, date, String(c.record_type || 'album').toLowerCase(), c.cover, c.url);
+          }
+        }
+      }
+      globalRefreshStatus.done++;
+      globalRefreshStatus.added = added;
+    }
+
+    // 2) SPOTIFY new-releases (descubrimiento puro más allá de tus similares) — best-effort
+    if (spotifyConfigured()) {
+      try {
+        const items = await spotifyNewReleases({ pages: spotifyPages });
+        globalRefreshStatus.spotify = items.length ? 'ok' : 'sin resultados (endpoint restringido por Spotify)';
+        for (const it of items) {
+          const artist = (it.artists && it.artists[0]) || it.artist || '';
+          added += store(
+            'spotify',
+            artist,
+            it.artists,
+            it.title,
+            (it.release_date || '').slice(0, 10),
+            String(it.record_type || 'album').toLowerCase(),
+            it.cover,
+            it.url
+          );
+        }
+      } catch (e) {
+        globalRefreshStatus.spotify = String(e.message || e);
+      }
+    } else {
+      globalRefreshStatus.spotify = 'no configurado';
+    }
+
+    // poda lo más viejo que la ventana de retención
+    const cutoff = new Date(now - RETENTION_DAYS * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    db.prepare('DELETE FROM global_releases WHERE release_date < ?').run(cutoff);
+    const count = db.prepare('SELECT COUNT(*) n FROM global_releases WHERE dismissed = 0').get().n;
+    globalRefreshStatus.count = count;
+    return { count, added, seeds: sims.length, spotify: globalRefreshStatus.spotify };
+  } catch (err) {
+    globalRefreshStatus.lastError = String(err.message || err);
+    throw err;
+  } finally {
+    globalRefreshStatus.running = false;
+    globalRefreshStatus.finishedAt = Date.now();
   }
-  // poda lo más viejo que la ventana de retención
-  const cutoff = new Date(now - RETENTION_DAYS * 24 * 3600 * 1000).toISOString().slice(0, 10);
-  db.prepare('DELETE FROM global_releases WHERE release_date < ?').run(cutoff);
-  const count = db.prepare('SELECT COUNT(*) n FROM global_releases WHERE dismissed = 0').get().n;
-  return { count, added };
 }
 
 // Índices de afinidad (en vivo): artistas tuyos (seguidos/en colección) y parecidos (Last.fm).

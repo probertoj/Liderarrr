@@ -138,12 +138,14 @@ function buildSteps() {
       // solo trae y guarda el feed global; la afinidad se calcula EN VIVO al leer (usa tu
       // colección y las sugerencias «similares» del momento), así que el orden aquí da igual.
       key: 'globalradar',
-      label: 'Radar de descubrimiento (novedades globales de Spotify)',
-      enabled: () => spotifyConfigured(),
+      label: 'Radar de descubrimiento (estrenos de artistas similares + Spotify)',
+      // fuente principal: estrenos de tus similares (artist_suggestions) vía Deezer; Spotify
+      // es suplemento. Se activa si hay similares O Spotify configurado.
+      enabled: () =>
+        !!db.prepare('SELECT 1 FROM artist_suggestions WHERE dismissed = 0 LIMIT 1').get() || spotifyConfigured(),
       run: async () => {
         const r = await refreshGlobalReleases();
-        if (r.skipped) return r.skipped;
-        return `${r.count} novedades globales (${r.added} nuevas)`;
+        return `${r.count} novedades globales (${r.added} nuevas)${r.spotify && r.spotify !== 'ok' ? ` · Spotify: ${r.spotify}` : ''}`;
       },
     },
     {

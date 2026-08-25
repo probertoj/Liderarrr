@@ -127,6 +127,7 @@ export const api = {
       `/globalreleases?days=${Number.isFinite(days) ? days : 14}${all ? '&all=1' : ''}${includeOwned ? '&includeOwned=1' : ''}`
     ),
   refreshGlobalReleases: () => req('/globalreleases/refresh', { method: 'POST' }),
+  refreshGlobalReleasesStatus: () => req('/globalreleases/refresh/status'),
   dismissGlobalRelease: (id) => req(`/globalreleases/${id}/dismiss`, { method: 'POST' }),
   dismissNewRelease: (id) => req(`/newreleases/${id}/dismiss`, { method: 'POST' }),
   spotifyAlbum: (artist, title) => req(`/spotify/album?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`),

@@ -11,6 +11,29 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [0.9.21] — 2026-08-25
+
+**El radar «Descubre» ahora sí trae resultados: fuente vía Deezer.**
+
+### Cambiado
+- **Fuente del radar de descubrimiento reescrita.** Spotify ha restringido su feed
+  `/browse/new-releases` (403 en apps creadas tras nov-2024), por lo que en 0.9.20 la pestaña
+  «🌐 Descubre» salía vacía aunque el token de Spotify fuera válido. Ahora la **fuente
+  principal** son los estrenos recientes (≤45 días) de tus **artistas similares**
+  (`artist_suggestions`, similares de Last.fm) obtenidos vía **Deezer** —sin API key, el mismo
+  camino fiable que «Canciones nuevas»—. Spotify queda como **suplemento best-effort**: si su
+  feed responde se añade, si no el radar funciona igual y la UI lo indica.
+- El barrido de «Descubre» ahora corre **en segundo plano con progreso** (no bloquea): nuevo
+  `GET /api/globalreleases/refresh/status`, y `POST /api/globalreleases/refresh` lanza y
+  devuelve al instante. Cachea el id de Deezer de cada similar (30 días) para no re-buscar.
+
+### Técnico
+- `globalradar.js`: `refreshGlobalReleases()` itera `artist_suggestions` → `deezerArtistAlbums`
+  (exportada ahora desde `newreleases.js`), con `cachedDeezerId()` (cache genérica) y
+  `globalRefreshStatus`. La afinidad se sigue calculando en vivo al leer.
+
+---
+
 ## [0.9.20] — 2026-08-25
 
 **Radar de descubrimiento: novedades globales por afinidad («otros grupos»).**

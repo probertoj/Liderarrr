@@ -36,8 +36,9 @@ function buildOwnedCheck() {
 
 const UA = 'Liderarrr ( https://github.com/probertoj/Liderarrr )';
 
-// Discografía reciente de Deezer por id de artista. Sin API key.
-async function deezerArtistAlbums(artistId) {
+// Discografía reciente de Deezer por id de artista. Sin API key. (Exportada: la reusa el
+// radar de descubrimiento para los estrenos de artistas similares.)
+export async function deezerArtistAlbums(artistId) {
   try {
     const res = await fetch(`https://api.deezer.com/artist/${artistId}/albums?limit=100`, {
       headers: { 'User-Agent': UA },

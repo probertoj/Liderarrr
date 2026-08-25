@@ -824,21 +824,43 @@ export default function Calendar() {
     setRows((p) => (p || []).filter((x) => x.id !== r.id));
     api.dismissGlobalRelease(r.id).catch(() => {});
   };
-  // Radar de descubrimiento: trae el feed global de Spotify (rápido, ~pocas llamadas).
+  // Radar de descubrimiento: barre los similares en Deezer (decenas de artistas). En segundo
+  // plano, con progreso, recargando la lista según avanza (no bloquea la UI).
   const [discBusy, setDiscBusy] = useState(false);
   const [discMsg, setDiscMsg] = useState(null);
+  const discPoll = useRef(null);
+  useEffect(() => () => clearInterval(discPoll.current), []);
   const refreshDiscover = async () => {
     setDiscBusy(true);
-    setDiscMsg(null);
+    setDiscMsg('Buscando estrenos de artistas afines…');
     try {
-      const r = await api.refreshGlobalReleases();
-      setRows(await api.globalReleases(discoverDays, discoverAll, novIncludeOwned));
-      setDiscMsg(r.skipped ? r.skipped : `${r.count} novedades globales (${r.added} nuevas).`);
+      await api.refreshGlobalReleases();
     } catch (e) {
       setErr(e.message);
-    } finally {
       setDiscBusy(false);
+      return;
     }
+    clearInterval(discPoll.current);
+    discPoll.current = setInterval(async () => {
+      let st;
+      try {
+        st = await api.refreshGlobalReleasesStatus();
+      } catch {
+        return;
+      }
+      if (st.total) setDiscMsg(`Buscando… ${st.done}/${st.total} artistas afines · ${st.added} novedades`);
+      try {
+        setRows(await api.globalReleases(discoverDays, discoverAll, novIncludeOwned));
+      } catch {
+        /* recarga best-effort */
+      }
+      if (!st.running) {
+        clearInterval(discPoll.current);
+        setDiscBusy(false);
+        const spNote = st.spotify && st.spotify !== 'ok' ? ` (Spotify: ${st.spotify})` : '';
+        setDiscMsg(`${st.count} novedades globales (${st.added} nuevas).${spNote}`);
+      }
+    }, 2500);
   };
 
   const SINCE_PRESETS = [
@@ -1105,9 +1127,10 @@ export default function Calendar() {
         <div className="card p-3 mb-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-xs text-neutral-500 min-w-0 flex-1">
-              Novedades globales de Spotify de <em>cualquier</em> artista, ordenadas por afinidad contigo: primero lo de
-              artistas que sigues o tienes, luego lo parecido a lo que escuchas (similares de Last.fm). Marca «También sin
-              relación» para ver el feed entero (descubrimiento puro). Se actualiza en el refresco nocturno.
+              Descubrimiento: estrenos recientes de artistas <em>parecidos</em> a lo que escuchas (similares de Last.fm,
+              vía Deezer) que aún no tienes, más el feed «New Releases» de Spotify cuando está disponible. Ordenado por
+              afinidad. Marca «También sin relación» para ver también lo global sin relación directa. Se actualiza en el
+              refresco nocturno o aquí.
             </p>
             <button
               onClick={refreshDiscover}
@@ -1169,7 +1192,7 @@ export default function Calendar() {
             : view === 'canciones'
               ? 'Sin singles nuevos en esta ventana. Se recogen por rotación de toda tu colección (Deezer/Spotify): pulsa «Buscar novedades ahora» arriba para avanzar el barrido, amplía la ventana de días, o espera al ciclo nocturno. Ojo: las canciones que salen dentro de un álbum recién estrenado aparecen en «Estrenados recientemente», no aquí.'
               : view === 'descubre'
-              ? 'Nada relevante para ti en esta ventana. Pulsa «Buscar novedades ahora», amplía la ventana de días, o marca «También sin relación» para ver el feed global entero. (Necesita Spotify configurado y, para las recomendaciones «parecido a», tener sugerencias de Last.fm.)'
+              ? 'Nada relevante para ti en esta ventana. Pulsa «Buscar novedades ahora» para barrer los estrenos de tus artistas afines (similares de Last.fm), amplía la ventana de días, o marca «También sin relación». Las recomendaciones «parecido a» salen de tus sugerencias de similares (Ajustes de Last.fm + refresco nocturno).'
               : view === 'novedades'
               ? 'Sin novedades. Se buscan estrenos recientes de tus artistas seguidos en Deezer/Spotify en el refresco: pulsa «Identificar y sincronizar» (o espera al ciclo nocturno). Requiere seguir a algún artista.'
               : view === 'labels'
