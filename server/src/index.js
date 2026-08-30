@@ -51,6 +51,15 @@ import {
 } from './newreleases.js';
 import { globalReleases, refreshGlobalReleases, globalRefreshStatus, dismissGlobalRelease } from './globalradar.js';
 import { spotifyTest, spotifyAlbumUrl } from './spotify.js';
+import {
+  spotifyAuthUrl,
+  spotifyConnect,
+  spotifyDisconnect,
+  spotifyUserStatus,
+  refreshSpotifyLibrary,
+  spotifyLibStatus,
+  spotifyGap,
+} from './spotifyuser.js';
 import { notifyTest } from './notify.js';
 import { wrappedImageSvg } from './wrappedimage.js';
 import { buildM3U, challengeM3U, sanitizePlaylistName } from './playlist.js';
@@ -467,6 +476,47 @@ app.get('/api/globalreleases/refresh/status', async () => globalRefreshStatus);
 app.post('/api/globalreleases/:id/dismiss', async (req) => dismissGlobalRelease(req.params.id));
 // URL del álbum concreto en Spotify (enlace directo desde la ficha; null si no hay)
 app.get('/api/spotify/album', async (req) => ({ url: await spotifyAlbumUrl(req.query?.artist, req.query?.title) }));
+
+// --- biblioteca de Spotify del usuario (OAuth) + brecha disco/streaming (1.0) ---
+app.get('/api/spotify/user/status', async () => spotifyUserStatus());
+app.get('/api/spotify/user/authurl', async (req, reply) => {
+  try {
+    return { url: spotifyAuthUrl() };
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/spotify/user/connect', async (req, reply) => {
+  try {
+    return await spotifyConnect(req.body?.code);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/spotify/user/disconnect', async () => spotifyDisconnect());
+app.post('/api/spotify/library/refresh', async () => {
+  if (!spotifyLibStatus.running) refreshSpotifyLibrary().catch((e) => console.error('spotifylib', e));
+  return { ...spotifyLibStatus, started: true };
+});
+app.get('/api/spotify/library/refresh/status', async () => spotifyLibStatus);
+app.get('/api/spotify/gap', async () => spotifyGap());
+// Callback OAuth para quien sirva Liderarr por HTTPS y registre ESTA ruta como redirect: si
+// llega el code, se completa solo. En el flujo por defecto (loopback 127.0.0.1) nadie sirve
+// esto y el usuario pega el code a mano; da igual.
+app.get('/callback', async (req, reply) => {
+  const code = req.query?.code;
+  const page = (msg, ok) =>
+    reply.type('text/html').send(
+      `<!doctype html><meta charset=utf-8><title>Liderarrr · Spotify</title><body style="font-family:system-ui;background:#14141a;color:#eee;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center;max-width:420px;padding:24px"><h2 style="color:${ok ? '#4ade80' : '#f87171'}">${msg}</h2><p style="color:#999">Ya puedes cerrar esta pestaña y volver a Liderarrr.</p></div></body>`
+    );
+  if (!code) return page('No llegó ningún código de Spotify.', false);
+  try {
+    await spotifyConnect(code);
+    return page('✅ Biblioteca de Spotify conectada', true);
+  } catch (err) {
+    return page(`No se pudo conectar: ${String(err.message || err)}`, false);
+  }
+});
 
 // búsqueda rápida del Dashboard: local (instantáneo) + externo (MusicBrainz)
 app.get('/api/find/local', async (req) => findLocal(req.query?.q));

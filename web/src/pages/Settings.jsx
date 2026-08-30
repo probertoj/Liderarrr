@@ -112,6 +112,180 @@ const Steps = ({ children }) => <ol className="list-decimal ml-4 space-y-1">{chi
 
 const input = 'w-full bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm mt-1';
 
+// Conectar la BIBLIOTECA de Spotify del usuario (OAuth). Flujo «pega el código»: por las
+// reglas de Spotify (2025) el redirect debe ser HTTPS o loopback 127.0.0.1, así que el
+// usuario aprueba, Spotify redirige a 127.0.0.1 (no carga), y pega el `code` de la barra aquí.
+function SpotifyLibrarySection({ onSave }) {
+  const [st, setSt] = useState(null);
+  const [authUrl, setAuthUrl] = useState(null);
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(null); // 'auth' | 'connect' | 'sync' | 'disconnect'
+  const [msg, setMsg] = useState(null);
+  const [err, setErr] = useState(null);
+
+  const load = () => api.spotifyUserStatus().then(setSt).catch(() => {});
+  useEffect(() => {
+    load();
+  }, []);
+
+  const getAuth = async () => {
+    setBusy('auth');
+    setErr(null);
+    setMsg(null);
+    try {
+      await onSave(); // guarda client id/secret antes de pedir la URL (el servidor los usa)
+      const r = await api.spotifyAuthUrl();
+      setAuthUrl(r.url);
+      window.open(r.url, '_blank', 'noopener');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const connect = async () => {
+    if (!code.trim()) return;
+    setBusy('connect');
+    setErr(null);
+    try {
+      await api.spotifyConnect(code.trim());
+      setCode('');
+      setAuthUrl(null);
+      setMsg('Biblioteca conectada. Sincronizando…');
+      await api.spotifyLibraryRefresh().catch(() => {});
+      await load();
+      setMsg('Biblioteca de Spotify conectada.');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const sync = async () => {
+    setBusy('sync');
+    setErr(null);
+    try {
+      await api.spotifyLibraryRefresh();
+      // sondeo breve hasta que termine
+      for (;;) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => setTimeout(r, 1500));
+        // eslint-disable-next-line no-await-in-loop
+        const s = await api.spotifyLibraryStatus().catch(() => null);
+        if (!s || !s.running) break;
+        setMsg(`Sincronizando… ${s.fetched}${s.total ? `/${s.total}` : ''} álbumes`);
+      }
+      setMsg(null);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const disconnect = async () => {
+    setBusy('disconnect');
+    try {
+      await api.spotifyDisconnect();
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (!st) return null;
+
+  return (
+    <section className="card p-5 mb-4">
+      <h2 className="font-display text-lg mb-1">
+        Biblioteca de Spotify <span className="text-xs text-neutral-500">(opcional · 1.0)</span>
+      </h2>
+      <p className="text-xs text-neutral-500 mb-3">
+        Conecta tu cuenta para cruzar tus <b>álbumes guardados</b> en Spotify con tu colección local (la brecha
+        «tienes en disco / tienes en streaming», en la página <b>Streaming</b>). Solo lectura.
+      </p>
+
+      {!st.clientConfigured ? (
+        <p className="text-sm text-amber-400/90">Primero pon el Client ID y el Client Secret de Spotify (arriba) y guarda.</p>
+      ) : st.connected ? (
+        <div className="space-y-2">
+          <p className="text-sm text-emerald-400 inline-flex items-center gap-1.5">
+            <Check size={15} /> Conectada · {st.savedCount.toLocaleString('es')} álbumes guardados
+            {st.syncedAt ? ` · última sync ${new Date(st.syncedAt).toLocaleString('es')}` : ''}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={sync} disabled={busy === 'sync'}>
+              <span className="inline-flex items-center gap-1.5">
+                <RefreshCw size={14} className={busy === 'sync' ? 'animate-spin' : ''} /> Sincronizar biblioteca
+              </span>
+            </Button>
+            <button
+              onClick={disconnect}
+              disabled={busy === 'disconnect'}
+              className="text-sm px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+            >
+              Desconectar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <HowTo title="Cómo conectar (una vez)">
+            <Steps>
+              <li>
+                En tu app de <code>developer.spotify.com/dashboard</code> → Edit settings → <b>Redirect URIs</b>, añade
+                exactamente: <code className="text-gold-300">{st.redirectUri}</code> y guarda.
+              </li>
+              <li>Pulsa «Obtener enlace de autorización» abajo y aprueba el acceso en Spotify.</li>
+              <li>
+                Spotify te redirigirá a <code>127.0.0.1…/callback?code=…</code> (la página no cargará, es normal). Copia
+                todo lo que hay después de <code>code=</code> (o pega la URL entera) y pégalo aquí abajo.
+              </li>
+            </Steps>
+          </HowTo>
+
+          <div className="flex flex-wrap gap-2 items-center">
+            <Button onClick={getAuth} disabled={busy === 'auth'}>
+              <span className="inline-flex items-center gap-1.5">
+                {busy === 'auth' ? <Loader2 size={14} className="animate-spin" /> : <ExternalLinkIcon />} Obtener enlace de
+                autorización
+              </span>
+            </Button>
+            {authUrl && (
+              <a href={authUrl} target="_blank" rel="noreferrer" className="text-xs text-gold-400 hover:underline break-all">
+                (o abre este enlace)
+              </a>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && connect()}
+              placeholder="Pega aquí el code (o la URL de redirección completa)"
+              className="flex-1 bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
+            />
+            <Button onClick={connect} disabled={busy === 'connect' || !code.trim()}>
+              {busy === 'connect' ? '…' : 'Conectar'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {msg && <p className="text-xs text-gold-300/90 mt-2">{msg}</p>}
+      {err && <p className="text-xs text-red-300 mt-2">{err}</p>}
+    </section>
+  );
+}
+const ExternalLinkIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
+  </svg>
+);
+
 function TestButton({ service, label, beforeTest }) {
   const [state, setState] = useState(null); // null | 'run' | ok | err
   const [msg, setMsg] = useState('');
@@ -405,6 +579,8 @@ export default function Settings() {
           <TestButton service="spotify" label="Spotify" beforeTest={save} />
         </div>
       </section>
+
+      <SpotifyLibrarySection onSave={save} />
 
       {/* Notificaciones */}
       <section className="card p-5 mb-4">

@@ -488,6 +488,23 @@ CREATE TABLE IF NOT EXISTS global_releases (
   UNIQUE(source, match_key)
 );
 CREATE INDEX IF NOT EXISTS idx_globalrel_date ON global_releases(release_date);
+
+-- Biblioteca GUARDADA del usuario en Spotify (1.0): sus «álbumes guardados» (/me/albums),
+-- de cualquier tipo. Se refresca vía OAuth de usuario y se cruza con tu colección local para
+-- la brecha «tienes en disco / tienes en streaming». match_key = matchKey(artista, título).
+CREATE TABLE IF NOT EXISTS spotify_saved_albums (
+  id TEXT PRIMARY KEY,        -- id de álbum en Spotify
+  artist TEXT,
+  title TEXT,
+  match_key TEXT,
+  album_type TEXT,           -- album | single | compilation
+  release_date TEXT,
+  cover TEXT,
+  url TEXT,                   -- enlace al álbum en Spotify
+  added_at TEXT,             -- cuándo lo guardaste en Spotify (added_at de /me/albums)
+  synced_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_spotsaved_key ON spotify_saved_albums(match_key);
 `);
 
 // --- migraciones ligeras ----------------------------------------------------
@@ -617,6 +634,7 @@ const SECRET_SETTING_KEYS = new Set([
   'jackett_key',
   'qbittorrent_pass',
   'spotify_client_secret',
+  'spotify_refresh_token',
   'notify_url',
   'listenbrainz_token',
 ]);

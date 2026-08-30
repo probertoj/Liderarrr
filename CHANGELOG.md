@@ -9,6 +9,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Integración con tu biblioteca de Spotify (la brecha disco ↔ streaming)** — la feature de
+  1.0. Conectas tu cuenta por **OAuth de usuario** (solo lectura, `user-library-read`) y
+  Liderarr cruza tus **álbumes guardados** en Spotify con tu colección local:
+  - Nueva página **«Streaming»**: dos lados. **En Spotify, no en tu disco** → botón Descargar
+    (+ enlace a Spotify, + «Añadir a reto»). **En tu disco, no en Spotify** → «Guardar en
+    Spotify» (abre el buscador de Spotify para que lo añadas). Con contadores (guardados /
+    en disco / en ambos / en la brecha).
+  - **Conexión en Ajustes → «Biblioteca de Spotify»**: flujo «pega el código» (por las reglas
+    de Spotify 2025, el redirect debe ser HTTPS o loopback `http://127.0.0.1:puerto`; una IP de
+    LAN no vale). El usuario registra el redirect que se le indica, aprueba, y pega el `code`.
+    Si sirve Liderarr por HTTPS y registra `…/callback`, se completa solo.
+  - Backend: `spotifyuser.js` (OAuth code + refresh token cifrado, `refreshSpotifyLibrary`,
+    `spotifyGap`), tabla `spotify_saved_albums`, rutas `/api/spotify/user/*`,
+    `/api/spotify/library/refresh[/status]`, `/api/spotify/gap`, y paso nocturno para
+    resincronizar la biblioteca. Refresco de biblioteca no bloqueante con progreso.
+
 ---
 
 ## [0.9.24] — 2026-08-30

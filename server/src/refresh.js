@@ -12,6 +12,7 @@ import { runAutoGrab, autoGrabConfig, autoGrabStatus } from './autograb.js';
 import { refreshExternalReleases } from './newreleases.js';
 import { refreshGlobalReleases } from './globalradar.js';
 import { spotifyConfigured } from './spotify.js';
+import { refreshSpotifyLibrary, spotifyUserConnected } from './spotifyuser.js';
 import { refreshArtistSuggestions } from './suggest.js';
 import { lastfmConfigured } from './lastfm.js';
 import { sendNotification } from './notify.js';
@@ -146,6 +147,16 @@ function buildSteps() {
       run: async () => {
         const r = await refreshGlobalReleases();
         return `${r.count} novedades globales (${r.added} nuevas)${r.spotify && r.spotify !== 'ok' ? ` · Spotify: ${r.spotify}` : ''}`;
+      },
+    },
+    {
+      key: 'spotify-library',
+      label: 'Sincronizar tu biblioteca guardada de Spotify',
+      enabled: () => spotifyUserConnected(),
+      run: async () => {
+        const r = await refreshSpotifyLibrary();
+        if (r.skipped) return r.skipped;
+        return `${r.count} álbumes guardados en Spotify`;
       },
     },
     {
