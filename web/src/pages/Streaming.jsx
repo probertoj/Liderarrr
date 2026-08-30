@@ -84,7 +84,7 @@ function LocalRow({ r }) {
       <div className="flex items-center gap-2 shrink-0">
         <AddToChallengeButton artist={r.artist} title={r.title} />
         <a
-          href={r.spotify_search_url}
+          href={`https://open.spotify.com/search/${encodeURIComponent(`${r.artist} ${r.title}`.trim())}`}
           target="_blank"
           rel="noreferrer"
           title="Buscarlo en Spotify para guardarlo en tu biblioteca"
@@ -106,7 +106,12 @@ export default function Streaming() {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState(null);
   const [side, setSide] = useState('streaming'); // qué lado de la brecha mostrar
+  const [q, setQ] = useState(''); // filtro de texto (la lista local puede tener miles)
+  const [limit, setLimit] = useState(200); // render por lotes: evita congelar con 26k filas
   const poll = useRef(null);
+  useEffect(() => {
+    setLimit(200); // al cambiar de lado o buscar, vuelve al primer lote
+  }, [side, q]);
 
   const loadStatus = () => api.spotifyUserStatus().then(setStatus).catch((e) => setErr(e.message));
   const loadGap = () =>
@@ -207,7 +212,12 @@ export default function Streaming() {
   }
 
   const c = gap?.counts;
-  const rows = side === 'streaming' ? gap?.onlyStreaming : gap?.onlyLocal;
+  const allRows = (side === 'streaming' ? gap?.onlyStreaming : gap?.onlyLocal) || [];
+  const term = q.trim().toLowerCase();
+  const filtered = term
+    ? allRows.filter((r) => `${r.artist} ${r.title}`.toLowerCase().includes(term))
+    : allRows;
+  const rows = filtered.slice(0, limit);
 
   return (
     <div>
@@ -262,28 +272,52 @@ export default function Streaming() {
         </button>
       </div>
 
-      <p className="text-xs text-neutral-600 mb-3 inline-flex items-center gap-1.5">
-        <Disc3 size={13} />
-        {side === 'streaming'
-          ? 'Lo tienes guardado en Spotify pero no en tu disco: descárgalo.'
-          : 'Lo tienes en tu disco pero no guardado en Spotify: ábrelo en Spotify y dale a guardar.'}
-      </p>
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <p className="text-xs text-neutral-600 inline-flex items-center gap-1.5">
+          <Disc3 size={13} />
+          {side === 'streaming'
+            ? 'Lo tienes guardado en Spotify pero no en tu disco: descárgalo.'
+            : 'Lo tienes en tu disco pero no guardado en Spotify: ábrelo en Spotify y dale a guardar.'}
+        </p>
+        {allRows.length > 20 && (
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Filtrar por artista o álbum…"
+            className="ml-auto w-full sm:w-64 bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
+          />
+        )}
+      </div>
 
       {!gap ? (
         <Spinner label="Cruzando tu colección con Spotify…" />
-      ) : rows.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="card p-6 text-center text-neutral-400">
-          {side === 'streaming'
-            ? 'No hay nada en tu Spotify que no tengas ya en disco. 🎉'
-            : 'Todo lo de tu disco está también guardado en tu Spotify.'}
+          {term
+            ? 'Nada coincide con tu filtro.'
+            : side === 'streaming'
+              ? 'No hay nada en tu Spotify que no tengas ya en disco. 🎉'
+              : 'Todo lo de tu disco está también guardado en tu Spotify.'}
           {status.syncedAt ? '' : ' (Pulsa «Sincronizar Spotify» para traer tu biblioteca.)'}
         </div>
       ) : (
-        <div className="space-y-1.5">
-          {side === 'streaming'
-            ? rows.map((r) => <StreamingRow key={r.id} r={r} added={added} busy={busy} onDownload={download} />)
-            : rows.map((r) => <LocalRow key={r.album_id} r={r} />)}
-        </div>
+        <>
+          <div className="space-y-1.5">
+            {side === 'streaming'
+              ? rows.map((r) => <StreamingRow key={r.id} r={r} added={added} busy={busy} onDownload={download} />)
+              : rows.map((r) => <LocalRow key={r.album_id} r={r} />)}
+          </div>
+          {filtered.length > rows.length && (
+            <div className="mt-3 text-center">
+              <button
+                onClick={() => setLimit((l) => l + 300)}
+                className="text-sm px-3 py-1.5 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800"
+              >
+                Mostrar más ({(filtered.length - rows.length).toLocaleString('es')} restantes)
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

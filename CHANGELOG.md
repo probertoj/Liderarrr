@@ -25,6 +25,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
     `spotifyGap`), tabla `spotify_saved_albums`, rutas `/api/spotify/user/*`,
     `/api/spotify/library/refresh[/status]`, `/api/spotify/gap`, y paso nocturno para
     resincronizar la biblioteca. Refresco de biblioteca no bloqueante con progreso.
+  - El lado «en tu disco, no en Spotify» puede tener miles de álbumes: **filtro de texto +
+    render por lotes** («Mostrar más») para que no congele el navegador.
+  - Si Spotify redirige con `error=…` (p. ej. `server_error` por app en modo desarrollo con la
+    cuenta sin añadir a «User Management», o `access_denied`), la app lo detecta y da un mensaje
+    accionable en vez de «no encontré el código».
 
 ---
 

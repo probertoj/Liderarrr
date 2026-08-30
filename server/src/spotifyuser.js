@@ -232,12 +232,6 @@ export function spotifyUserStatus() {
   };
 }
 
-// Enlace de búsqueda en Spotify para un álbum que tienes en disco pero no en streaming (para
-// que lo abras y lo guardes tú). Un enlace de búsqueda es fiable sin llamar a la API.
-function spotifySearchUrl(artist, title) {
-  return `https://open.spotify.com/search/${encodeURIComponent(`${artist} ${title}`.trim())}`;
-}
-
 // LA BRECHA, calculada EN VIVO: cruza tu colección local con tu biblioteca de Spotify.
 //  · onlyStreaming: guardado en Spotify pero NO en tu disco  → descargar.
 //  · onlyLocal:     en tu disco pero NO guardado en Spotify  → abrir en Spotify para guardarlo.
@@ -276,6 +270,8 @@ export function spotifyGap() {
     }))
     .sort((a, b) => String(b.added_at || '').localeCompare(String(a.added_at || '')));
 
+  // onlyLocal puede ser ENORME (casi toda tu colección): payload mínimo por fila (el enlace de
+  // búsqueda en Spotify se compone en el cliente) y el render va por lotes allí.
   const onlyLocal = [...localByPrimary.entries()]
     .filter(([k]) => !spotKeys.has(k))
     .map(([, r]) => ({
@@ -284,7 +280,6 @@ export function spotifyGap() {
       artist: r.album_artist,
       title: r.title,
       year: r.year,
-      spotify_search_url: spotifySearchUrl(r.album_artist, r.title),
     }))
     .sort((a, b) => String(a.artist).localeCompare(String(b.artist)) || (a.year || 0) - (b.year || 0));
 
