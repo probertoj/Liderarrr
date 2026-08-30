@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarClock, Plus, Check, Loader2, ExternalLink, Search, Star, Tag, X, RefreshCw, Radio } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, SearchModal, useLidarrEnabled } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, SearchModal, QuickSearch, useLidarrEnabled } from '../components.jsx';
 import MonthCalendar from './MonthCalendar.jsx';
 
 // Lanzamientos: cuatro vistas. «Próximos» (release groups por estrenar de tus artistas),
@@ -999,6 +999,8 @@ export default function Calendar() {
             : ''
         }
       />
+
+      <QuickSearch />
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {tab('mes', '📅 Mes')}

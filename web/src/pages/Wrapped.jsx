@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { PartyPopper, Download } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { api, coverUrl } from '../api.js';
-import { PageTitle, Spinner, StatCard, ArtistPhoto } from '../components.jsx';
+import { PageTitle, Spinner, StatCard, ArtistPhoto, QuickSearch } from '../components.jsx';
 
 // «Resumen» tipo Wrapped: crea el resumen de un periodo (semana / mes / 3 meses / año /
 // un año concreto / todo) con un mosaico de las portadas de tus discos más escuchados.
@@ -73,6 +73,7 @@ export default function Wrapped() {
     return (
       <div>
         <PageTitle icon={PartyPopper} title="Resumen" />
+        <QuickSearch />
         <div className="card p-8 text-center text-neutral-400">
           Aún no hay escuchas importadas. Conecta Last.fm en Ajustes y trae tu historial para crear tu resumen.
         </div>
@@ -102,6 +103,8 @@ export default function Wrapped() {
   return (
     <div>
       <PageTitle icon={PartyPopper} title="Resumen" sub={`Tu ${sel.label.toLowerCase()} en música`} />
+
+      <QuickSearch />
 
       <div className="flex flex-wrap gap-2 mb-6">
         {presets.map((p) => (

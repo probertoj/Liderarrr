@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Headphones, TrendingUp, Star, EarOff, Search, Disc3, ListMusic } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { api } from '../api.js';
-import { PageTitle, Stat, Spinner, ErrorMsg, Button, SearchModal } from '../components.jsx';
+import { PageTitle, Stat, Spinner, ErrorMsg, Button, SearchModal, QuickSearch } from '../components.jsx';
 
 // Ventanas de fecha para la brecha. `since` = ms (o null = todo el tiempo).
 const RANGES = [
@@ -90,6 +90,7 @@ export default function Listening() {
     return (
       <div>
         <PageTitle icon={Headphones} title="Escuchas" />
+        <QuickSearch />
         <div className="card p-8 text-center">
           <p className="text-neutral-300 mb-2">Aún no hay escuchas importadas.</p>
           <p className="text-neutral-500 text-sm mb-4">
@@ -117,6 +118,7 @@ export default function Listening() {
           {importing ? 'Importando…' : 'Actualizar escuchas'}
         </Button>
       </PageTitle>
+      <QuickSearch />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Stat label="Escuchas" value={t.scrobbles.toLocaleString('es')} />

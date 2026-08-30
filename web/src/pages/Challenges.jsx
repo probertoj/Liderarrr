@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download, X, ListMusic, Headphones } from 'lucide-react';
 import { api, coverUrl } from '../api.js';
-import { PageTitle, Section, Spinner, ErrorMsg, Button, SearchModal, useLidarrEnabled } from '../components.jsx';
+import { PageTitle, Section, Spinner, ErrorMsg, Button, SearchModal, QuickSearch, useLidarrEnabled } from '../components.jsx';
 
 // Retos: listas de álbumes "que hay que tener/oír". Anillos concéntricos de lo
 // que tienes vs lo que has escuchado, y envío en bloque a Lidarr de lo que falta.
@@ -34,6 +34,7 @@ export default function Challenges() {
           </span>
         </Button>
       </PageTitle>
+      <QuickSearch />
 
       {adding && <AddForm onDone={() => { setAdding(false); load(); }} />}
 

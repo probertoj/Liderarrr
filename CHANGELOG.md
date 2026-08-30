@@ -9,6 +9,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Buscador rápido en más páginas**: la barra de búsqueda del Dashboard (colección + externo
+  en MusicBrainz, con Seguir/Descargar) está ahora también en **Huecos, Lanzamientos, Escuchas,
+  Resumen y Retos**. El componente `QuickSearch` se extrajo de `Dashboard.jsx` a
+  `components.jsx` para reutilizarlo.
+
 ### Cambiado
 - **Notificación de importación detallada**: el aviso «descargas importadas» ahora enumera
   QUÉ discos entraron («Artista — Álbum», uno por línea; recorta con «…y N más» si son muchos)

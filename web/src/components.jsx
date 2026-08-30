@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Component } from 'react';
-import { Link } from 'react-router-dom';
-import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy, Star } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy, Star, User, Loader2, ExternalLink } from 'lucide-react';
 import { api, coverUrl, artistPhotoUrl, fmtBytes } from './api.js';
 
 // ¿Lidarr configurado? La UI oculta sus caminos cuando no lo está (Lidarr es opcional:
@@ -861,6 +861,184 @@ export function DuplicateGroupPanel({ group, onClose }) {
         </p>
         <DuplicateCopies copies={group.copies} reason={group.bestReason} pinned={group.pinned} />
       </div>
+    </div>
+  );
+}
+
+// Enlace a MusicBrainz para desambiguar resultados externos (hay muchos «Beef» o «La Bohème»
+// distintos; el MBID te dice cuál es cuál). stopPropagation por si va dentro de una fila.
+const MbLink = ({ url }) => (
+  <a
+    href={url}
+    target="_blank"
+    rel="noreferrer"
+    onClick={(e) => e.stopPropagation()}
+    className="text-[11px] text-neutral-600 hover:text-gold-400 inline-flex items-center gap-0.5 shrink-0"
+    title="Ver en MusicBrainz"
+  >
+    MB <ExternalLink size={10} />
+  </a>
+);
+
+// Buscador rápido: el punto de entrada de la app. Busca al instante en tu colección
+// (artista/disco → su ficha) y, debajo, fuera de ella en MusicBrainz (seguir artista /
+// descargar disco). La app va de lo que tienes y, sobre todo, de lo que aún no tienes. Se
+// usa en el Dashboard y, para tenerlo siempre a mano, en Huecos, Lanzamientos, Escuchas,
+// Resumen y Retos.
+export function QuickSearch() {
+  const navigate = useNavigate();
+  const [q, setQ] = useState('');
+  const [local, setLocal] = useState(null);
+  const [ext, setExt] = useState(null);
+  const [extLoading, setExtLoading] = useState(false);
+  const [busy, setBusy] = useState(null);
+  const [search, setSearch] = useState(null);
+
+  useEffect(() => {
+    const term = q.trim();
+    if (!term) {
+      setLocal(null);
+      setExt(null);
+      return;
+    }
+    const t1 = setTimeout(() => api.findLocal(term).then(setLocal).catch(() => {}), 180);
+    setExtLoading(true);
+    setExt(null);
+    const t2 = setTimeout(
+      () =>
+        api
+          .findExternal(term)
+          .then(setExt)
+          .catch(() => setExt(null))
+          .finally(() => setExtLoading(false)),
+      550
+    );
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [q]);
+
+  const follow = async (a) => {
+    setBusy(a.mbid);
+    try {
+      const r = await api.followMbid(a.mbid, 'artist');
+      setQ('');
+      navigate(`/artista/${r.artist_id}`);
+    } catch (e) {
+      alert(e.message);
+      setBusy(null);
+    }
+  };
+
+  const close = () => setQ('');
+  const localHas = local && (local.artists.length || local.albums.length);
+  const extArtistsNew = ext?.artists?.filter((a) => !a.artist_id) || [];
+  const extArtistsOwned = ext?.artists?.filter((a) => a.artist_id) || [];
+  const open = q.trim() && (local || ext || extLoading);
+
+  return (
+    <div className="relative mb-6">
+      <div className="flex items-center gap-2 bg-ink-850 border border-ink-800 rounded-xl px-3 focus-within:border-gold-500/50">
+        <Search size={18} className="text-neutral-500 shrink-0" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && setQ('')}
+          placeholder="Buscar un disco o un artista… (los tuyos y los que aún no tienes)"
+          className="flex-1 bg-transparent py-2.5 outline-none text-sm"
+        />
+        {q && (
+          <button onClick={close} className="text-neutral-600 hover:text-neutral-300" title="Limpiar">
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-20" onClick={close} />
+          <div className="absolute z-30 mt-1.5 w-full card p-2 shadow-xl border border-ink-700 max-h-[70vh] overflow-y-auto">
+            {localHas ? (
+              <div className="mb-1">
+                <div className="text-[11px] uppercase tracking-wider text-neutral-600 px-2 py-1">En tu colección</div>
+                {local.artists.map((a) => (
+                  <Link key={`a${a.id}`} to={`/artista/${a.id}`} onClick={close} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-ink-800 text-sm">
+                    <User size={14} className="text-neutral-500 shrink-0" />
+                    <span className="flex-1 truncate">{a.name}</span>
+                    <span className="text-xs text-neutral-600 shrink-0">{a.albums} discos</span>
+                  </Link>
+                ))}
+                {local.albums.map((al) => (
+                  <Link key={`al${al.id}`} to={`/album/${al.id}`} onClick={close} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-ink-800 text-sm">
+                    <Disc3 size={14} className="text-neutral-500 shrink-0" />
+                    <span className="flex-1 truncate">
+                      {al.title} <span className="text-neutral-600">· {al.album_artist}</span>
+                    </span>
+                    {al.year ? <span className="text-xs text-neutral-600 shrink-0">{al.year}</span> : null}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="text-[11px] uppercase tracking-wider text-neutral-600 px-2 py-1 flex items-center gap-2">
+              Fuera de tu colección {extLoading && <Loader2 size={11} className="animate-spin" />}
+            </div>
+            {extArtistsOwned.map((a) => (
+              <div key={`mao${a.mbid}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-ink-800 text-sm">
+                <User size={14} className="text-neutral-500 shrink-0" />
+                <Link to={`/artista/${a.artist_id}`} onClick={close} className="flex-1 truncate hover:text-gold-400">
+                  {a.name}
+                </Link>
+                {a.mbid && <MbLink url={`https://musicbrainz.org/artist/${a.mbid}`} />}
+                <span className="text-xs text-emerald-400/70 shrink-0">lo sigues/tienes</span>
+              </div>
+            ))}
+            {extArtistsNew.map((a) => (
+              <div key={`ma${a.mbid}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-ink-800 text-sm">
+                <User size={14} className="text-neutral-500 shrink-0" />
+                <span className="flex-1 truncate">
+                  {a.name}
+                  {a.disambiguation ? <span className="text-neutral-600"> · {a.disambiguation}</span> : ''}
+                </span>
+                {a.mbid && <MbLink url={`https://musicbrainz.org/artist/${a.mbid}`} />}
+                <button
+                  onClick={() => follow(a)}
+                  disabled={busy === a.mbid}
+                  className="text-xs px-2 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 shrink-0 disabled:opacity-50"
+                >
+                  {busy === a.mbid ? <Loader2 size={12} className="animate-spin" /> : <Star size={12} />} Seguir
+                </button>
+              </div>
+            ))}
+            {(ext?.albums || []).map((al) => (
+              <div key={`mal${al.rg_mbid}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-ink-800 text-sm">
+                <Disc3 size={14} className="text-neutral-500 shrink-0" />
+                <span className="flex-1 truncate">
+                  {al.title} <span className="text-neutral-600">· {al.artist}{al.year ? ` · ${al.year}` : ''}</span>
+                </span>
+                {al.rg_mbid && <MbLink url={`https://musicbrainz.org/release-group/${al.rg_mbid}`} />}
+                {al.owned ? (
+                  <span className="text-xs text-emerald-400/70 shrink-0">lo tienes</span>
+                ) : (
+                  <button
+                    onClick={() => setSearch(`${al.artist} ${al.title}`)}
+                    className="text-xs px-2 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 shrink-0"
+                  >
+                    <Download size={12} /> Descargar
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {!extLoading && ext && !ext.artists.length && !ext.albums.length && !localHas && (
+              <div className="text-sm text-neutral-600 px-2 py-2">Nada en tu colección ni en MusicBrainz.</div>
+            )}
+          </div>
+        </>
+      )}
+
+      {search != null && <SearchModal initialQuery={search} onClose={() => setSearch(null)} />}
     </div>
   );
 }
