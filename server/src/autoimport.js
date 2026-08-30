@@ -48,6 +48,7 @@ export async function runAutoImport() {
   Object.assign(autoImportStatus, {
     running: true,
     imported: 0,
+    importedItems: [],
     checked: 0,
     errors: [],
     torrents: 0,
@@ -86,6 +87,7 @@ export async function runAutoImport() {
     const maps = pathMappings();
     const misses = []; // rutas que NO cuelgan de la carpeta (muestra para configurar el remapeo)
     let importedAny = false;
+    const importedItems = []; // qué se importó en ESTA pasada (para el aviso detallado)
     for (const t of torrents) {
       const cp = remapPath(t.contentPath, maps); // aplica el remapeo qB→contenedor
       if (!cp || !within(cp, source)) {
@@ -123,6 +125,7 @@ export async function runAutoImport() {
         const r = isDir ? await importFolder(cp, override) : await importFile(cp, override);
         importedAny = true;
         autoImportStatus.imported++;
+        importedItems.push({ artist: r.artist || override.artist || null, album: r.album || override.album || t.name });
         if (req) setDownloadStatus(req.id, 'imported', r.dest);
         console.log(`[autoimport] ✓ ${t.name} → ${r.dest} (${r.linked} ficheros)`);
       } catch (e) {
@@ -159,10 +162,18 @@ export async function runAutoImport() {
       } catch (e) {
         console.warn('[autoimport] identify tras importar falló:', String(e.message || e));
       }
-      // aviso «tu descarga está lista» (best-effort; no notifica si no está configurado)
-      if (autoImportStatus.imported > 0) {
-        const n = autoImportStatus.imported;
-        sendNotification('Liderarr', `${n} ${n === 1 ? 'descarga importada' : 'descargas importadas'} a tu biblioteca`).catch(() => {});
+      // aviso «tu descarga está lista» DETALLADO: enumera qué discos entraron (best-effort;
+      // no notifica si no está configurado). Cada línea «Artista — Álbum»; si son muchos, se
+      // recorta con «…y N más» para no pasarse del límite de los webhooks (Discord ~1900).
+      autoImportStatus.importedItems = importedItems;
+      if (importedItems.length > 0) {
+        const n = importedItems.length;
+        const fmt = (it) => (it.artist ? `${it.artist} — ${it.album}` : it.album);
+        const MAX = 15;
+        const lines = importedItems.slice(0, MAX).map((it) => `• ${fmt(it)}`);
+        if (n > MAX) lines.push(`…y ${n - MAX} más`);
+        const header = n === 1 ? 'Disco importado a tu biblioteca:' : `${n} discos importados a tu biblioteca:`;
+        sendNotification('Liderarr', `${header}\n${lines.join('\n')}`).catch(() => {});
       }
     }
   } finally {

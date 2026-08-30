@@ -9,6 +9,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Cambiado
+- **Notificación de importación detallada**: el aviso «descargas importadas» ahora enumera
+  QUÉ discos entraron («Artista — Álbum», uno por línea; recorta con «…y N más» si son muchos)
+  en vez de solo el número. `autoimport.js` recoge los ítems de la pasada
+  (`autoImportStatus.importedItems`) y los lista en `sendNotification`.
+
 ---
 
 ## [0.9.23] — 2026-08-25
