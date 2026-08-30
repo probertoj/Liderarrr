@@ -197,6 +197,7 @@ export const api = {
   addChallengeItems: (id, text) => req(`/challenges/${id}/items`, { method: 'POST', body: { text } }),
   removeChallengeItem: (id, position) => req(`/challenges/${id}/items/${position}`, { method: 'DELETE' }),
   importChallengeUrl: (url, name) => req('/challenges/import', { method: 'POST', body: { url, name } }),
+  importChallengeStatus: () => req('/challenges/import/status'),
   challenge: (id) => req(`/challenges/${id}`),
   deleteChallenge: (id) => req(`/challenges/${id}`, { method: 'DELETE' }),
   challengeToLidarr: (id) => req(`/challenges/${id}/radarr`, { method: 'POST' }),

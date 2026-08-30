@@ -77,7 +77,7 @@ import { importListens, scrobbleStatus, scrobblesConfigured } from './scrobbles.
 import { lbTest } from './listenbrainz.js';
 import { listeningOverview, ownershipGap, ownedUnplayed, unownedScrobbledAlbums, hasScrobbles, topPlayed, wrapped } from './listening.js';
 import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing, nextChallengeListens, createChallenge, addItemsToChallenge, removeChallengeItem, challengeMembership } from './challenges.js';
-import { importListFromUrl } from './listimport.js';
+import { startListImport, listImportStatus } from './listimport.js';
 import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCompletism, resolveAlbumLabel } from './editions.js';
 import { albumPersonnel } from './albumcredits.js';
@@ -714,13 +714,15 @@ app.delete('/api/challenges/:id/items/:position', async (req) =>
   removeChallengeItem(Number(req.params.id), Number(req.params.position))
 );
 // importar una lista por URL (AOTY y similares) vía lector que ejecuta JS
+// Importar por URL: puede tardar minutos (AOTY se lee página a página por el lector). Se
+// lanza en SEGUNDO PLANO y el cliente sigue el progreso por /import/status.
 app.post('/api/challenges/import', async (req, reply) => {
-  try {
-    return await importListFromUrl(req.body?.url, req.body?.name);
-  } catch (err) {
-    return reply.code(400).send({ error: String(err.message || err) });
-  }
+  const url = req.body?.url;
+  if (!/^https?:\/\//i.test(String(url || ''))) return reply.code(400).send({ error: 'Pon una URL válida (http/https)' });
+  if (listImportStatus.running) return reply.code(409).send({ error: 'Ya hay una importación en curso', ...listImportStatus });
+  return startListImport(url, req.body?.name);
 });
+app.get('/api/challenges/import/status', async () => listImportStatus);
 app.get('/api/challenges/:id', async (req, reply) => {
   const c = challengeDetail(Number(req.params.id));
   if (!c) return reply.code(404).send({ error: 'No encontrado' });

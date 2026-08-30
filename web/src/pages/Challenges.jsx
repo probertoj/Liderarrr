@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download, X, ListMusic, Headphones } from 'lucide-react';
 import { api, coverUrl } from '../api.js';
@@ -130,6 +130,9 @@ function AddForm({ onDone }) {
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
+  const [importMsg, setImportMsg] = useState(null); // progreso/aviso de la importación por URL
+  const poll = useRef(null);
+  useEffect(() => () => clearInterval(poll.current), []);
 
   const submit = async () => {
     if (!text.trim() && !name.trim()) return;
@@ -144,23 +147,50 @@ function AddForm({ onDone }) {
       setBusy(false);
     }
   };
+  // La importación por URL corre en SEGUNDO PLANO (AOTY tarda minutos): se lanza y se sigue el
+  // progreso por sondeo, sin bloquear. Al terminar, recarga la lista de retos.
   const importUrl = async () => {
-    if (!url.trim()) return;
+    if (!url.trim() || busy) return;
     setBusy(true);
+    setImportMsg('Iniciando importación…');
     try {
-      const r = await api.importChallengeUrl(url, name);
-      alert(
-        `Importados ${r.count} álbumes como reto.` +
-          (r.partial
-            ? '\n\n⚠️ Esa lista carga por scroll y puede haber venido a medias. Para la completa: ábrela, baja hasta el final, copia todo y usa «pegar la lista».'
-            : '')
-      );
-      onDone();
+      await api.importChallengeUrl(url, name);
     } catch (e) {
-      alert(e.message);
-    } finally {
+      setImportMsg(null);
       setBusy(false);
+      alert(e.message);
+      return;
     }
+    clearInterval(poll.current);
+    poll.current = setInterval(async () => {
+      let st;
+      try {
+        st = await api.importChallengeStatus();
+      } catch {
+        return;
+      }
+      if (st.running) {
+        setImportMsg(`Importando… ${st.page ? `página ${st.page} · ` : ''}${st.items} álbumes (puede tardar en listas largas).`);
+        return;
+      }
+      clearInterval(poll.current);
+      setBusy(false);
+      if (st.error) {
+        setImportMsg(null);
+        alert(st.error);
+        return;
+      }
+      setImportMsg(null);
+      if (st.challengeId) {
+        alert(
+          `Importados ${st.count} álbumes como reto «${st.challengeName}».` +
+            (st.partial
+              ? '\n\n⚠️ Esa lista puede haber venido a medias. Para la completa: ábrela, baja hasta el final, copia todo y usa «pegar la lista».'
+              : '')
+        );
+        onDone();
+      }
+    }, 2000);
   };
 
   return (
@@ -183,9 +213,10 @@ function AddForm({ onDone }) {
             className="flex-1 bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
           />
           <Button onClick={importUrl} disabled={busy}>
-            {busy ? '…' : 'Importar'}
+            {busy ? 'Importando…' : 'Importar'}
           </Button>
         </div>
+        {importMsg && <div className="text-xs text-gold-300/90 mt-1.5">{importMsg}</div>}
         <div className="text-[11px] text-neutral-600 mt-1 space-y-0.5">
           <div>
             <span className="text-neutral-500">Reconoce bien:</span> AlbumOfTheYear (listas con ranking, aunque sean

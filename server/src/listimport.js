@@ -106,12 +106,13 @@ const withPage = (url, p) => {
 // ranking ascendente (el #1 primero), para que el reto vaya de mejor a peor. Un fallo en la
 // PRIMERA página aborta (no hay nada); en páginas siguientes se asume fin de lista / hipo
 // temporal del lector y se para con lo que se lleva (partial), en vez de tirar todo.
-async function importAoty(url, name) {
+async function importAoty(url, name, onProgress) {
   const byRank = new Map();
   let listTitle = null;
   let partial = false;
   const MAX_PAGES = 20; // tope de seguridad (hasta ~1000 álbumes)
   for (let p = 1; p <= MAX_PAGES; p++) {
+    onProgress?.({ page: p, items: byRank.size });
     let md;
     try {
       md = await fetchViaReader(p === 1 ? url : withPage(url, p));
@@ -124,6 +125,7 @@ async function importAoty(url, name) {
     const pairs = extractAotyPage(md);
     let added = 0;
     for (const { rank, entry } of pairs) if (!byRank.has(rank)) { byRank.set(rank, entry); added++; }
+    onProgress?.({ page: p, items: byRank.size });
     if (!pairs.length || added === 0) break; // sin novedades: fin de la lista
   }
   const lines = [...byRank.keys()].sort((a, b) => a - b).map((r) => byRank.get(r));
@@ -234,7 +236,7 @@ function hhgaTitle(html) {
   );
 }
 
-export async function importListFromUrl(url, name) {
+export async function importListFromUrl(url, name, onProgress) {
   if (!/^https?:\/\//i.test(String(url || ''))) throw new Error('Pon una URL válida (http/https)');
   url = url.trim();
   const isAoty = /albumoftheyear\.org/i.test(url);
@@ -257,11 +259,67 @@ export async function importListFromUrl(url, name) {
     lines = extractRecordClub(md);
     listTitle = (listTitleOf(md) || '').replace(/,\s*a list by .*$/i, '').trim() || null;
   } else {
-    ({ lines, listTitle, partial } = isAoty ? await importAoty(url, name) : importGeneric(await fetchViaReader(url)));
+    ({ lines, listTitle, partial } = isAoty ? await importAoty(url, name, onProgress) : importGeneric(await fetchViaReader(url)));
   }
   if (!lines.length) {
     throw new Error('No reconocí ninguna lista de álbumes en esa URL. Prueba a abrirla, copiar el texto y usar «pegar la lista».');
   }
   const ch = addChallenge(name?.trim() || listTitle || 'Lista importada', lines.join('\n'));
-  return { id: ch.id, count: ch.item_count, partial };
+  return { id: ch.id, name: ch.name, count: ch.item_count, partial };
+}
+
+// Import EN SEGUNDO PLANO con progreso: el fetch por el lector (AOTY) puede tardar minutos
+// (página a página), así que no se puede bloquear la petición HTTP. Un solo import a la vez.
+export const listImportStatus = {
+  running: false,
+  url: null,
+  name: null,
+  page: 0,
+  items: 0,
+  challengeId: null,
+  challengeName: null,
+  count: 0,
+  partial: false,
+  error: null,
+  startedAt: null,
+  finishedAt: null,
+};
+
+export function startListImport(url, name) {
+  if (listImportStatus.running) return { ...listImportStatus, busy: true };
+  Object.assign(listImportStatus, {
+    running: true,
+    url: String(url || ''),
+    name: name || null,
+    page: 0,
+    items: 0,
+    challengeId: null,
+    challengeName: null,
+    count: 0,
+    partial: false,
+    error: null,
+    startedAt: Date.now(),
+    finishedAt: null,
+  });
+  // no se hace await: corre en segundo plano y el cliente sigue el progreso por /status
+  importListFromUrl(url, name, (p) => {
+    if (p?.page) listImportStatus.page = p.page;
+    if (typeof p?.items === 'number') listImportStatus.items = p.items;
+  })
+    .then((r) => {
+      Object.assign(listImportStatus, {
+        challengeId: r.id,
+        challengeName: r.name,
+        count: r.count,
+        partial: !!r.partial,
+      });
+    })
+    .catch((err) => {
+      listImportStatus.error = String(err.message || err);
+    })
+    .finally(() => {
+      listImportStatus.running = false;
+      listImportStatus.finishedAt = Date.now();
+    });
+  return { ...listImportStatus, started: true };
 }
