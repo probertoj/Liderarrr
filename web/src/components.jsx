@@ -346,6 +346,34 @@ export function AlbumCard({ album, onClick, selectable = false, selected = false
   );
 }
 
+// Botón compacto «Reto» que abre el menú de retos anclado donde pulsas. Para tener el mismo
+// «Añadir a reto» EN TODAS PARTES donde aparece un disco (Lanzamientos, calendario, etc.),
+// no solo en la ficha y el clic derecho de la Discoteca. Reutiliza ChallengeContextMenu.
+export function AddToChallengeButton({ artist, title, label = 'Reto', className }) {
+  const [menu, setMenu] = useState(null);
+  return (
+    <>
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setMenu({ x: e.clientX, y: e.clientY });
+        }}
+        title={`Añadir «${title}» a un reto`}
+        className={
+          className ||
+          'text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1'
+        }
+      >
+        <Trophy size={12} /> {label}
+      </button>
+      {menu && (
+        <ChallengeContextMenu x={menu.x} y={menu.y} artist={artist} title={title} onClose={() => setMenu(null)} />
+      )}
+    </>
+  );
+}
+
 // Menú contextual (clic derecho en una tarjeta) para añadir el disco a un reto. Anclado en
 // el cursor, con un fondo invisible que lo cierra. Carga tus retos al abrir y añade
 // «Artista - Álbum» al que elijas (el servidor deduplica y avisa si ya estaba).

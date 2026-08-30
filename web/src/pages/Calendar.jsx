@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarClock, Plus, Check, Loader2, ExternalLink, Search, Star, Tag, X, RefreshCw, Radio } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, SearchModal, QuickSearch, useLidarrEnabled } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, SearchModal, QuickSearch, AddToChallengeButton, useLidarrEnabled } from '../components.jsx';
 import MonthCalendar from './MonthCalendar.jsx';
 
 // Lanzamientos: cuatro vistas. «Próximos» (release groups por estrenar de tus artistas),
@@ -73,6 +73,7 @@ function ReleaseRow({ r, added, busy, followed, onAdd, onFollow, onSearch, lidar
         >
           <Search size={12} /> Buscar
         </button>
+        <AddToChallengeButton artist={r.artist} title={r.title} />
         <a
           href={`https://musicbrainz.org/release-group/${r.rg_mbid}`}
           target="_blank"
@@ -150,6 +151,7 @@ function ExternalReleaseRow({ r, added, busy, onAdd, onSearch, onDismiss }) {
         >
           <Search size={12} /> Buscar
         </button>
+        <AddToChallengeButton artist={r.artist} title={r.title} />
         {done ? (
           <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
             <Check size={13} /> pedido
@@ -437,6 +439,7 @@ function RadarRow({ r, onSearch, onFollowMbid, onQueue, lidarrOn }) {
         >
           <Search size={12} /> Buscar
         </button>
+        <AddToChallengeButton artist={r.artist} title={r.title} />
         {r.url && (
           <a
             href={r.url}

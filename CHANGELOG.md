@@ -10,6 +10,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 ## [Sin publicar]
 
 ### Añadido
+- **«Añadir a reto» en Lanzamientos**: cada disco/lanzamiento (Próximos, Estrenados, Sellos,
+  Novedades, Canciones nuevas, Descubre, Radar y el detalle del calendario «Mes») tiene ahora
+  un botón «Reto» que abre el menú de retos, igual que en la ficha y el clic derecho de la
+  Discoteca. Componente reutilizable `AddToChallengeButton` (envuelve `ChallengeContextMenu`).
 - **Buscador rápido en más páginas**: la barra de búsqueda del Dashboard (colección + externo
   en MusicBrainz, con Seguir/Descargar) está ahora también en **Huecos, Lanzamientos, Escuchas,
   Resumen y Retos**. El componente `QuickSearch` se extrajo de `Dashboard.jsx` a

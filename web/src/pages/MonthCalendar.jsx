@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Search, Download, ExternalLink, Loader2, Check } from 'lucide-react';
 import { api } from '../api.js';
-import { Spinner } from '../components.jsx';
+import { Spinner, AddToChallengeButton } from '../components.jsx';
 
 // Vista MES tipo Google Calendar: una rejilla mensual que junta TODAS las fuentes de
 // lanzamientos en su día — Próximos y Estrenados recientemente (MusicBrainz), De tus
@@ -308,6 +308,7 @@ export default function MonthCalendar({ onSearch }) {
                     >
                       <Search size={12} /> Buscar
                     </button>
+                    <AddToChallengeButton artist={e.artist} title={e.title} />
                     {grab[key] === 'done' ? (
                       <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
                         <Check size={13} /> pedido
