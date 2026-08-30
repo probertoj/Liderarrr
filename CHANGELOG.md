@@ -26,6 +26,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   - **Huecos**: cada álbum que te falta.
   - **Escuchas**: la brecha escucha↔propiedad y «Los más escuchados» (icono al pasar el ratón).
   - **Discoteca**: botón visible en la carátula al pasar el ratón (además del clic derecho).
+  - **Marca de pertenencia**: si un disco ya está en algún reto, el botón lo indica (trofeo
+    dorado + «En reto», con el/los reto(s) en el tooltip) y el menú señala con un check el reto
+    que ya lo contiene — sin impedir añadirlo a otro. Nuevo `GET /api/challenges/membership`
+    (matchKey→retos), hook `useChallengeMembership` cacheado y compartido (una sola petición,
+    todos los botones se actualizan al añadir), y `web/src/matchkey.js` portado del servidor.
 - **Buscador rápido en más páginas**: la barra de búsqueda del Dashboard (colección + externo
   en MusicBrainz, con Seguir/Descargar) está ahora también en **Huecos, Lanzamientos, Escuchas,
   Resumen y Retos**. El componente `QuickSearch` se extrajo de `Dashboard.jsx` a

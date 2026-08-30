@@ -222,6 +222,26 @@ export function listChallenges() {
     .map((c) => ({ ...c, pct: c.item_count ? Math.round((c.owned / c.item_count) * 100) : 0 }));
 }
 
+// Mapa de pertenencia: matchKey(artista, álbum) → [{id, name}] de los retos (no ocultos)
+// que ya lo contienen. Para que el botón «Añadir a reto» de cualquier disco pueda marcar
+// «ya está en el reto X». Una sola llamada; el cliente calcula el matchKey igual.
+export function challengeMembership() {
+  const rows = db
+    .prepare(
+      `SELECT ci.artist, ci.album, c.id AS cid, c.name AS cname
+         FROM challenge_items ci JOIN challenges c ON c.id = ci.challenge_id
+        WHERE c.hidden = 0`
+    )
+    .all();
+  const map = {};
+  for (const r of rows) {
+    const k = matchKey(r.artist, r.album);
+    const arr = (map[k] ||= []);
+    if (!arr.some((x) => x.id === r.cid)) arr.push({ id: r.cid, name: r.cname });
+  }
+  return map;
+}
+
 export function challengeDetail(id) {
   const c = db.prepare('SELECT * FROM challenges WHERE id = ?').get(id);
   if (!c) return null;

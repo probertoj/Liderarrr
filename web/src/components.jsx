@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, Component } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy, Star, User, Loader2, ExternalLink } from 'lucide-react';
 import { api, coverUrl, artistPhotoUrl, fmtBytes } from './api.js';
+import { matchKey } from './matchkey.js';
 
 // ¿Lidarr configurado? La UI oculta sus caminos cuando no lo está (Lidarr es opcional:
 // el flujo nativo —buscar/descargar, auto-descarga— es el que manda). Se consulta una
@@ -235,6 +236,7 @@ export function ArtistPhoto({ id, name, size = 40, className = '', bust, retry =
 export function AlbumCard({ album, onClick, selectable = false, selected = false, onSelectToggle }) {
   const incomplete = album.track_file_count < album.track_count;
   const [menu, setMenu] = useState(null); // menú contextual (clic derecho) → añadir a reto
+  const { inChallenges, reload } = useChallengeMembership();
   const coverInner = (
     <div className={`relative rounded-lg overflow-hidden card ${selected ? 'ring-2 ring-gold-500' : ''}`}>
       <Cover id={album.id} />
@@ -348,6 +350,8 @@ export function AlbumCard({ album, onClick, selectable = false, selected = false
           y={menu.y}
           artist={album.album_artist}
           title={album.title}
+          containing={inChallenges(album.album_artist, album.title)}
+          onAdded={reload}
           onClose={() => setMenu(null)}
         />
       )}
@@ -355,11 +359,52 @@ export function AlbumCard({ album, onClick, selectable = false, selected = false
   );
 }
 
+// Pertenencia a retos, cacheada a nivel de módulo y COMPARTIDA por todos los botones «Reto»
+// de la página (una sola petición). matchKey(artista,álbum) → [{id,name}] de retos que ya lo
+// contienen. Al añadir algo, se recarga y todos los botones se actualizan.
+let _membership = null;
+let _membershipPromise = null;
+const _memSubs = new Set();
+function loadMembership(force) {
+  if (!force && _membership) return Promise.resolve(_membership);
+  if (!force && _membershipPromise) return _membershipPromise;
+  _membershipPromise = api
+    .challengeMembership()
+    .then((m) => {
+      _membership = m || {};
+      _membershipPromise = null;
+      _memSubs.forEach((fn) => fn(_membership));
+      return _membership;
+    })
+    .catch(() => {
+      _membershipPromise = null;
+      return _membership || {};
+    });
+  return _membershipPromise;
+}
+export function useChallengeMembership() {
+  const [map, setMap] = useState(_membership);
+  useEffect(() => {
+    const fn = (m) => setMap(m);
+    _memSubs.add(fn);
+    loadMembership(false).then((m) => setMap(m));
+    return () => _memSubs.delete(fn);
+  }, []);
+  const inChallenges = (artist, title) => (map ? map[matchKey(artist, title)] || [] : []);
+  return { inChallenges, reload: () => loadMembership(true) };
+}
+
 // Botón compacto «Reto» que abre el menú de retos anclado donde pulsas. Para tener el mismo
 // «Añadir a reto» EN TODAS PARTES donde aparece un disco (Lanzamientos, calendario, etc.),
 // no solo en la ficha y el clic derecho de la Discoteca. Reutiliza ChallengeContextMenu.
+// Si el disco YA está en algún reto, el botón lo marca (trofeo dorado + «En reto»), pero
+// sigue permitiendo añadirlo a otro.
 export function AddToChallengeButton({ artist, title, label = 'Reto', className }) {
   const [menu, setMenu] = useState(null);
+  const { inChallenges, reload } = useChallengeMembership();
+  const inList = inChallenges(artist, title);
+  const isIn = inList.length > 0;
+  const iconOnly = label === '';
   return (
     <>
       <button
@@ -368,16 +413,32 @@ export function AddToChallengeButton({ artist, title, label = 'Reto', className 
           e.stopPropagation();
           setMenu({ x: e.clientX, y: e.clientY });
         }}
-        title={`Añadir «${title}» a un reto`}
+        title={
+          isIn
+            ? `Ya en: ${inList.map((c) => c.name).join(', ')} · pulsa para añadir a otro reto`
+            : `Añadir «${title}» a un reto`
+        }
         className={
           className ||
-          'text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1'
+          `text-xs px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${
+            isIn
+              ? 'border-gold-500/50 bg-gold-500/15 text-gold-300 hover:bg-gold-500/25'
+              : 'border-ink-700 bg-ink-850 hover:bg-ink-800'
+          }`
         }
       >
-        <Trophy size={12} /> {label}
+        <Trophy size={12} className={isIn ? 'text-gold-400' : ''} /> {iconOnly ? '' : isIn ? 'En reto' : label}
       </button>
       {menu && (
-        <ChallengeContextMenu x={menu.x} y={menu.y} artist={artist} title={title} onClose={() => setMenu(null)} />
+        <ChallengeContextMenu
+          x={menu.x}
+          y={menu.y}
+          artist={artist}
+          title={title}
+          containing={inList}
+          onAdded={reload}
+          onClose={() => setMenu(null)}
+        />
       )}
     </>
   );
@@ -386,10 +447,11 @@ export function AddToChallengeButton({ artist, title, label = 'Reto', className 
 // Menú contextual (clic derecho en una tarjeta) para añadir el disco a un reto. Anclado en
 // el cursor, con un fondo invisible que lo cierra. Carga tus retos al abrir y añade
 // «Artista - Álbum» al que elijas (el servidor deduplica y avisa si ya estaba).
-export function ChallengeContextMenu({ x, y, artist, title, onClose }) {
+export function ChallengeContextMenu({ x, y, artist, title, onClose, containing = [], onAdded }) {
   const [list, setList] = useState(null);
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
+  const inIds = new Set(containing.map((c) => c.id));
   useEffect(() => {
     api.challenges().then(setList).catch(() => setList([]));
   }, []);
@@ -398,6 +460,7 @@ export function ChallengeContextMenu({ x, y, artist, title, onClose }) {
     try {
       const r = await api.addChallengeItems(ch.id, `${artist} - ${title}`);
       setMsg(r.added > 0 ? `Añadido a «${ch.name}»` : `Ya estaba en «${ch.name}»`);
+      onAdded?.(); // recarga la pertenencia para que los botones se actualicen
       setTimeout(onClose, 1000);
     } catch (e) {
       setMsg(e.message);
@@ -435,18 +498,23 @@ export function ChallengeContextMenu({ x, y, artist, title, onClose }) {
             </Link>
           </div>
         ) : (
-          list.map((ch) => (
-            <button
-              key={ch.id}
-              onClick={() => add(ch)}
-              disabled={busy}
-              className="w-full text-left px-2.5 py-1.5 rounded text-sm text-neutral-300 hover:bg-ink-800 inline-flex items-center gap-2 disabled:opacity-50"
-            >
-              <Trophy size={13} className="text-neutral-500 shrink-0" />
-              <span className="truncate">{ch.name}</span>
-              <span className="text-xs text-neutral-600 ml-auto shrink-0">{ch.item_count}</span>
-            </button>
-          ))
+          list.map((ch) => {
+            const already = inIds.has(ch.id);
+            return (
+              <button
+                key={ch.id}
+                onClick={() => add(ch)}
+                disabled={busy}
+                title={already ? 'Ya está en este reto' : `Añadir a «${ch.name}»`}
+                className="w-full text-left px-2.5 py-1.5 rounded text-sm hover:bg-ink-800 inline-flex items-center gap-2 disabled:opacity-50 text-neutral-300"
+              >
+                <Trophy size={13} className={`shrink-0 ${already ? 'text-gold-400' : 'text-neutral-500'}`} />
+                <span className="truncate">{ch.name}</span>
+                {already && <Check size={13} className="text-gold-400 shrink-0" />}
+                <span className="text-xs text-neutral-600 ml-auto shrink-0">{ch.item_count}</span>
+              </button>
+            );
+          })
         )}
       </div>
     </>

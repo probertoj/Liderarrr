@@ -193,6 +193,7 @@ export const api = {
   challenges: () => req('/challenges'),
   nextChallengeListens: (perChallenge) => req(`/challenges/next-listens${perChallenge ? '?per_challenge=1' : ''}`),
   addChallenge: (name, text) => req('/challenges', { method: 'POST', body: { name, text } }),
+  challengeMembership: () => req('/challenges/membership'),
   addChallengeItems: (id, text) => req(`/challenges/${id}/items`, { method: 'POST', body: { text } }),
   removeChallengeItem: (id, position) => req(`/challenges/${id}/items/${position}`, { method: 'DELETE' }),
   importChallengeUrl: (url, name) => req('/challenges/import', { method: 'POST', body: { url, name } }),

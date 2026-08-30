@@ -76,7 +76,7 @@ import { runAutoLidarr, autoLidarrStatus, autoLidarrConfig } from './automation.
 import { importListens, scrobbleStatus, scrobblesConfigured } from './scrobbles.js';
 import { lbTest } from './listenbrainz.js';
 import { listeningOverview, ownershipGap, ownedUnplayed, unownedScrobbledAlbums, hasScrobbles, topPlayed, wrapped } from './listening.js';
-import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing, nextChallengeListens, createChallenge, addItemsToChallenge, removeChallengeItem } from './challenges.js';
+import { addChallenge, listChallenges, challengeDetail, deleteChallenge, challengeMissing, nextChallengeListens, createChallenge, addItemsToChallenge, removeChallengeItem, challengeMembership } from './challenges.js';
 import { importListFromUrl } from './listimport.js';
 import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCompletism, resolveAlbumLabel } from './editions.js';
@@ -682,6 +682,8 @@ app.get('/api/listening/wrapped/image', async (req, reply) => {
 
 // --- retos ------------------------------------------------------------------
 app.get('/api/challenges', async () => listChallenges());
+// pertenencia: matchKey(artista,álbum) → retos que ya lo contienen (para marcar el botón)
+app.get('/api/challenges/membership', async () => challengeMembership());
 // dashboard: siguiente(s) disco(s) por escuchar de tus retos (los que tienes y no oíste)
 app.get('/api/challenges/next-listens', async (req) => {
   const per = req.query?.per_challenge;
