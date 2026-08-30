@@ -9,6 +9,17 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '0.9.24',
+    title: 'Retos por todas partes, buscador global y más detalle',
+    items: [
+      '«Añadir a reto» ahora está donde haya un disco: Lanzamientos (todas las pestañas y el calendario), Huecos, Escuchas, la Discoteca (botón al pasar el ratón) y la ficha del disco.',
+      'Si un disco ya está en un reto, su botón lo marca en dorado con «En reto» y te dice en cuál(es) — pero puedes añadirlo a otro igualmente.',
+      'La barra de búsqueda del Dashboard (tuyo + lo que aún no tienes, con Seguir/Descargar) está ahora también en Huecos, Lanzamientos, Escuchas, Resumen y Retos.',
+      'Las notificaciones de «descargas importadas» ahora dicen QUÉ discos entraron, no solo cuántos.',
+      'Importar listas por URL (AlbumOfTheYear) es más fiable (reintenta fallos temporales, trae la lista completa) y ya no bloquea: corre en segundo plano con progreso.',
+    ],
+  },
+  {
     version: '0.9.23',
     title: 'Calendario «Mes» con filtros por fuente (singles y Descubre incluidos)',
     items: [

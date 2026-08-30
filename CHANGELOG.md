@@ -9,6 +9,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+---
+
+## [0.9.24] — 2026-08-30
+
+**Retos por todas partes (con marca «En reto»), buscador global, notificaciones detalladas y
+mejor importación de listas.**
+
 ### Arreglado
 - **Importar listas de AlbumOfTheYear más robusto**: el lector (r.jina.ai) devuelve a veces un
   404/429/5xx TEMPORAL para AOTY y la importación fallaba en seco. Ahora se **reintenta** con
@@ -26,6 +33,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   - **Huecos**: cada álbum que te falta.
   - **Escuchas**: la brecha escucha↔propiedad y «Los más escuchados» (icono al pasar el ratón).
   - **Discoteca**: botón visible en la carátula al pasar el ratón (además del clic derecho).
+  - **Ficha del disco**: unificada al mismo botón compartido (antes tenía su propio desplegable).
   - **Marca de pertenencia**: si un disco ya está en algún reto, el botón lo indica (trofeo
     dorado + «En reto», con el/los reto(s) en el tooltip) y el menú señala con un check el reto
     que ya lo contiene — sin impedir añadirlo a otro. Nuevo `GET /api/challenges/membership`
@@ -41,6 +49,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   QUÉ discos entraron («Artista — Álbum», uno por línea; recorta con «…y N más» si son muchos)
   en vez de solo el número. `autoimport.js` recoge los ítems de la pasada
   (`autoImportStatus.importedItems`) y los lista en `sendNotification`.
+- **Importar listas por URL en segundo plano**: AOTY se lee página a página por el lector
+  (puede tardar minutos), así que ya no bloquea. `POST /api/challenges/import` lanza y devuelve
+  al instante (409 si ya hay una en curso); `GET /api/challenges/import/status` da el progreso
+  (página · nº de álbumes) y la UI lo muestra («Importando… página N · X álbumes») y recarga al
+  terminar.
 
 ---
 
