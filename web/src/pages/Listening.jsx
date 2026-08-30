@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Headphones, TrendingUp, Star, EarOff, Search, Disc3, ListMusic } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { api } from '../api.js';
-import { PageTitle, Stat, Spinner, ErrorMsg, Button, SearchModal, QuickSearch } from '../components.jsx';
+import { PageTitle, Stat, Spinner, ErrorMsg, Button, SearchModal, QuickSearch, AddToChallengeButton } from '../components.jsx';
 
 // Ventanas de fecha para la brecha. `since` = ms (o null = todo el tiempo).
 const RANGES = [
@@ -199,6 +199,7 @@ export default function Listening() {
                 >
                   <Search size={12} /> Buscar
                 </button>
+                <AddToChallengeButton artist={a.artist} title={a.album} />
               </div>
             ))}
           </div>
@@ -310,13 +311,16 @@ function TopPlayed() {
             <h3 className="text-xs uppercase tracking-wide text-neutral-600 mb-2">Álbumes</h3>
             <div className="space-y-1">
               {data.albums.map((a, i) => (
-                <div key={i} className="flex items-center justify-between text-sm px-1 py-0.5">
-                  <span className="truncate text-neutral-300">
+                <div key={i} className="flex items-center gap-2 text-sm px-1 py-0.5 group">
+                  <span className="truncate text-neutral-300 flex-1 min-w-0">
                     {a.artist} <span className="text-neutral-500">— {a.album}</span>
                   </span>
-                  <span className="text-neutral-500 shrink-0 ml-2">
+                  <span className="text-neutral-500 shrink-0">
                     {a.plays}
                     {!a.owned && <span className="text-amber-500/80"> · no lo tienes</span>}
+                  </span>
+                  <span className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <AddToChallengeButton artist={a.artist} title={a.album} label="" className="text-neutral-500 hover:text-gold-400 p-0.5" />
                   </span>
                 </div>
               ))}

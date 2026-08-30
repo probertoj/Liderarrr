@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Compass, Plus, Check, X, RefreshCw, Loader2, ExternalLink } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, Button, SearchModal, QuickSearch, useLidarrEnabled } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, Button, SearchModal, QuickSearch, AddToChallengeButton, useLidarrEnabled } from '../components.jsx';
 
 // Huecos: álbumes de estudio que MusicBrainz conoce de tus artistas y que no
 // tienes. Agrupados por artista, con envío a Lidarr (uno o todos) y opción de
@@ -171,6 +171,7 @@ export default function Discover() {
                       >
                         Buscar
                       </button>
+                      <AddToChallengeButton artist={group.artist} title={m.title} />
                       {done ? (
                         <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
                           <Check size={13} /> {m.in_lidarr ? 'Lidarr' : 'pedido'}

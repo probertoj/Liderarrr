@@ -279,6 +279,15 @@ export function AlbumCard({ album, onClick, selectable = false, selected = false
               )}
             </div>
           )}
+          {/* «Añadir a reto» visible al pasar el ratón (además del clic derecho en la tarjeta) */}
+          <div className="absolute bottom-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <AddToChallengeButton
+              artist={album.album_artist}
+              title={album.title}
+              label=""
+              className="p-1 rounded bg-ink-900/85 border border-ink-700 text-neutral-200 hover:text-gold-400 hover:border-gold-500/40 inline-flex items-center"
+            />
+          </div>
         </>
       )}
       {album.discs > 1 && (
