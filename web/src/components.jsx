@@ -399,12 +399,19 @@ export function useChallengeMembership() {
 // no solo en la ficha y el clic derecho de la Discoteca. Reutiliza ChallengeContextMenu.
 // Si el disco YA está en algún reto, el botón lo marca (trofeo dorado + «En reto»), pero
 // sigue permitiendo añadirlo a otro.
-export function AddToChallengeButton({ artist, title, label = 'Reto', className }) {
+export function AddToChallengeButton({ artist, title, label = 'Reto', className, size = 'sm' }) {
   const [menu, setMenu] = useState(null);
   const { inChallenges, reload } = useChallengeMembership();
   const inList = inChallenges(artist, title);
   const isIn = inList.length > 0;
   const iconOnly = label === '';
+  const base =
+    size === 'md'
+      ? 'text-sm px-3 py-1.5 rounded-lg border inline-flex items-center gap-1.5'
+      : 'text-xs px-1.5 py-0.5 rounded border inline-flex items-center gap-1';
+  const tone = isIn
+    ? 'border-gold-500/50 bg-gold-500/15 text-gold-300 hover:bg-gold-500/25'
+    : 'border-ink-700 bg-ink-850 hover:bg-ink-800';
   return (
     <>
       <button
@@ -418,16 +425,9 @@ export function AddToChallengeButton({ artist, title, label = 'Reto', className 
             ? `Ya en: ${inList.map((c) => c.name).join(', ')} · pulsa para añadir a otro reto`
             : `Añadir «${title}» a un reto`
         }
-        className={
-          className ||
-          `text-xs px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${
-            isIn
-              ? 'border-gold-500/50 bg-gold-500/15 text-gold-300 hover:bg-gold-500/25'
-              : 'border-ink-700 bg-ink-850 hover:bg-ink-800'
-          }`
-        }
+        className={className || `${base} ${tone}`}
       >
-        <Trophy size={12} className={isIn ? 'text-gold-400' : ''} /> {iconOnly ? '' : isIn ? 'En reto' : label}
+        <Trophy size={size === 'md' ? 14 : 12} className={isIn ? 'text-gold-400' : ''} /> {iconOnly ? '' : isIn ? 'En reto' : label}
       </button>
       {menu && (
         <ChallengeContextMenu
