@@ -509,9 +509,13 @@ app.get('/callback', async (req, reply) => {
     reply.type('text/html').send(
       `<!doctype html><meta charset=utf-8><title>Liderarrr · Spotify</title><body style="font-family:system-ui;background:#14141a;color:#eee;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center;max-width:420px;padding:24px"><h2 style="color:${ok ? '#4ade80' : '#f87171'}">${msg}</h2><p style="color:#999">Ya puedes cerrar esta pestaña y volver a Liderarrr.</p></div></body>`
     );
-  if (!code) return page('No llegó ningún código de Spotify.', false);
+  // reconstruye la query (code o error) para que spotifyConnect dé el mensaje adecuado
+  const qs = Object.entries(req.query || {})
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+    .join('&');
+  if (!code && !req.query?.error) return page('No llegó ningún código de Spotify.', false);
   try {
-    await spotifyConnect(code);
+    await spotifyConnect(code || `?${qs}`);
     return page('✅ Biblioteca de Spotify conectada', true);
   } catch (err) {
     return page(`No se pudo conectar: ${String(err.message || err)}`, false);

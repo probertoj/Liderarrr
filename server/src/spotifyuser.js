@@ -63,10 +63,33 @@ function parseCode(input) {
   return s; // código pelado
 }
 
+// Mensaje claro para los errores que Spotify puede devolver en el redirect (en vez de un code).
+function authErrorHint(err, desc) {
+  const e = String(err || '').toLowerCase();
+  if (e === 'access_denied') return 'Rechazaste el acceso en Spotify. Vuelve a intentarlo y pulsa «Aceptar».';
+  if (e === 'server_error') {
+    return (
+      'Spotify devolvió «server_error» en la autorización. Casi siempre es porque tu app está en ' +
+      'MODO DESARROLLO y la cuenta con la que inicias sesión NO está añadida a la lista de usuarios: ' +
+      've a developer.spotify.com/dashboard → tu app → «User Management» y añade tu cuenta (nombre + email). ' +
+      'Comprueba también que el Redirect URI está guardado EXACTAMENTE, y reintenta (a veces es temporal).' +
+      (desc ? ` [detalle: ${desc}]` : '')
+    );
+  }
+  return `Spotify devolvió un error en la autorización: ${err}${desc ? ` (${desc})` : ''}.`;
+}
+
 // Canjea el código de autorización por tokens y guarda el refresh_token.
 export async function spotifyConnect(codeOrUrl) {
   if (!spotifyClientConfigured()) throw new Error('Faltan client id/secret de Spotify en Ajustes');
-  const code = parseCode(codeOrUrl);
+  const raw = String(codeOrUrl || '').trim();
+  // ¿Spotify devolvió un error en vez de un code? (p. ej. …/callback?error=server_error)
+  const em = raw.match(/[?&]error=([^&]+)/);
+  if (em) {
+    const dm = raw.match(/[?&]error_description=([^&]+)/);
+    throw new Error(authErrorHint(decodeURIComponent(em[1]), dm ? decodeURIComponent(dm[1].replace(/\+/g, ' ')) : ''));
+  }
+  const code = parseCode(raw);
   if (!code) throw new Error('No encontré el código. Pega el `code=…` de la URL a la que te redirigió Spotify.');
   const res = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
