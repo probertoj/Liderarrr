@@ -9,6 +9,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Arreglado
+- **Importar listas de AlbumOfTheYear más robusto**: el lector (r.jina.ai) devuelve a veces un
+  404/429/5xx TEMPORAL para AOTY y la importación fallaba en seco. Ahora se **reintenta** con
+  backoff en esos códigos (solo 401/403 —bloqueo real de bots, p. ej. RateYourMusic— falla sin
+  reintentar). Además, las listas de tipo «ratings»/«genre» (…/2000s/1) **paginan por el
+  número del path**, no por `?p=N`, así que ahora traen la lista completa (p. ej. 500 álbumes
+  de «highest rated 2000s»). Un fallo en páginas posteriores ya no tira toda la importación:
+  se queda con lo recogido.
+
 ### Añadido
 - **«Añadir a reto» coherente en toda la app**: botón «Reto» (componente reutilizable
   `AddToChallengeButton`, envuelve `ChallengeContextMenu`) allá donde aparece un disco:

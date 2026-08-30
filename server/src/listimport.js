@@ -9,29 +9,57 @@ import { rosyList } from './rosyoverdrive.js';
 
 const READER = 'https://r.jina.ai/';
 const UA = 'Mozilla/5.0 (compatible; Liderarrr list importer)';
-
-async function fetchViaReader(url) {
-  let res;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const hostOf = (url) => {
   try {
-    res = await fetch(READER + url, {
-      headers: { 'User-Agent': UA, Accept: 'text/plain', 'X-Return-Format': 'markdown', 'X-No-Cache': 'true' },
-      signal: AbortSignal.timeout(60000),
-    });
-  } catch (err) {
-    const why = err?.name === 'TimeoutError' ? 'tardó demasiado' : String(err?.message || err);
-    throw new Error(`No se pudo leer la URL (${why})`);
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return 'ese sitio';
   }
-  const text = await res.text();
-  if (!res.ok) throw new Error(`El lector devolvió ${res.status} para esa URL`);
-  // el lector responde 200 pero avisa dentro si el destino lo bloqueó (RYM: 403)
-  const blocked = text.match(/Target URL returned error (\d+)/i);
-  if (blocked) {
-    const host = (() => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'ese sitio'; } })();
-    throw new Error(
-      `${host} bloqueó la descarga (${blocked[1]}), incluso a través del lector. No se puede importar por URL desde ahí (RateYourMusic, por ejemplo, bloquea los bots).`
-    );
+};
+
+// Lee una URL a través del lector (r.jina.ai). El lector es algo inestable con sitios tras
+// Cloudflare: a veces devuelve un 404/429/5xx TEMPORAL (rate-limit del propio lector) aunque
+// la página exista. Por eso se REINTENTA en esos códigos; solo un 403/401 persistente se
+// trata como bloqueo real de bots (RYM), que no tiene arreglo reintentando.
+async function fetchViaReader(url, { retries = 3 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt) await sleep(1200 * attempt); // backoff creciente entre intentos
+    let res;
+    let text;
+    try {
+      res = await fetch(READER + url, {
+        headers: { 'User-Agent': UA, Accept: 'text/plain', 'X-Return-Format': 'markdown', 'X-No-Cache': 'true' },
+        signal: AbortSignal.timeout(60000),
+      });
+      text = await res.text();
+    } catch (err) {
+      const why = err?.name === 'TimeoutError' ? 'tardó demasiado' : String(err?.message || err);
+      lastErr = new Error(`No se pudo leer la URL (${why})`);
+      continue; // error de red/timeout: reintenta
+    }
+    if (!res.ok) {
+      lastErr = new Error(`El lector devolvió ${res.status} para esa URL`);
+      continue; // el propio lector falló: reintenta
+    }
+    // el lector responde 200 pero avisa dentro si el destino lo bloqueó
+    const blocked = text.match(/Target URL returned error (\d+)/i);
+    if (blocked) {
+      const code = Number(blocked[1]);
+      // 401/403 = bloqueo real de bots (p. ej. RateYourMusic): no tiene sentido reintentar.
+      if (code === 401 || code === 403) {
+        throw new Error(
+          `${hostOf(url)} bloqueó la descarga (${code}), incluso a través del lector. No se puede importar por URL desde ahí (RateYourMusic, por ejemplo, bloquea los bots).`
+        );
+      }
+      // 404/429/5xx suelen ser temporales (rate-limit del lector): reintenta.
+      lastErr = new Error(`${hostOf(url)} devolvió ${code} a través del lector (puede ser temporal).`);
+      continue;
+    }
+    return text; // ok
   }
-  return text;
+  throw lastErr || new Error(`No se pudo leer ${hostOf(url)}`);
 }
 
 const clean = (tx) => String(tx || '').trim();
@@ -59,20 +87,39 @@ function extractAotyPage(md) {
   return pairs;
 }
 
+// AOTY pagina de DOS formas según el tipo de lista:
+//  · «ratings»/«genre» (…/2000s/1, …/2000s/2): por el número FINAL del path.
+//  · listas de usuario (…/list/…): por ?p=N.
 const withPage = (url, p) => {
   const u = new URL(url);
+  if (/\/ratings\//i.test(u.pathname) || /\/genre\//i.test(u.pathname)) {
+    u.pathname = /\/\d+$/.test(u.pathname)
+      ? u.pathname.replace(/\/\d+$/, `/${p}`) // …/2000s/1 → …/2000s/N
+      : `${u.pathname.replace(/\/$/, '')}/${p}`; // …/2000s → …/2000s/N
+    return u.toString();
+  }
   u.searchParams.set('p', String(p));
   return u.toString();
 };
 
-// AOTY con paginación (?p=N). Encadena hasta que una página no aporta nada nuevo.
-// Ordena por ranking ascendente (el #1 primero), para que el reto vaya de mejor a peor.
+// AOTY con paginación. Encadena hasta que una página no aporta nada nuevo. Ordena por
+// ranking ascendente (el #1 primero), para que el reto vaya de mejor a peor. Un fallo en la
+// PRIMERA página aborta (no hay nada); en páginas siguientes se asume fin de lista / hipo
+// temporal del lector y se para con lo que se lleva (partial), en vez de tirar todo.
 async function importAoty(url, name) {
   const byRank = new Map();
   let listTitle = null;
+  let partial = false;
   const MAX_PAGES = 20; // tope de seguridad (hasta ~1000 álbumes)
   for (let p = 1; p <= MAX_PAGES; p++) {
-    const md = await fetchViaReader(p === 1 ? url : withPage(url, p));
+    let md;
+    try {
+      md = await fetchViaReader(p === 1 ? url : withPage(url, p));
+    } catch (err) {
+      if (p === 1) throw err; // sin la primera página no hay lista que importar
+      partial = true;
+      break; // fin de lista o fallo temporal en páginas siguientes: paramos con lo que hay
+    }
     if (!listTitle) listTitle = listTitleOf(md);
     const pairs = extractAotyPage(md);
     let added = 0;
@@ -80,7 +127,7 @@ async function importAoty(url, name) {
     if (!pairs.length || added === 0) break; // sin novedades: fin de la lista
   }
   const lines = [...byRank.keys()].sort((a, b) => a - b).map((r) => byRank.get(r));
-  return { lines, listTitle, partial: false };
+  return { lines, listTitle, partial };
 }
 
 // Genérico: textos de enlaces markdown con forma "Artista - Álbum"; si no, líneas planas.
