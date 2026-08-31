@@ -59,6 +59,7 @@ import {
   refreshSpotifyLibrary,
   spotifyLibStatus,
   spotifyGap,
+  spotifySaveAlbum,
 } from './spotifyuser.js';
 import { notifyTest } from './notify.js';
 import { wrappedImageSvg } from './wrappedimage.js';
@@ -500,6 +501,13 @@ app.post('/api/spotify/library/refresh', async () => {
 });
 app.get('/api/spotify/library/refresh/status', async () => spotifyLibStatus);
 app.get('/api/spotify/gap', async () => spotifyGap());
+app.post('/api/spotify/library/save', async (req, reply) => {
+  try {
+    return await spotifySaveAlbum(req.body?.artist, req.body?.title);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 // Callback OAuth para quien sirva Liderarr por HTTPS y registre ESTA ruta como redirect: si
 // llega el code, se completa solo. En el flujo por defecto (loopback 127.0.0.1) nadie sirve
 // esto y el usuario pega el code a mano; da igual.

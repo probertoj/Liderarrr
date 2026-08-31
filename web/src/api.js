@@ -137,6 +137,7 @@ export const api = {
   spotifyLibraryRefresh: () => req('/spotify/library/refresh', { method: 'POST' }),
   spotifyLibraryStatus: () => req('/spotify/library/refresh/status'),
   spotifyGap: () => req('/spotify/gap'),
+  spotifySaveToLibrary: (artist, title) => req('/spotify/library/save', { method: 'POST', body: { artist, title } }),
   dismissNewRelease: (id) => req(`/newreleases/${id}/dismiss`, { method: 'POST' }),
   spotifyAlbum: (artist, title) => req(`/spotify/album?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`),
   searchArtistMb: (q) => req(`/artists/search-mb?q=${encodeURIComponent(q)}`),

@@ -29,6 +29,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
     render por lotes** («Mostrar más») para que no congele el navegador.
   - Toggle opcional **«Solo álbumes»**: deja fuera singles/EPs/recopilatorios (streaming por
     `album_type` de Spotify; local por `primary_type`). Apagado por defecto.
+  - **«Guardar en Spotify» de un clic** en el lado «en tu disco, no en Spotify»: busca el álbum
+    en Spotify y lo añade a tu biblioteca (scope `user-library-modify`). Si conectaste solo con
+    lectura, avisa de reconectar. Queda el enlace ↗ para hacerlo a mano.
   - Si Spotify redirige con `error=…` (p. ej. `server_error` por app en modo desarrollo con la
     cuenta sin añadir a «User Management», o `access_denied`), la app lo detecta y da un mensaje
     accionable en vez de «no encontré el código».

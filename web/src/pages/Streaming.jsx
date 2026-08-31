@@ -64,7 +64,7 @@ function StreamingRow({ r, added, busy, onDownload }) {
   );
 }
 
-function LocalRow({ r }) {
+function LocalRow({ r, saved, busy, onSave }) {
   return (
     <div className="card px-3 py-2 flex items-center gap-3 text-sm">
       <div className="min-w-0 flex-1">
@@ -83,14 +83,28 @@ function LocalRow({ r }) {
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <AddToChallengeButton artist={r.artist} title={r.title} />
+        {saved ? (
+          <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
+            <Check size={13} /> guardado
+          </span>
+        ) : (
+          <button
+            onClick={() => onSave(r)}
+            disabled={busy === r.album_id}
+            title="Añadirlo a tu biblioteca de Spotify"
+            className="text-xs px-1.5 py-0.5 rounded border border-emerald-600/40 bg-emerald-600/10 text-emerald-300/90 hover:bg-emerald-600/20 inline-flex items-center gap-1 disabled:opacity-50"
+          >
+            {busy === r.album_id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Guardar en Spotify
+          </button>
+        )}
         <a
           href={`https://open.spotify.com/search/${encodeURIComponent(`${r.artist} ${r.title}`.trim())}`}
           target="_blank"
           rel="noreferrer"
-          title="Buscarlo en Spotify para guardarlo en tu biblioteca"
-          className="text-xs px-1.5 py-0.5 rounded border border-emerald-600/40 bg-emerald-600/10 text-emerald-300/90 hover:bg-emerald-600/20 inline-flex items-center gap-1"
+          title="Abrirlo en Spotify (por si prefieres hacerlo a mano)"
+          className="text-neutral-600 hover:text-emerald-300"
         >
-          <ExternalLink size={12} /> Guardar en Spotify
+          <ExternalLink size={13} />
         </a>
       </div>
     </div>
@@ -103,6 +117,8 @@ export default function Streaming() {
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(null);
   const [added, setAdded] = useState({});
+  const [savingLocal, setSavingLocal] = useState(null); // album_id en curso de guardar en Spotify
+  const [savedLocal, setSavedLocal] = useState({}); // album_id → guardado en Spotify
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState(null);
   const [side, setSide] = useState('streaming'); // qué lado de la brecha mostrar
@@ -161,6 +177,18 @@ export default function Streaming() {
       await loadStatus();
       await loadGap();
     }, 1500);
+  };
+
+  const saveToSpotify = async (r) => {
+    setSavingLocal(r.album_id);
+    try {
+      await api.spotifySaveToLibrary(r.artist, r.title);
+      setSavedLocal((p) => ({ ...p, [r.album_id]: true }));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSavingLocal(null);
+    }
   };
 
   const download = async (r) => {
@@ -316,7 +344,9 @@ export default function Streaming() {
           <div className="space-y-1.5">
             {side === 'streaming'
               ? rows.map((r) => <StreamingRow key={r.id} r={r} added={added} busy={busy} onDownload={download} />)
-              : rows.map((r) => <LocalRow key={r.album_id} r={r} />)}
+              : rows.map((r) => (
+                  <LocalRow key={r.album_id} r={r} saved={savedLocal[r.album_id]} busy={savingLocal} onSave={saveToSpotify} />
+                ))}
           </div>
           {filtered.length > rows.length && (
             <div className="mt-3 text-center">

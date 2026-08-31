@@ -1,5 +1,5 @@
 import { db, getSetting, setSetting } from './db.js';
-import { matchKey } from './matchkey.js';
+import { matchKey, normName, cleanTitleForMatch } from './matchkey.js';
 
 // Integración con la BIBLIOTECA del usuario en Spotify (no el catálogo). Usa OAuth de usuario
 // (Authorization Code): el usuario aprueba una vez y guardamos su refresh_token para leer sus
@@ -11,7 +11,9 @@ import { matchKey } from './matchkey.js';
 // Spotify redirige a 127.0.0.1 (no carga, es normal) y pega el `code` de la barra aquí.
 
 const UA = 'Liderarrr ( https://github.com/probertoj/Liderarrr )';
-const SCOPES = 'user-library-read';
+// Lectura de la biblioteca + escritura (para «Guardar en Spotify» de un clic). Si un usuario
+// conectó antes solo con lectura, al guardar recibirá 403 y se le pedirá reconectar.
+const SCOPES = 'user-library-read user-library-modify';
 const DEFAULT_REDIRECT = 'http://127.0.0.1:3861/callback';
 
 export function spotifyRedirectUri() {
@@ -230,6 +232,66 @@ export function spotifyUserStatus() {
     savedCount: count,
     syncedAt,
   };
+}
+
+// «Guardar en Spotify» de un clic: busca el álbum en el catálogo de Spotify (por artista +
+// título), y si hay coincidencia fiable lo AÑADE a tu biblioteca (PUT /me/albums). Requiere el
+// scope user-library-modify (si conectaste solo con lectura, da 403 → reconectar). Al guardar,
+// lo mete también en la tabla local para que desaparezca de la brecha al instante.
+export async function spotifySaveAlbum(artist, title) {
+  if (!artist || !title) throw new Error('Faltan artista o título.');
+  const t = await userAccessToken();
+  const wantArtist = normName(artist);
+  const wantTitle = cleanTitleForMatch(title);
+  const search = async (q) => {
+    const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=album&limit=10`, {
+      headers: { Authorization: `Bearer ${t}`, 'User-Agent': UA },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) throw new Error(`Spotify ${res.status} al buscar`);
+    const data = await res.json();
+    return data.albums?.items || [];
+  };
+  // primero una búsqueda acotada; si no casa, otra más suelta
+  let items = await search(`album:${title} artist:${artist}`);
+  const pick = (list) =>
+    list.find(
+      (al) => (al.artists || []).some((a) => normName(a.name) === wantArtist) && cleanTitleForMatch(al.name) === wantTitle
+    ) || list.find((al) => (al.artists || []).some((a) => normName(a.name) === wantArtist));
+  let best = pick(items);
+  if (!best) {
+    items = await search(`${artist} ${title}`);
+    best = pick(items);
+  }
+  if (!best) throw new Error(`No encontré «${artist} — ${title}» en Spotify con confianza. Ábrelo a mano y guárdalo.`);
+
+  const put = await fetch(`https://api.spotify.com/v1/me/albums?ids=${encodeURIComponent(best.id)}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${t}`, 'User-Agent': UA },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (put.status === 403) {
+    throw new Error(
+      'Spotify no permite escribir: conectaste solo con lectura. Ve a Ajustes → Biblioteca de Spotify → Desconectar y vuelve a conectar para dar permiso de guardar.'
+    );
+  }
+  if (!put.ok) throw new Error(`Spotify ${put.status} al guardar`);
+
+  // refleja el cambio en la tabla local (desaparece de la brecha sin re-sincronizar)
+  const a = (best.artists && best.artists[0]?.name) || artist;
+  upsertSaved.run({
+    id: best.id,
+    artist: a,
+    title: best.name || title,
+    match_key: matchKey(a, best.name || title),
+    album_type: best.album_type || 'album',
+    release_date: (best.release_date || '').slice(0, 10) || null,
+    cover: best.images?.[0]?.url || null,
+    url: best.external_urls?.spotify || null,
+    added_at: new Date().toISOString(),
+    synced_at: Date.now(),
+  });
+  return { ok: true, url: best.external_urls?.spotify || null, name: best.name };
 }
 
 // LA BRECHA, calculada EN VIVO: cruza tu colección local con tu biblioteca de Spotify.
