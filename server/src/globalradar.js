@@ -1,6 +1,5 @@
 import { db, cacheRead, cacheWrite } from './db.js';
 import { matchKey, normName } from './matchkey.js';
-import { spotifyNewReleases, spotifyConfigured } from './spotify.js';
 import { deezerFindArtist } from './artistpix.js';
 import { deezerArtistAlbums } from './newreleases.js';
 
@@ -83,7 +82,7 @@ const storeRow = (now) => (source, artist, artists, title, date, type, cover, ur
 // editorial «New Releases» de Spotify, que Spotify ha ido restringiendo (403 en apps nuevas);
 // si falla, se anota y se sigue: el radar no depende de él. windowDays = cuánto hacia atrás
 // se recogen los estrenos (la UI luego filtra por su ventana de días).
-export async function refreshGlobalReleases({ windowDays = RETENTION_DAYS, throttleMs = 150, spotifyPages = 5 } = {}) {
+export async function refreshGlobalReleases({ windowDays = RETENTION_DAYS, throttleMs = 150 } = {}) {
   if (globalRefreshStatus.running) return { ...globalRefreshStatus, busy: true };
   const now = Date.now();
   const since = new Date(now - windowDays * 24 * 3600 * 1000).toISOString().slice(0, 10);
@@ -147,37 +146,15 @@ export async function refreshGlobalReleases({ windowDays = RETENTION_DAYS, throt
       globalRefreshStatus.added = added;
     }
 
-    // 2) SPOTIFY new-releases (descubrimiento puro más allá de tus similares) — best-effort
-    if (spotifyConfigured()) {
-      try {
-        const items = await spotifyNewReleases({ pages: spotifyPages });
-        globalRefreshStatus.spotify = items.length ? 'ok' : 'sin resultados (endpoint restringido por Spotify)';
-        for (const it of items) {
-          const artist = (it.artists && it.artists[0]) || it.artist || '';
-          added += store(
-            'spotify',
-            artist,
-            it.artists,
-            it.title,
-            (it.release_date || '').slice(0, 10),
-            String(it.record_type || 'album').toLowerCase(),
-            it.cover,
-            it.url
-          );
-        }
-      } catch (e) {
-        globalRefreshStatus.spotify = String(e.message || e);
-      }
-    } else {
-      globalRefreshStatus.spotify = 'no configurado';
-    }
+    // (Antes se sumaba el feed New Releases de Spotify, pero Spotify lo tiene restringido
+    //  —devolvía vacío— y consumía cuota de la app. El radar va SOLO por Deezer/similares.)
 
     // poda lo más viejo que la ventana de retención
     const cutoff = new Date(now - RETENTION_DAYS * 24 * 3600 * 1000).toISOString().slice(0, 10);
     db.prepare('DELETE FROM global_releases WHERE release_date < ?').run(cutoff);
     const count = db.prepare('SELECT COUNT(*) n FROM global_releases WHERE dismissed = 0').get().n;
     globalRefreshStatus.count = count;
-    return { count, added, seeds: seeds.length, spotify: globalRefreshStatus.spotify };
+    return { count, added, seeds: seeds.length };
   } catch (err) {
     globalRefreshStatus.lastError = String(err.message || err);
     throw err;

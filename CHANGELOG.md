@@ -31,7 +31,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
     `album_type` de Spotify; local por `primary_type`). Apagado por defecto.
   - **«Guardar en Spotify» de un clic** en el lado «en tu disco, no en Spotify»: busca el álbum
     en Spotify y lo añade a tu biblioteca (scope `user-library-modify`). Si conectaste solo con
-    lectura, avisa de reconectar. Queda el enlace ↗ para hacerlo a mano.
+    lectura, avisa de reconectar. Queda el enlace ↗ para hacerlo a mano. Maneja el 429
+    (rate-limit) con reintentos y Retry-After.
+  - **El catálogo (Canciones nuevas / Descubre) ya no usa Spotify, solo Deezer.** Antes se
+    consultaba Spotify artista por artista de la colección (miles de peticiones), lo que agotaba
+    la cuota de la app —capada en «modo desarrollo»— y provocaba 429 al usar la biblioteca de
+    Spotify. Deezer ya cubre eso, así que la cuota de Spotify queda para sincronizar/guardar.
   - Si Spotify redirige con `error=…` (p. ej. `server_error` por app en modo desarrollo con la
     cuenta sin añadir a «User Management», o `access_denied`), la app lo detecta y da un mensaje
     accionable en vez de «no encontré el código».

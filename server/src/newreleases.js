@@ -1,7 +1,8 @@
 import { db } from './db.js';
 import { matchKey, normName, cleanTitleForMatch } from './matchkey.js';
 import { deezerFindArtist } from './artistpix.js';
-import { spotifyArtistAlbums, spotifyConfigured } from './spotify.js';
+// (Ya no se usa Spotify aquí: el barrido de novedades/singles de la colección va solo por
+//  Deezer, para no agotar la cuota de la app de Spotify —capada en modo desarrollo—.)
 
 // ¿YA lo tienes? Cruce robusto contra la biblioteca, con DOS señales para no mostrar como
 // «novedad» algo que ya está en tu disco: (1) matchKey(artista, título) global —casa por
@@ -173,7 +174,6 @@ export async function refreshExternalReleases({
       .map((r) => matchKey(r.artist, r.title))
   );
 
-  const spotifyOn = spotifyConfigured();
   const now = Date.now();
   Object.assign(externalRefreshStatus, {
     running: true,
@@ -216,16 +216,9 @@ export async function refreshExternalReleases({
         // eslint-disable-next-line no-await-in-loop
         if (throttleMs) await sleep(throttleMs);
       }
-      // Spotify (si hay credenciales)
-      if (spotifyOn) {
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          const sp = await spotifyArtistAlbums(s.name);
-          if (sp.length && normName(sp[0].artistName) === normName(s.name)) candidates.push(...sp);
-        } catch {
-          /* idem */
-        }
-      }
+      // (Antes también se consultaba Spotify por artista, pero Deezer ya cubre esto y aquello
+      //  agotaba la cuota de Spotify de la app —capada en modo desarrollo— y rompía la
+      //  biblioteca de Spotify (sincronizar/guardar). Ahora el barrido es SOLO Deezer.)
 
       for (const c of candidates) {
         const type = String(c.record_type || 'album').toLowerCase();

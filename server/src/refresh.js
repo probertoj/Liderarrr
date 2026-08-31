@@ -11,7 +11,6 @@ import { runAutoImport, autoImportEnabled, autoImportStatus } from './autoimport
 import { runAutoGrab, autoGrabConfig, autoGrabStatus } from './autograb.js';
 import { refreshExternalReleases } from './newreleases.js';
 import { refreshGlobalReleases } from './globalradar.js';
-import { spotifyConfigured } from './spotify.js';
 import { refreshSpotifyLibrary, spotifyUserConnected } from './spotifyuser.js';
 import { refreshArtistSuggestions } from './suggest.js';
 import { lastfmConfigured } from './lastfm.js';
@@ -144,14 +143,15 @@ function buildSteps() {
       // solo trae y guarda el feed global; la afinidad se calcula EN VIVO al leer (usa tu
       // colección y las sugerencias «similares» del momento), así que el orden aquí da igual.
       key: 'globalradar',
-      label: 'Radar de descubrimiento (estrenos de artistas similares + Spotify)',
-      // fuente principal: estrenos de tus similares (artist_suggestions) vía Deezer; Spotify
-      // es suplemento. Se activa si hay similares O Spotify configurado.
+      label: 'Radar de descubrimiento (estrenos de artistas similares y de tus sellos)',
+      // fuente: estrenos de tus similares (artist_suggestions) + artistas de tus sellos, vía
+      // Deezer. Se activa si hay similares o sellos seguidos.
       enabled: () =>
-        !!db.prepare('SELECT 1 FROM artist_suggestions WHERE dismissed = 0 LIMIT 1').get() || spotifyConfigured(),
+        !!db.prepare('SELECT 1 FROM artist_suggestions WHERE dismissed = 0 LIMIT 1').get() ||
+        !!db.prepare('SELECT 1 FROM label_release_groups LIMIT 1').get(),
       run: async () => {
         const r = await refreshGlobalReleases();
-        return `${r.count} novedades globales (${r.added} nuevas)${r.spotify && r.spotify !== 'ok' ? ` · Spotify: ${r.spotify}` : ''}`;
+        return `${r.count} novedades globales (${r.added} nuevas)`;
       },
     },
     {
