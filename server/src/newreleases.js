@@ -188,6 +188,7 @@ export async function refreshExternalReleases({
     lastError: null,
   });
   let added = 0;
+  const addedItems = []; // qué novedades NUEVAS entraron (para el aviso detallado; se acota)
 
   try {
     for (const s of seeds) {
@@ -249,7 +250,10 @@ export async function refreshExternalReleases({
           ahead: mbKeys.has(mk) ? 0 : 1, // MB aún no lo lista → adelantada
           now,
         });
-        if (info.changes && !isOwnedRel) added++;
+        if (info.changes && !isOwnedRel) {
+          added++;
+          if (addedItems.length < 40) addedItems.push({ artist: s.name, title: c.title, record_type: type });
+        }
       }
       // marca de rotación SOLO si hubo resolución definitiva (id>0 o -1 «no hallado»). Si
       // saltamos por agotar el cupo de búsquedas o por fallo transitorio (dzId == null), NO
@@ -275,7 +279,7 @@ export async function refreshExternalReleases({
 
     const count = externalNewReleases({ limit: 100000 }).length; // los que NO tienes (para el aviso)
     externalRefreshStatus.count = count;
-    return { count, added, seeds: seeds.length };
+    return { count, added, seeds: seeds.length, addedItems };
   } catch (err) {
     externalRefreshStatus.lastError = String(err.message || err);
     throw err;

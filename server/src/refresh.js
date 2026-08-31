@@ -127,10 +127,15 @@ function buildSteps() {
         !!db.prepare("SELECT 1 FROM albums WHERE match_state != 'dismissed' LIMIT 1").get(),
       run: async () => {
         const r = await refreshExternalReleases();
-        // aviso solo en el ciclo nocturno (en el manual el usuario ya está delante)
+        // aviso solo en el ciclo nocturno (en el manual el usuario ya está delante), DETALLADO:
+        // enumera qué estrenos entraron (Artista — Álbum), con «…y N más» si son muchos.
         if (r.added > 0 && refreshStatus.trigger === 'nightly') {
-          const n = r.added;
-          sendNotification('Liderarr', `${n} ${n === 1 ? 'novedad nueva' : 'novedades nuevas'} de tu colección en «Lanzamientos»`).catch(() => {});
+          const items = (r.addedItems || []).slice(0, 15);
+          const lines = items.map((it) => `• ${it.artist} — ${it.title}`);
+          if (r.added > items.length) lines.push(`…y ${r.added - items.length} más`);
+          const header =
+            r.added === 1 ? 'Nueva novedad de tu colección en «Lanzamientos»:' : `${r.added} novedades nuevas en «Lanzamientos»:`;
+          sendNotification('Liderarr', `${header}\n${lines.join('\n')}`).catch(() => {});
         }
         return `${r.count} novedades (${r.added} nuevas) de ${r.seeds} artistas`;
       },
