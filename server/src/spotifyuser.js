@@ -140,10 +140,13 @@ async function userAccessToken() {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const RATE_LIMIT_MSG =
+  'Spotify está limitando las peticiones (429). Suele ser la CUOTA de tu app en «modo desarrollo»: ' +
+  'espera un minuto y reintenta. Para quitar el tope, pide «Extended Quota Mode» en la app del dashboard de Spotify.';
 
 // Petición autenticada a la API de usuario con reintentos: 401 → renueva token y reintenta;
 // 429 → espera lo que diga Retry-After (acotado) y reintenta. Devuelve la Response.
-async function spUserFetch(path, { method = 'GET', retries = 2 } = {}) {
+async function spUserFetch(path, { method = 'GET', retries = 3 } = {}) {
   let lastStatus = 0;
   for (let attempt = 0; attempt <= retries; attempt++) {
     // eslint-disable-next-line no-await-in-loop
@@ -161,7 +164,7 @@ async function spUserFetch(path, { method = 'GET', retries = 2 } = {}) {
       continue;
     }
     if (res.status === 429 && attempt < retries) {
-      const wait = Math.min((Number(res.headers.get('retry-after')) || 2) + 1, 8);
+      const wait = Math.min((Number(res.headers.get('retry-after')) || 2) + 1, 12);
       // eslint-disable-next-line no-await-in-loop
       await sleep(wait * 1000);
       continue;
@@ -272,7 +275,7 @@ export async function spotifySaveAlbum(artist, title) {
   const wantTitle = cleanTitleForMatch(title);
   const search = async (q) => {
     const res = await spUserFetch(`/search?q=${encodeURIComponent(q)}&type=album&limit=10`);
-    if (res.status === 429) throw new Error('Spotify está limitando las peticiones (429). Prueba de nuevo en un momento.');
+    if (res.status === 429) throw new Error(RATE_LIMIT_MSG);
     if (!res.ok) throw new Error(`Spotify ${res.status} al buscar`);
     const data = await res.json();
     return data.albums?.items || [];
@@ -296,7 +299,7 @@ export async function spotifySaveAlbum(artist, title) {
       'Spotify no permite escribir: conectaste solo con lectura. Ve a Ajustes → Biblioteca de Spotify → Desconectar y vuelve a conectar para dar permiso de guardar.'
     );
   }
-  if (put.status === 429) throw new Error('Spotify está limitando las peticiones (429). Prueba de nuevo en un momento.');
+  if (put.status === 429) throw new Error(RATE_LIMIT_MSG);
   if (!put.ok) throw new Error(`Spotify ${put.status} al guardar`);
 
   // refleja el cambio en la tabla local (desaparece de la brecha sin re-sincronizar)
