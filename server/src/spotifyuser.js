@@ -139,12 +139,40 @@ async function userAccessToken() {
   return _userToken.value;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Petición autenticada a la API de usuario con reintentos: 401 → renueva token y reintenta;
+// 429 → espera lo que diga Retry-After (acotado) y reintenta. Devuelve la Response.
+async function spUserFetch(path, { method = 'GET', retries = 2 } = {}) {
+  let lastStatus = 0;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    // eslint-disable-next-line no-await-in-loop
+    const t = await userAccessToken();
+    // eslint-disable-next-line no-await-in-loop
+    const res = await fetch(`https://api.spotify.com/v1${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${t}`, 'User-Agent': UA },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (res.ok) return res;
+    lastStatus = res.status;
+    if (res.status === 401 && attempt < retries) {
+      _userToken = { value: null, exp: 0 }; // fuerza renovación del token
+      continue;
+    }
+    if (res.status === 429 && attempt < retries) {
+      const wait = Math.min((Number(res.headers.get('retry-after')) || 2) + 1, 8);
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(wait * 1000);
+      continue;
+    }
+    return res; // otros errores: los gestiona quien llama
+  }
+  throw new Error(`Spotify ${lastStatus} (con reintentos agotados)`);
+}
+
 async function meFetch(path) {
-  const t = await userAccessToken();
-  const res = await fetch(`https://api.spotify.com/v1${path}`, {
-    headers: { Authorization: `Bearer ${t}`, 'User-Agent': UA },
-    signal: AbortSignal.timeout(20000),
-  });
+  const res = await spUserFetch(path);
   if (!res.ok) throw new Error(`Spotify ${res.status} en ${path}`);
   return res.json();
 }
@@ -240,14 +268,11 @@ export function spotifyUserStatus() {
 // lo mete también en la tabla local para que desaparezca de la brecha al instante.
 export async function spotifySaveAlbum(artist, title) {
   if (!artist || !title) throw new Error('Faltan artista o título.');
-  const t = await userAccessToken();
   const wantArtist = normName(artist);
   const wantTitle = cleanTitleForMatch(title);
   const search = async (q) => {
-    const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=album&limit=10`, {
-      headers: { Authorization: `Bearer ${t}`, 'User-Agent': UA },
-      signal: AbortSignal.timeout(15000),
-    });
+    const res = await spUserFetch(`/search?q=${encodeURIComponent(q)}&type=album&limit=10`);
+    if (res.status === 429) throw new Error('Spotify está limitando las peticiones (429). Prueba de nuevo en un momento.');
     if (!res.ok) throw new Error(`Spotify ${res.status} al buscar`);
     const data = await res.json();
     return data.albums?.items || [];
@@ -265,16 +290,13 @@ export async function spotifySaveAlbum(artist, title) {
   }
   if (!best) throw new Error(`No encontré «${artist} — ${title}» en Spotify con confianza. Ábrelo a mano y guárdalo.`);
 
-  const put = await fetch(`https://api.spotify.com/v1/me/albums?ids=${encodeURIComponent(best.id)}`, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${t}`, 'User-Agent': UA },
-    signal: AbortSignal.timeout(15000),
-  });
+  const put = await spUserFetch(`/me/albums?ids=${encodeURIComponent(best.id)}`, { method: 'PUT' });
   if (put.status === 403) {
     throw new Error(
       'Spotify no permite escribir: conectaste solo con lectura. Ve a Ajustes → Biblioteca de Spotify → Desconectar y vuelve a conectar para dar permiso de guardar.'
     );
   }
+  if (put.status === 429) throw new Error('Spotify está limitando las peticiones (429). Prueba de nuevo en un momento.');
   if (!put.ok) throw new Error(`Spotify ${put.status} al guardar`);
 
   // refleja el cambio en la tabla local (desaparece de la brecha sin re-sincronizar)
