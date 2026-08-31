@@ -1,4 +1,4 @@
-import { HardDrive, Sparkles, Compass, DownloadCloud, Radio, Headphones, Clock, Moon } from 'lucide-react';
+import { HardDrive, Sparkles, Compass, DownloadCloud, Radio, Headphones, Clock, Moon, Library } from 'lucide-react';
 import { PageTitle } from '../components.jsx';
 
 // «¿Cómo funciona todo esto?»: explica en cristiano el recorrido de la app y, sobre todo,
@@ -52,13 +52,21 @@ export default function HowItWorks() {
           termina, el <strong className="text-neutral-400">auto-import</strong> lo enlaza (hardlink) a tu biblioteca
           organizada, sin copiar ni dejar de sembrar. Con la prioridad de trackers eliges de dónde tirar.
         </Step>
-        <Step n="5" Icon={Radio} title="Radar de novedades">
-          Sigue a curadores y sitios (buymusic.club, Rosy Overdrive, Raven Sings the Blues, Hipersónica) y te trae
-          sus novedades, marcando lo que ya tienes y lo que no.
+        <Step n="5" Icon={Radio} title="Radar de novedades (Lanzamientos)">
+          Estrenos de tu colección (álbumes y <strong className="text-neutral-400">Canciones nuevas</strong>/singles),
+          un calendario «Mes» con filtros por fuente, curadores (buymusic.club, Rosy Overdrive, Hipersónica), y{' '}
+          <strong className="text-neutral-400">Descubre</strong>: novedades por afinidad de artistas parecidos a lo que
+          escuchas y de tus sellos seguidos. Todo marcando lo que ya tienes.
         </Step>
         <Step n="6" Icon={Headphones} title="Escuchas y retos (Losing My Edge)">
           Conecta Last.fm para cruzar lo que TIENES con lo que has ESCUCHADO, y construye retos (1001 discos,
-          listas, tier lists…) con anillos de progreso.
+          listas, tier lists…) con anillos de progreso. El botón <strong className="text-neutral-400">«Añadir a
+          reto»</strong> está en cualquier disco de la app, y marca los que ya están en un reto.
+        </Step>
+        <Step n="7" Icon={Library} title="Streaming (tu biblioteca de Spotify)">
+          Conecta tu cuenta de Spotify (solo lectura) y cruza tus <strong className="text-neutral-400">álbumes
+          guardados</strong> con tu colección local: lo que tienes en streaming y no en disco (para descargar) y lo
+          que tienes en disco y no en streaming (para abrirlo en Spotify y guardarlo).
         </Step>
       </div>
 
@@ -86,9 +94,10 @@ export default function HowItWorks() {
             <div className="text-xs text-neutral-500 leading-relaxed">
               La pasada de fondo, en orden: auto-importar → escanear → identificar todo lo pendiente → importar
               escuchas de Last.fm → (si usas Lidarr) sincronizar su snapshot → recalcular discografías y
-              completismo → actualizar sellos seguidos → refrescar el radar → auto-descargar estrenos. Es lo mismo
-              que hace el botón <strong className="text-neutral-400">«Actualizar todo»</strong> cuando lo pulsas a
-              mano.
+              completismo → actualizar sellos seguidos → refrescar el radar y las novedades de tu colección
+              (Deezer/Spotify) → radar de descubrimiento → sincronizar tu biblioteca de Spotify → auto-descargar
+              estrenos. Es lo mismo que hace el botón <strong className="text-neutral-400">«Actualizar todo»</strong>{' '}
+              cuando lo pulsas a mano.
             </div>
           </div>
         </div>
