@@ -239,7 +239,7 @@ export function spotifyGap() {
   // claves locales (por album_artist y, si existe, por el nombre canónico del artista)
   const localRows = db
     .prepare(
-      `SELECT a.id, a.album_artist, a.title, a.year, a.artist_id, ar.name AS artist_name, a.rg_mbid
+      `SELECT a.id, a.album_artist, a.title, a.year, a.artist_id, ar.name AS artist_name, a.primary_type
          FROM albums a LEFT JOIN artists ar ON ar.id = a.artist_id
         WHERE a.match_state != 'dismissed' AND a.title IS NOT NULL AND a.title != ''`
     )
@@ -280,6 +280,7 @@ export function spotifyGap() {
       artist: r.album_artist,
       title: r.title,
       year: r.year,
+      primary_type: r.primary_type || null,
     }))
     .sort((a, b) => String(a.artist).localeCompare(String(b.artist)) || (a.year || 0) - (b.year || 0));
 

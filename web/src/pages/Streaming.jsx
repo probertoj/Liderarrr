@@ -108,10 +108,11 @@ export default function Streaming() {
   const [side, setSide] = useState('streaming'); // qué lado de la brecha mostrar
   const [q, setQ] = useState(''); // filtro de texto (la lista local puede tener miles)
   const [limit, setLimit] = useState(200); // render por lotes: evita congelar con 26k filas
+  const [onlyAlbums, setOnlyAlbums] = useState(false); // opcional: deja fuera singles/EPs
   const poll = useRef(null);
   useEffect(() => {
-    setLimit(200); // al cambiar de lado o buscar, vuelve al primer lote
-  }, [side, q]);
+    setLimit(200); // al cambiar de lado, buscar o filtrar, vuelve al primer lote
+  }, [side, q, onlyAlbums]);
 
   const loadStatus = () => api.spotifyUserStatus().then(setStatus).catch((e) => setErr(e.message));
   const loadGap = () =>
@@ -212,7 +213,13 @@ export default function Streaming() {
   }
 
   const c = gap?.counts;
-  const allRows = (side === 'streaming' ? gap?.onlyStreaming : gap?.onlyLocal) || [];
+  // toggle «solo álbumes»: fuera singles/EPs/recopilatorios. En streaming por album_type de
+  // Spotify; en local por primary_type (null = sin identificar → se trata como álbum).
+  const isAlbumStreaming = (r) => (r.album_type || 'album').toLowerCase() === 'album';
+  const isAlbumLocal = (r) => !r.primary_type || /^album$/i.test(r.primary_type);
+  const streamRows = onlyAlbums ? (gap?.onlyStreaming || []).filter(isAlbumStreaming) : gap?.onlyStreaming || [];
+  const localRows = onlyAlbums ? (gap?.onlyLocal || []).filter(isAlbumLocal) : gap?.onlyLocal || [];
+  const allRows = side === 'streaming' ? streamRows : localRows;
   const term = q.trim().toLowerCase();
   const filtered = term
     ? allRows.filter((r) => `${r.artist} ${r.title}`.toLowerCase().includes(term))
@@ -260,7 +267,7 @@ export default function Streaming() {
             side === 'streaming' ? 'border-gold-500/50 bg-gold-500/15 text-gold-300' : 'border-ink-800 bg-ink-850 text-neutral-400'
           }`}
         >
-          ⬇️ En Spotify, no en tu disco{c ? ` · ${c.onlyStreaming}` : ''}
+          ⬇️ En Spotify, no en tu disco{gap ? ` · ${streamRows.length}` : ''}
         </button>
         <button
           onClick={() => setSide('local')}
@@ -268,7 +275,7 @@ export default function Streaming() {
             side === 'local' ? 'border-gold-500/50 bg-gold-500/15 text-gold-300' : 'border-ink-800 bg-ink-850 text-neutral-400'
           }`}
         >
-          ⬆️ En tu disco, no en Spotify{c ? ` · ${c.onlyLocal}` : ''}
+          ⬆️ En tu disco, no en Spotify{gap ? ` · ${localRows.length}` : ''}
         </button>
       </div>
 
@@ -279,12 +286,16 @@ export default function Streaming() {
             ? 'Lo tienes guardado en Spotify pero no en tu disco: descárgalo.'
             : 'Lo tienes en tu disco pero no guardado en Spotify: ábrelo en Spotify y dale a guardar.'}
         </p>
+        <label className="ml-auto flex items-center gap-2 text-sm text-neutral-400 cursor-pointer shrink-0">
+          <input type="checkbox" checked={onlyAlbums} onChange={(e) => setOnlyAlbums(e.target.checked)} />
+          Solo álbumes
+        </label>
         {allRows.length > 20 && (
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Filtrar por artista o álbum…"
-            className="ml-auto w-full sm:w-64 bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
+            className="w-full sm:w-64 bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
           />
         )}
       </div>

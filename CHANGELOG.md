@@ -27,6 +27,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
     resincronizar la biblioteca. Refresco de biblioteca no bloqueante con progreso.
   - El lado «en tu disco, no en Spotify» puede tener miles de álbumes: **filtro de texto +
     render por lotes** («Mostrar más») para que no congele el navegador.
+  - Toggle opcional **«Solo álbumes»**: deja fuera singles/EPs/recopilatorios (streaming por
+    `album_type` de Spotify; local por `primary_type`). Apagado por defecto.
   - Si Spotify redirige con `error=…` (p. ej. `server_error` por app en modo desarrollo con la
     cuenta sin añadir a «User Management», o `access_denied`), la app lo detecta y da un mensaje
     accionable en vez de «no encontré el código».
