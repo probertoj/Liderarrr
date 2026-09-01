@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { db, getSetting } from './db.js';
-import { qbCompletedTorrents } from './qbittorrent.js';
-import { importFolder, importFile, importConfig, isIgnoredImport } from './importer.js';
+import { qbCompletedTorrents, qbConfig } from './qbittorrent.js';
+import { importFolder, importFile, importConfig, isIgnoredImport, audioFiles } from './importer.js';
 import { matchRequest, setDownloadStatus, reconcileAgainstLibrary, pruneDownloads } from './downloads.js';
 import { runScan } from './scanner.js';
 import { runIdentify } from './identify.js';
@@ -55,6 +55,8 @@ export async function runAutoImport() {
     underSource: 0,
     alreadyImported: 0,
     skippedNonMusic: 0,
+    settling: 0,
+    qbConfigured: !!qbConfig().url,
     source,
     samplePaths: [],
   });
@@ -76,12 +78,16 @@ export async function runAutoImport() {
     } catch (e) {
       autoImportStatus.errors.push(`prune: ${String(e.message || e)}`);
     }
-    let torrents;
-    try {
-      torrents = await qbCompletedTorrents();
-    } catch (e) {
-      autoImportStatus.errors.push(`qBittorrent: ${String(e.message || e)}`);
-      return autoImportStatus;
+    // qBittorrent es OPCIONAL: solo se consulta si está configurado. Si no (p. ej. usas
+    // Deluge/rTorrent), no es un error — el barrido de carpeta de más abajo hace el trabajo.
+    let torrents = [];
+    if (qbConfig().url) {
+      try {
+        torrents = await qbCompletedTorrents();
+      } catch (e) {
+        autoImportStatus.errors.push(`qBittorrent: ${String(e.message || e)}`);
+        // no abortamos: seguimos con el barrido de carpeta (sirve para cualquier cliente)
+      }
     }
     autoImportStatus.torrents = torrents.length;
     const maps = pathMappings();
@@ -148,6 +154,89 @@ export async function runAutoImport() {
       const music = misses.filter((p) => /music/i.test(p));
       autoImportStatus.samplePaths = [...new Set(music.length ? music : misses)].slice(0, 4);
     }
+
+    // BARRIDO DE LA CARPETA (cliente-agnóstico): además de qBittorrent, mira la propia carpeta
+    // de descargas y enlaza lo que esté COMPLETO y sin importar. Es lo que hace que el
+    // auto-import funcione con Deluge, rTorrent, Transmission… o descargas puestas a mano.
+    // «Completo» = ESTABLE: ningún fichero de audio tocado en los últimos SETTLE_MS (si sigue
+    // bajando, sus mtimes cambian y esperamos a la siguiente pasada). nlink>1 = ya enlazado.
+    const SETTLE_MS = 5 * 60 * 1000;
+    const AUDIO_LOOSE = /\.(flac|mp3|m4a|aac|ogg|opus|wav|wma|alac|aif|aiff|ape|wv)$/i;
+    const now = Date.now();
+    let scanEntries = [];
+    try {
+      scanEntries = fs.readdirSync(source, { withFileTypes: true });
+    } catch (e) {
+      autoImportStatus.errors.push(`No se puede leer ${source}: ${String(e.message || e)}`);
+    }
+    const scanList = scanEntries
+      .map((e) => {
+        const full = path.join(source, e.name);
+        let mtime = 0;
+        try {
+          mtime = fs.statSync(full).mtimeMs;
+        } catch {
+          /* noop */
+        }
+        return { name: e.name, full, isDir: e.isDirectory(), mtime };
+      })
+      .sort((a, b) => b.mtime - a.mtime)
+      .slice(0, 250); // tope: no recorrer un pool de seeding gigante entero en cada pasada
+    for (const d of scanList) {
+      const resolved = path.resolve(d.full);
+      if (isImported.get(resolved)) {
+        autoImportStatus.alreadyImported++;
+        continue;
+      }
+      if (isIgnoredImport(d.full)) {
+        autoImportStatus.alreadyImported++;
+        continue;
+      }
+      // audios dentro (carpeta) o el propio fichero (single suelto)
+      let audioRels;
+      if (d.isDir) audioRels = audioFiles(d.full);
+      else audioRels = AUDIO_LOOSE.test(d.name) ? [d.name] : [];
+      if (!audioRels.length) continue; // sin audio: no es música
+      // ¿estable? mtime más nuevo de sus audios (mira hasta 60 para acotar)
+      let newest = 0;
+      for (const rel of audioRels.slice(0, 60)) {
+        try {
+          const m = fs.statSync(d.isDir ? path.join(d.full, rel) : d.full).mtimeMs;
+          if (m > newest) newest = m;
+        } catch {
+          /* noop */
+        }
+      }
+      if (now - newest < SETTLE_MS) {
+        autoImportStatus.settling++;
+        continue; // aún cambiando (bajando): la próxima pasada
+      }
+      // ¿ya hardlinkeado en la biblioteca? (importado por Lidarr o por nosotros antes)
+      try {
+        const first = d.isDir ? path.join(d.full, audioRels[0]) : d.full;
+        if (fs.statSync(first).nlink > 1) continue;
+      } catch {
+        /* noop */
+      }
+      autoImportStatus.checked++;
+      try {
+        const r = d.isDir ? await importFolder(d.full) : await importFile(d.full);
+        importedAny = true;
+        autoImportStatus.imported++;
+        importedItems.push({ artist: r.artist || null, album: r.album || d.name });
+        console.log(`[autoimport] ✓ (barrido) ${d.name} → ${r.dest} (${r.linked} ficheros)`);
+      } catch (e) {
+        const msg = String(e.message || e);
+        if (/no (tiene ficheros de audio|es de audio)/i.test(msg)) {
+          autoImportStatus.checked--;
+          autoImportStatus.skippedNonMusic++;
+          continue;
+        }
+        autoImportStatus.errors.push(`${d.name}: ${msg}`);
+        console.warn(`[autoimport] ✗ (barrido) ${d.name} — ${msg}`);
+      }
+    }
+
     if (importedAny) {
       try {
         await runScan();

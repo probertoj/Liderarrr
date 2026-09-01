@@ -91,7 +91,7 @@ function walkKeep(root, rel = '') {
 }
 
 // ficheros de audio de una carpeta (rutas relativas, ordenadas)
-function audioFiles(dir) {
+export function audioFiles(dir) {
   return walkKeep(dir).filter((r) => AUDIO_EXT.has(path.extname(r).toLowerCase())).sort();
 }
 

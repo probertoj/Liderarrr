@@ -93,18 +93,23 @@ function AutoImportPanel() {
         <div className="text-[11px] mt-1.5 space-y-0.5">
           <div className="text-neutral-500">
             Última pasada <span className="text-neutral-400">{fmtAgo(st.lastRun)}</span>
-            {st.running ? <span className="text-gold-300"> · en curso…</span> : ''}: qBittorrent devolvió{' '}
-            <b className="text-neutral-300">{st.torrents ?? 0}</b> completados ·{' '}
-            <b className="text-neutral-300">{st.underSource ?? 0}</b> bajo tu carpeta de torrents ·{' '}
+            {st.running ? <span className="text-gold-300"> · en curso…</span> : ''}:{' '}
             <b className="text-neutral-300">{st.imported ?? 0}</b> importados
+            {st.qbConfigured ? ` · qBittorrent: ${st.torrents ?? 0} completados` : ''}
+            {st.settling ? ` · ${st.settling} aún bajando (esperando)` : ''}
             {st.alreadyImported ? ` · ${st.alreadyImported} ya estaban` : ''}
             {st.skippedNonMusic ? ` · ${st.skippedNonMusic} sin música (saltados)` : ''}
             {st.errors?.length ? ` · ${st.errors.length} con error` : ''}.
           </div>
-          {st.torrents === 0 && (
+          <div className="text-neutral-600">
+            Vale con cualquier cliente (qBittorrent, Deluge, rTorrent…): además de preguntar a qBittorrent si está
+            configurado, Liderarr <b>barre tu carpeta de descargas</b> e importa lo que esté completo y aún no importado.
+          </div>
+          {st.qbConfigured && st.torrents === 0 && (
             <div className="text-amber-400/80">
               ⚠ qBittorrent no devolvió descargas completadas. Si pusiste una <b>categoría</b> en Ajustes, solo mira esa
-              categoría — comprueba que tus torrents la tengan (o quítala). Y que estén completos.
+              categoría — comprueba que tus torrents la tengan (o quítala). Y que estén completos. (Si NO usas
+              qBittorrent, ignora esto y deja sus campos vacíos: el barrido de carpeta hace el trabajo.)
             </div>
           )}
           {st.torrents > 0 && st.underSource === 0 && (

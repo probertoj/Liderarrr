@@ -9,6 +9,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Arreglado
+- **Auto-import compatible con cualquier cliente (Deluge, rTorrent, Transmission…)**, no solo
+  qBittorrent. Antes, si qBittorrent no respondía (p. ej. usas Deluge), el auto-import abortaba
+  y no importaba nada. Ahora qBittorrent es opcional (solo se consulta si está configurado) y,
+  además, Liderarr **barre la carpeta de descargas** e importa lo que esté COMPLETO (estable:
+  sin cambios en los últimos 5 min) y aún no importado. El diagnóstico de «Importar descargas»
+  deja de ser solo-qBittorrent y muestra «N aún bajando (esperando)».
+
 ### Añadido
 - **Integración con tu biblioteca de Spotify (la brecha disco ↔ streaming)** — la feature de
   1.0. Conectas tu cuenta por **OAuth de usuario** (solo lectura, `user-library-read`) y
