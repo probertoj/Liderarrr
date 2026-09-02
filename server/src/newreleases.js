@@ -99,6 +99,10 @@ const upsert = db.prepare(
 
 // Caché del id de Deezer por artista: buscar una vez, reusar siempre. Sin esto, barrer los
 // miles de artistas de la colección re-buscaría en cada refresco (2 llamadas por artista).
+// ¿ya conocíamos esta novedad? Para contar/avisar SOLO de las GENUINAMENTE nuevas: el upsert
+// hace UPDATE de las que ya existen (refresca fecha/carátula), y eso también cuenta como
+// «cambio», así que sin esto el aviso nocturno repetía cada día lo mismo.
+const alreadyKnown = db.prepare('SELECT 1 FROM external_releases WHERE artist_id = ? AND match_key = ?');
 const setDeezerId = db.prepare('UPDATE artists SET deezer_id = ?, deezer_checked_at = ? WHERE id = ?');
 const markChecked = db.prepare('UPDATE artists SET ext_checked_at = ? WHERE id = ?');
 const DEEZER_RECHECK_MS = 30 * 24 * 3600 * 1000; // reintentar los «no hallado» al mes
@@ -164,6 +168,11 @@ export async function refreshExternalReleases({
   if (!seeds.length) return { count: 0, added: 0, seeds: 0 };
 
   const cutoff = new Date(Date.now() - months * 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  // corte de guardado por TIPO = su retención. Antes se guardaba todo con la ventana de 6
+  // meses y luego se podaban los singles a 45 días: un single de 45 d–6 meses se guardaba,
+  // se contaba como «nuevo», se podaba, y a la noche siguiente vuelta a empezar (repetía el
+  // aviso cada día). Guardando ya con el corte por tipo, eso no pasa.
+  const singleStoreCutoff = new Date(Date.now() - SINGLE_RETENTION_DAYS * 24 * 3600 * 1000).toISOString().slice(0, 10);
 
   // lo que YA tienes (cruce robusto) y lo que MB YA conoce (release_groups): para no repetir
   const owned = buildOwnedCheck();
@@ -224,13 +233,15 @@ export async function refreshExternalReleases({
         const type = String(c.record_type || 'album').toLowerCase();
         if (!STORE_TYPES.has(type)) continue;
         const date = (c.release_date || '').slice(0, 10);
-        if (!date || date < cutoff || date === '0000-00-00') continue;
+        const storeCutoff = type === 'single' ? singleStoreCutoff : cutoff; // singles caducan a 45 d
+        if (!date || date < storeCutoff || date === '0000-00-00') continue;
         const mk = matchKey(s.name, c.title);
         // Guardamos TODOS los estrenos recientes (también los que ya tienes), para poder
         // ofrecer la opción «mostrar los que ya tengo». El filtrado por propiedad se hace EN
         // VIVO al mostrar. `added` cuenta solo los NUEVOS que NO tienes (para el aviso).
         const isOwnedRel = owned(s.id, s.name, c.title);
-        const info = upsert.run({
+        const isNew = !alreadyKnown.get(s.id, mk); // ¿la vemos por primera vez?
+        upsert.run({
           source: c.source,
           artist_id: s.id,
           artist: s.name,
@@ -243,7 +254,9 @@ export async function refreshExternalReleases({
           ahead: mbKeys.has(mk) ? 0 : 1, // MB aún no lo lista → adelantada
           now,
         });
-        if (info.changes && !isOwnedRel) {
+        // `added`/el aviso: SOLO las que no conocíamos y que NO tienes ya (evita repetir cada
+        // noche lo mismo; las que ya estaban se refrescan en silencio vía el UPDATE del upsert).
+        if (isNew && !isOwnedRel) {
           added++;
           if (addedItems.length < 40) addedItems.push({ artist: s.name, title: c.title, record_type: type });
         }

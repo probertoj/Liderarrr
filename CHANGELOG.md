@@ -10,6 +10,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 ## [Sin publicar]
 
 ### Arreglado
+- **El aviso nocturno de novedades ya no repite lo mismo cada día.** Contaba como «nuevo» todo
+  lo que tocaba en cada pasada: (1) el `upsert` refresca filas que ya existían y eso contaba
+  como cambio, y (2) las **singles de 45 días a 6 meses** se guardaban con la ventana de 6
+  meses y se podaban a los 45 días, así que cada noche se re-guardaban y re-contaban. Ahora
+  solo cuenta lo GENUINAMENTE nuevo (`alreadyKnown`) y el corte de guardado va por tipo (las
+  singles ya no se guardan más allá de su retención). Verificado: 2ª y 3ª pasada → 0 nuevas.
 - **Auto-import compatible con cualquier cliente (Deluge, rTorrent, Transmission…)**, no solo
   qBittorrent. Antes, si qBittorrent no respondía (p. ej. usas Deluge), el auto-import abortaba
   y no importaba nada. Ahora qBittorrent es opcional (solo se consulta si está configurado) y,
