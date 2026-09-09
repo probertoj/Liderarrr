@@ -6,14 +6,14 @@ import { Spinner, AddToChallengeButton } from '../components.jsx';
 
 // Vista MES tipo Google Calendar: una rejilla mensual que junta TODAS las fuentes de
 // lanzamientos en su día — Próximos y Estrenados recientemente (MusicBrainz), De tus
-// sellos, Radar (curadores) y Novedades de Spotify/Deezer. Se cargan una vez con una
+// sellos, Radar (curadores) y Discos nuevos / Canciones nuevas (Deezer). Se cargan una vez con una
 // ventana amplia y se re-agrupan al navegar de mes (sin repetir peticiones).
 
 const KIND = {
   upcoming: { label: 'Próximo', dot: '#0ea5e9' },
   recent: { label: 'Estreno', dot: '#b9852f' },
   label: { label: 'Sello', dot: '#d97706' },
-  novedad: { label: 'Spotify', dot: '#10b981' },
+  novedad: { label: 'Disco nuevo', dot: '#10b981' },
   single: { label: 'Canción', dot: '#ec4899' },
   radar: { label: 'Radar', dot: '#8b5cf6' },
   descubre: { label: 'Descubre', dot: '#2dd4bf' },

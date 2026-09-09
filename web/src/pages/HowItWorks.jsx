@@ -53,7 +53,8 @@ export default function HowItWorks() {
           organizada, sin copiar ni dejar de sembrar. Con la prioridad de trackers eliges de dónde tirar.
         </Step>
         <Step n="5" Icon={Radio} title="Radar de novedades (Lanzamientos)">
-          Estrenos de tu colección (álbumes y <strong className="text-neutral-400">Canciones nuevas</strong>/singles),
+          Estrenos de tu colección, separados en <strong className="text-neutral-400">Discos nuevos</strong> (álbumes y
+          EPs) y <strong className="text-neutral-400">Canciones nuevas</strong> (singles sueltos),
           un calendario «Mes» con filtros por fuente, curadores (buymusic.club, Rosy Overdrive, Hipersónica), y{' '}
           <strong className="text-neutral-400">Descubre</strong>: novedades por afinidad de artistas parecidos a lo que
           escuchas y de tus sellos seguidos. Todo marcando lo que ya tienes.
@@ -94,8 +95,8 @@ export default function HowItWorks() {
             <div className="text-xs text-neutral-500 leading-relaxed">
               La pasada de fondo, en orden: auto-importar → escanear → identificar todo lo pendiente → importar
               escuchas de Last.fm → (si usas Lidarr) sincronizar su snapshot → recalcular discografías y
-              completismo → actualizar sellos seguidos → refrescar el radar y las novedades de tu colección
-              (Deezer/Spotify) → radar de descubrimiento → sincronizar tu biblioteca de Spotify → auto-descargar
+              completismo → actualizar sellos seguidos → refrescar el radar y los discos/canciones nuevos de tu
+              colección (vía Deezer) → radar de descubrimiento → sincronizar tu biblioteca de Spotify → auto-descargar
               estrenos. Es lo mismo que hace el botón <strong className="text-neutral-400">«Actualizar todo»</strong>{' '}
               cuando lo pulsas a mano.
             </div>

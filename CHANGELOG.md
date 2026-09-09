@@ -9,6 +9,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Cambiado
+- **«Novedades de Spotify» pasa a llamarse «💿 Discos nuevos»**, que es lo que es: los álbumes
+  y EPs recién estrenados por los artistas de tu colección. El nombre se había quedado obsoleto
+  (esa pestaña ya no usa Spotify: el catálogo va **solo por Deezer**) y confundía con «🎵
+  Canciones nuevas», que son los **singles sueltos** — misma fuente y mismo barrido, repartidos
+  por tipo de lanzamiento. Textos, estados vacíos y la leyenda del calendario «Mes» (que ponía
+  «Spotify») actualizados, con referencias cruzadas entre ambas pestañas.
+
 ### Arreglado
 - **El aviso nocturno de novedades ya no repite lo mismo cada día.** Contaba como «nuevo» todo
   lo que tocaba en cada pasada: (1) el `upsert` refresca filas que ya existían y eso contaba

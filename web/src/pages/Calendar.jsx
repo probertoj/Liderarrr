@@ -104,7 +104,7 @@ function ReleaseRow({ r, added, busy, followed, onAdd, onFollow, onSearch, lidar
   );
 }
 
-// Fila de NOVEDAD externa (Deezer/Spotify que MusicBrainz aún no lista). Distinta de
+// Fila de NOVEDAD externa (Deezer, que MusicBrainz aún no lista). Distinta de
 // ReleaseRow: no hay rg_mbid (ni carátula de MB ni «enviar a Lidarr» por rg), así que la
 // carátula viene de la fuente y la descarga es siempre nativa (grabBest por texto).
 function ExternalReleaseRow({ r, added, busy, onAdd, onSearch, onDismiss }) {
@@ -930,7 +930,7 @@ export default function Calendar() {
       setErr(e.message);
     }
   };
-  // Novedades de Spotify / Canciones nuevas: se llenan en el refresco. El barrido cruza TODA
+  // Discos nuevos / Canciones nuevas: se llenan en el refresco. El barrido cruza TODA
   // la colección (miles de artistas) y tarda minutos, así que se lanza en segundo plano y se
   // sigue el progreso por sondeo, recargando la lista según avanza (por rotación van
   // apareciendo). No bloquea la UI.
@@ -947,7 +947,7 @@ export default function Calendar() {
   };
   const refreshNov = async () => {
     setNovBusy(true);
-    setNovMsg('Barriendo tu colección en Deezer/Spotify…');
+    setNovMsg('Barriendo tu colección en Deezer…');
     try {
       await api.refreshNewReleases(); // arranca en segundo plano y vuelve al instante
     } catch (e) {
@@ -992,7 +992,7 @@ export default function Calendar() {
                     : view === 'radar'
                       ? 'en el radar'
                       : view === 'novedades'
-                        ? 'novedades de tus artistas (⚡ = MusicBrainz aún no las tiene)'
+                        ? 'discos nuevos de tu colección (⚡ = MusicBrainz aún no los tiene)'
                         : view === 'descubre'
                           ? 'novedades globales por afinidad'
                           : view === 'canciones'
@@ -1009,7 +1009,7 @@ export default function Calendar() {
         {tab('mes', '📅 Mes')}
         {tab('upcoming', 'Próximos')}
         {tab('recent', 'Estrenados recientemente')}
-        {tab('novedades', 'Novedades de Spotify')}
+        {tab('novedades', '💿 Discos nuevos')}
         {tab('canciones', '🎵 Canciones nuevas')}
         {tab('descubre', '🌐 Descubre')}
         {tab('labels', 'De tus sellos')}
@@ -1095,8 +1095,9 @@ export default function Calendar() {
         <div className="card p-3 mb-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-xs text-neutral-500 min-w-0 flex-1">
-              Estrenos recientes (últimos ~6 meses) de tus artistas seguidos en Deezer/Spotify que no tienes, semana a
-              semana. Se llenan solos en el refresco; búscalos ahora si quieres.
+              Álbumes y EPs recién estrenados (últimos ~6 meses) por los artistas de tu colección (los sigas o no),
+              vía Deezer, que aún no tienes — semana a semana. Los singles sueltos van en «🎵 Canciones nuevas». Se
+              llenan solos en el refresco; búscalos ahora si quieres.
             </p>
             <button
               onClick={refreshNov}
@@ -1113,9 +1114,10 @@ export default function Calendar() {
         <div className="card p-3 mb-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-xs text-neutral-500 min-w-0 flex-1">
-              Singles (canciones sueltas) recién publicados por los artistas de tu colección (los sigas o no) en
-              Deezer/Spotify. Se recogen en el refresco, que barre la colección por rotación (varias pasadas la cubren
-              entera); búscalos ahora si quieres. Elige la ventana de días arriba.
+              Singles (canciones sueltas) recién publicados por los artistas de tu colección (los sigas o no), vía
+              Deezer. Los álbumes y EPs van en «💿 Discos nuevos». Se recogen en el refresco, que barre la colección
+              por rotación (varias pasadas la cubren entera); búscalos ahora si quieres. Elige la ventana de días
+              arriba.
             </p>
             <button
               onClick={refreshNov}
@@ -1195,11 +1197,11 @@ export default function Calendar() {
               ? 'Aún no sigues ningún curador. Añade uno arriba (p. ej. calltheranger) para empezar.'
               : 'Nada en el radar en esta ventana. Amplía el rango o sigue a más curadores.'
             : view === 'canciones'
-              ? 'Sin singles nuevos en esta ventana. Se recogen por rotación de toda tu colección (Deezer/Spotify): pulsa «Buscar novedades ahora» arriba para avanzar el barrido, amplía la ventana de días, o espera al ciclo nocturno. Ojo: las canciones que salen dentro de un álbum recién estrenado aparecen en «Estrenados recientemente», no aquí.'
+              ? 'Sin singles nuevos en esta ventana. Se recogen por rotación de toda tu colección (vía Deezer): pulsa «Buscar novedades ahora» arriba para avanzar el barrido, amplía la ventana de días, o espera al ciclo nocturno. Ojo: las canciones que salen dentro de un álbum recién estrenado aparecen en «💿 Discos nuevos», no aquí.'
               : view === 'descubre'
               ? 'Nada relevante para ti en esta ventana. Pulsa «Buscar novedades ahora» para barrer los estrenos de tus artistas afines (similares de Last.fm), amplía la ventana de días, o marca «También sin relación». Las recomendaciones «parecido a» salen de tus sugerencias de similares (Ajustes de Last.fm + refresco nocturno).'
               : view === 'novedades'
-              ? 'Sin novedades. Se buscan estrenos recientes de tus artistas seguidos en Deezer/Spotify en el refresco: pulsa «Identificar y sincronizar» (o espera al ciclo nocturno). Requiere seguir a algún artista.'
+              ? 'Sin discos nuevos. Se buscan estrenos recientes (álbumes y EPs) de los artistas de tu colección en Deezer: pulsa «Buscar novedades ahora» arriba, o espera al ciclo nocturno. Ojo: los singles sueltos aparecen en «🎵 Canciones nuevas», no aquí.'
               : view === 'labels'
                 ? labels.length === 0
                   ? 'Aún no sigues ningún sello. Busca uno arriba para empezar.'
