@@ -10,6 +10,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 ## [Sin publicar]
 
 ### Cambiado
+- **Botón «Spotify» en cada lanzamiento** (Discos nuevos, Canciones nuevas y Descubre): abre
+  la búsqueda del disco/canción en Spotify para escucharlo al momento, junto al enlace de la
+  fuente (Deezer, que pasa a un estilo neutro). Es un enlace de **búsqueda** a propósito:
+  resolver el álbum exacto por API costaría una petición por fila y se comería la cuota de
+  Spotify, que hace falta para tu biblioteca en «Streaming».
 - **«Novedades de Spotify» pasa a llamarse «💿 Discos nuevos»**, que es lo que es: los álbumes
   y EPs recién estrenados por los artistas de tu colección. El nombre se había quedado obsoleto
   (esa pestaña ya no usa Spotify: el catálogo va **solo por Deezer**) y confundía con «🎵

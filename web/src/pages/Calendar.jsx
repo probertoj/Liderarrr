@@ -171,11 +171,23 @@ function ExternalReleaseRow({ r, added, busy, onAdd, onSearch, onDismiss }) {
             target="_blank"
             rel="noreferrer"
             title={`Abrir en ${r.source}`}
-            className="text-xs px-1.5 py-0.5 rounded border border-emerald-600/40 bg-emerald-600/10 text-emerald-300/90 hover:bg-emerald-600/20 inline-flex items-center gap-1 capitalize"
+            className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1 capitalize"
           >
             <ExternalLink size={12} /> {r.source}
           </a>
         )}
+        {/* Escucharlo en Spotify. Es un enlace de BÚSQUEDA a propósito: resolver el álbum
+            exacto por API costaría una petición por fila y se comería la cuota de Spotify,
+            que hace falta para tu biblioteca («Streaming»). Así es instantáneo y gratis. */}
+        <a
+          href={`https://open.spotify.com/search/${encodeURIComponent(`${r.artist} ${r.title}`.trim())}`}
+          target="_blank"
+          rel="noreferrer"
+          title={`Buscar «${r.title}» en Spotify`}
+          className="text-xs px-1.5 py-0.5 rounded border border-emerald-600/40 bg-emerald-600/10 text-emerald-300/90 hover:bg-emerald-600/20 inline-flex items-center gap-1"
+        >
+          <ExternalLink size={12} /> Spotify
+        </a>
         <button onClick={() => onDismiss(r)} className="text-neutral-600 hover:text-neutral-300" aria-label="Descartar">
           <X size={14} />
         </button>
