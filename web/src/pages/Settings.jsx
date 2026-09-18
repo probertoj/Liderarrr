@@ -1021,6 +1021,35 @@ export default function Settings() {
         </div>
       </section>
 
+      {/* 4c. «Lo quiero»: vigilancia de la lista de deseos */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">
+          4c · Vigilar «Lo quiero» <span className="text-xs text-neutral-500">(lista de deseos)</span>
+        </h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Los discos que marcas con ♥ <b className="font-normal text-neutral-400">Lo quiero</b> (al buscarlos, en el
+          calendario, en el radar…) quedan vigilados: cada cierto tiempo Liderarr los busca en tus indexers y agarra la
+          mejor release en cuanto aparece, aunque no sigas al artista. Si el disco aún no ha salido, espera a su fecha de
+          estreno. La lista vive en <b className="font-normal text-neutral-400">Lanzamientos → ♥ Lo quiero</b>.
+        </p>
+        <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={s.wanted_watch_enabled !== '0'}
+            onChange={(e) => setS((p) => ({ ...p, wanted_watch_enabled: e.target.checked ? '1' : '0' }))}
+          />
+          Vigilar mi lista de deseos y descargar lo que aparezca
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Cada cuánto mirar (minutos)" hint="60 = una ronda por hora. Mínimo 10.">
+            <input type="number" value={s.wanted_watch_interval_min || '60'} onChange={set('wanted_watch_interval_min')} className={input} />
+          </Field>
+          <Field label="Máximo por ronda" hint="Cuántos deseos busca en cada pasada (cada búsqueda consulta indexers en vivo).">
+            <input type="number" value={s.wanted_watch_per_run || '12'} onChange={set('wanted_watch_per_run')} className={input} />
+          </Field>
+        </div>
+      </section>
+
       {/* 5. Escritura de etiquetas */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">

@@ -9,6 +9,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Añadido
+- **«Lo quiero»: lista de deseos VIGILADA.** Botón ♥ en todos los discos que aún no tienes —al
+  buscarlos, en el calendario (Mes, Próximos, Estrenados, Discos nuevos, Canciones nuevas,
+  Descubre, De tus sellos, Radar), en los huecos de un artista y en la brecha de streaming—.
+  Al marcarlo, Liderarr lo **busca solo en tus indexers cada hora** (y en el refresco nocturno)
+  y agarra la mejor release en cuanto aparece, aunque no sigas al artista: un disco que sale el
+  viernes de madrugada te lo encuentras descargado por la mañana, con notificación.
+  - **No busca antes de tiempo**: si se conoce la fecha de estreno, espera a que llegue.
+  - **Cadencia con freno**: cada hora las primeras horas, cada 3 h los primeros días y cada 12 h
+    después, para no machacar los indexers con un deseo que no aparece nunca.
+  - **No pide dos veces lo mismo**: salta lo que ya está en el ledger de descargas, y cierra solo
+    los deseos cuyo disco ya está en tu biblioteca (`owned`).
+  - Pestaña **Lanzamientos → ♥ Lo quiero** con el estado de cada deseo (sale el…, sin release,
+    pedido, ya en tu disco), «Buscar ahora» y quitar; y ajuste **4c** para la cadencia.
+  - Reutiliza lo que ya había: `searchAndGrabBest` (mejor release, sin pérdida primero), el
+    registro de descargas y el auto-import por hardlink. Sin Lidarr.
+
 ### Cambiado
 - **Botón «Spotify» en cada lanzamiento** (Discos nuevos, Canciones nuevas y Descubre): abre
   la búsqueda del disco/canción en Spotify para escucharlo al momento, junto al enlace de la

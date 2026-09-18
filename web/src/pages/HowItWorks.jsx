@@ -1,4 +1,4 @@
-import { HardDrive, Sparkles, Compass, DownloadCloud, Radio, Headphones, Clock, Moon, Library } from 'lucide-react';
+import { HardDrive, Sparkles, Compass, DownloadCloud, Radio, Headphones, Clock, Moon, Library, Heart } from 'lucide-react';
 import { PageTitle } from '../components.jsx';
 
 // «¿Cómo funciona todo esto?»: explica en cristiano el recorrido de la app y, sobre todo,
@@ -52,6 +52,12 @@ export default function HowItWorks() {
           termina, el <strong className="text-neutral-400">auto-import</strong> lo enlaza (hardlink) a tu biblioteca
           organizada, sin copiar ni dejar de sembrar. Con la prioridad de trackers eliges de dónde tirar.
         </Step>
+        <Step n="4b" Icon={Heart} title="«Lo quiero» (lista de deseos vigilada)">
+          El ♥ que verás en cualquier disco que aún no tengas —al buscarlo, en el calendario, en el radar, en la
+          brecha de streaming— lo pone en vigilancia: Liderarr lo busca solo en tus indexers cada hora hasta que
+          aparece, y lo agarra. Si todavía no ha salido, espera a su fecha de estreno. Un disco que sale el viernes de
+          madrugada te lo encuentras descargado por la mañana. La lista está en Lanzamientos → ♥ Lo quiero.
+        </Step>
         <Step n="5" Icon={Radio} title="Radar de novedades (Lanzamientos)">
           Estrenos de tu colección, separados en <strong className="text-neutral-400">Discos nuevos</strong> (álbumes y
           EPs) y <strong className="text-neutral-400">Canciones nuevas</strong> (singles sueltos),
@@ -87,6 +93,19 @@ export default function HowItWorks() {
           </div>
         </div>
         <div className="card p-4 flex gap-3">
+          <div className="shrink-0 w-8 h-8 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 flex items-center justify-center">
+            <Heart size={16} />
+          </div>
+          <div>
+            <div className="text-sm text-neutral-200 mb-0.5">Cada hora · vigilancia de «Lo quiero»</div>
+            <div className="text-xs text-neutral-500 leading-relaxed">
+              Busca en tus indexers los discos de tu lista de deseos que ya han salido y agarra la mejor release en
+              cuanto aparece. Reintenta con más calma según pasan los días, y te avisa por notificación cuando pilla
+              algo. Si no tienes nada en la lista, no hace nada.
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 flex gap-3">
           <div className="shrink-0 w-8 h-8 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 flex items-center justify-center">
             <Moon size={16} />
           </div>
@@ -96,7 +115,7 @@ export default function HowItWorks() {
               La pasada de fondo, en orden: auto-importar → escanear → identificar todo lo pendiente → importar
               escuchas de Last.fm → (si usas Lidarr) sincronizar su snapshot → recalcular discografías y
               completismo → actualizar sellos seguidos → refrescar el radar y los discos/canciones nuevos de tu
-              colección (vía Deezer) → radar de descubrimiento → sincronizar tu biblioteca de Spotify → auto-descargar
+              colección (vía Deezer) → radar de descubrimiento → sincronizar tu biblioteca de Spotify → buscar los discos de «Lo quiero» → auto-descargar
               estrenos. Es lo mismo que hace el botón <strong className="text-neutral-400">«Actualizar todo»</strong>{' '}
               cuando lo pulsas a mano.
             </div>

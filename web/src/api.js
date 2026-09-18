@@ -104,6 +104,12 @@ export const api = {
   autograb: () => req('/autograb'),
   autograbRun: (dryRun) => req('/autograb/run', { method: 'POST', body: { dryRun } }),
   grabBest: (query, context) => req('/grab-best', { method: 'POST', body: { query, context } }),
+  // «Lo quiero»: lista de deseos vigilada (el barrido la busca en tus indexers).
+  wanted: () => req('/wanted'),
+  wantedKeys: () => req('/wanted/keys'),
+  wantAlbum: (body) => req('/wanted', { method: 'POST', body }),
+  unwantAlbum: (body) => req('/wanted/remove', { method: 'POST', body }),
+  wantedRun: () => req('/wanted/run', { method: 'POST', body: { force: true } }),
   lidarrEnabled: () => req('/lidarr/enabled'),
 
   // fase 2 — la caza

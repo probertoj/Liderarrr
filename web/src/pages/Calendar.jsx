@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarClock, Plus, Check, Loader2, ExternalLink, Search, Star, Tag, X, RefreshCw, Radio } from 'lucide-react';
+import { CalendarClock, Plus, Check, Loader2, ExternalLink, Search, Star, Tag, X, RefreshCw, Radio, Heart } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, SearchModal, QuickSearch, AddToChallengeButton, useLidarrEnabled } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, SearchModal, QuickSearch, AddToChallengeButton, WantButton, useLidarrEnabled } from '../components.jsx';
 import MonthCalendar from './MonthCalendar.jsx';
 
 // Lanzamientos: cuatro vistas. «Próximos» (release groups por estrenar de tus artistas),
@@ -74,6 +74,15 @@ function ReleaseRow({ r, added, busy, followed, onAdd, onFollow, onSearch, lidar
           <Search size={12} /> Buscar
         </button>
         <AddToChallengeButton artist={r.artist} title={r.title} />
+        {!r.is_owned && (
+          <WantButton
+            artist={r.artist}
+            title={r.title}
+            rg_mbid={r.rg_mbid}
+            releaseDate={r.first_release}
+            origin="calendario"
+          />
+        )}
         <a
           href={`https://musicbrainz.org/release-group/${r.rg_mbid}`}
           target="_blank"
@@ -152,6 +161,15 @@ function ExternalReleaseRow({ r, added, busy, onAdd, onSearch, onDismiss }) {
           <Search size={12} /> Buscar
         </button>
         <AddToChallengeButton artist={r.artist} title={r.title} />
+        {!r.owned && (
+          <WantButton
+            artist={r.artist}
+            title={r.title}
+            releaseDate={r.release_date}
+            cover={r.cover}
+            origin="calendario"
+          />
+        )}
         {done ? (
           <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
             <Check size={13} /> pedido
@@ -452,6 +470,9 @@ function RadarRow({ r, onSearch, onFollowMbid, onQueue, lidarrOn }) {
           <Search size={12} /> Buscar
         </button>
         <AddToChallengeButton artist={r.artist} title={r.title} />
+        {!r.is_owned && (
+          <WantButton artist={r.artist} title={r.title} releaseDate={r.release_date} origin="radar" />
+        )}
         {r.url && (
           <a
             href={r.url}
@@ -735,6 +756,147 @@ function CuratorManager({ curators, onChange }) {
   );
 }
 
+// Pestaña «Lo quiero»: la lista de deseos vigilada. Aquí ves qué está esperando Liderarr,
+// por qué aún no lo ha pillado (no ha salido, sin release, ya pedido…) y puedes forzar un
+// barrido. El trabajo de verdad lo hace el temporizador del servidor cada hora.
+function WantedPanel({ onSearch }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const poll = useRef(null);
+  const load = () => api.wanted().then(setData).catch((e) => setErr(e.message));
+  useEffect(() => {
+    load();
+    return () => clearInterval(poll.current);
+  }, []);
+
+  const buscarAhora = async () => {
+    setBusy(true);
+    try {
+      await api.wantedRun();
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+      return;
+    }
+    clearInterval(poll.current);
+    poll.current = setInterval(async () => {
+      let d;
+      try {
+        d = await api.wanted();
+      } catch {
+        return;
+      }
+      setData(d);
+      if (!d.status?.running) {
+        clearInterval(poll.current);
+        setBusy(false);
+      }
+    }, 2500);
+  };
+
+  const quitar = async (w) => {
+    try {
+      await api.unwantAlbum({ id: w.id });
+      load();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  if (err) return <ErrorMsg>{err}</ErrorMsg>;
+  if (!data) return <Spinner />;
+  const { items, counts, status } = data;
+
+  return (
+    <div>
+      <div className="card p-3 mb-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-xs text-neutral-500 min-w-0 flex-1">
+            Los discos que marcas con <span className="text-rose-300">♥ Lo quiero</span> quedan vigilados: cada hora (y
+            en el refresco nocturno) Liderarr los busca en tus indexers y agarra la mejor release en cuanto aparece. Si
+            aún no ha salido, espera a su fecha de estreno. Tú te enteras por la notificación.
+            {!data.enabled && <span className="text-amber-400/90"> · La vigilancia está desactivada en Ajustes.</span>}
+          </p>
+          <button
+            onClick={buscarAhora}
+            disabled={busy || !items.length}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+          >
+            <RefreshCw size={13} className={busy ? 'animate-spin' : ''} /> {busy ? 'Buscando…' : 'Buscar ahora'}
+          </button>
+        </div>
+        <p className="text-xs text-neutral-600 mt-2">
+          {counts.watching} vigilando · {counts.grabbed} pedidos · {counts.owned} ya en tu disco
+          {status?.lastRun ? ` · último barrido ${new Date(status.lastRun).toLocaleString('es')}` : ''}
+        </p>
+        {busy && status?.log?.length > 0 && (
+          <div className="text-[11px] text-neutral-500 mt-2 max-h-32 overflow-y-auto space-y-0.5">
+            {status.log.map((l, i) => (
+              <div key={i} className="truncate" title={l}>
+                {l}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {items.length === 0 ? (
+        <div className="card p-6 text-center text-neutral-400">
+          Tu lista está vacía. Pulsa <span className="text-rose-300">♥ Lo quiero</span> en cualquier disco —al buscarlo,
+          en el calendario, en el radar o en la brecha de streaming— y aparecerá aquí, vigilado hasta que se pueda
+          descargar.
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {items.map((w) => (
+            <div key={w.id} className="card px-3 py-2 flex items-center gap-3 text-sm">
+              <img
+                src={w.cover || ''}
+                alt=""
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.style.visibility = 'hidden';
+                }}
+                className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="truncate clamp-mobile" title={`${w.artist} — ${w.title}`}>
+                  {w.artist}
+                  <span className="text-neutral-500"> — {w.title}</span>
+                </div>
+                <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
+                  {w.status === 'owned' ? (
+                    <span className="text-emerald-400/80">✓ ya está en tu disco</span>
+                  ) : w.status === 'grabbed' ? (
+                    <span className="text-emerald-400/80">✓ {w.pending}</span>
+                  ) : (
+                    <span>{w.pending}</span>
+                  )}
+                  {w.tries > 0 && w.status === 'watching' && <span className="text-neutral-700">{w.tries} intentos</span>}
+                  {w.origin && <span className="text-neutral-700">desde {w.origin}</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => onSearch(`${w.artist} ${w.title}`)}
+                  className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1"
+                >
+                  <Search size={12} /> Buscar
+                </button>
+                <AddToChallengeButton artist={w.artist} title={w.title} />
+                <button onClick={() => quitar(w)} className="text-neutral-600 hover:text-rose-400" title="Quitar de «Lo quiero»">
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Calendar() {
   const [view, setView] = useState('upcoming'); // upcoming | recent | labels | radar
   const [rows, setRows] = useState(null);
@@ -760,7 +922,7 @@ export default function Calendar() {
   useEffect(() => {
     setRows(null);
     setErr(null);
-    if (view === 'mes') return; // la vista mes carga sus propias fuentes (MonthCalendar)
+    if (view === 'mes' || view === 'quiero') return; // cargan sus propias fuentes (MonthCalendar / WantedPanel)
     const load =
       view === 'recent'
         ? api.recentReleases(since, all)
@@ -995,7 +1157,7 @@ export default function Calendar() {
         icon={CalendarClock}
         title="Lanzamientos"
         sub={
-          rows && view !== 'mes'
+          rows && view !== 'mes' && view !== 'quiero'
             ? `${rows.length} ${
                 view === 'upcoming'
                   ? 'por estrenar'
@@ -1026,6 +1188,7 @@ export default function Calendar() {
         {tab('descubre', '🌐 Descubre')}
         {tab('labels', 'De tus sellos')}
         {tab('radar', 'Radar')}
+        {tab('quiero', '♥ Lo quiero')}
         {(view === 'upcoming' || view === 'recent') && (
           <label className="flex items-center gap-2 text-sm text-neutral-400 ml-auto cursor-pointer">
             <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />
@@ -1099,7 +1262,9 @@ export default function Calendar() {
 
       {view === 'mes' && <MonthCalendar onSearch={setSearch} />}
 
-      {view !== 'mes' && (
+      {view === 'quiero' && <WantedPanel onSearch={setSearch} />}
+
+      {view !== 'mes' && view !== 'quiero' && (
         <>
       {view === 'labels' && <LabelManager labels={labels} onChange={loadLabels} />}
       {view === 'radar' && <CuratorManager curators={curators} onChange={reloadRadar} />}

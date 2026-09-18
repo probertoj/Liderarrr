@@ -21,6 +21,7 @@ import { pendingImports, importFolder, listAlbumSubfolders, ignoreImport, unigno
 import { recordGrab, magnetHash, downloadsList, activeRequestRgs, clearImported } from './downloads.js';
 import { runAutoImport, autoImportStatus, autoImportEnabled } from './autoimport.js';
 import { runAutoGrab, autoGrabConfig, autoGrabStatus, searchAndGrabBest } from './autograb.js';
+import { addWanted, removeWanted, wantedList, wantedKeys, wantedCounts, wantedConfig, wantedStatus, runWantedWatch } from './wanted.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground, releaseGroupOfRelease } from './musicbrainz.js';
 import { buildReleaseSeed, findPossibleDuplicate } from './mbseed.js';
 import { acoustidTest } from './acoustid.js';
@@ -1138,6 +1139,38 @@ app.post('/api/grab-best', async (req, reply) => {
     return reply.code(400).send({ error: String(err.message || err) });
   }
 });
+// --- «Lo quiero» (lista de deseos vigilada) ---------------------------------
+// Marcas un disco donde lo veas y el barrido lo busca en tus indexers hasta encontrarlo.
+app.get('/api/wanted', async () => ({
+  ...wantedConfig(),
+  counts: wantedCounts(),
+  status: wantedStatus,
+  items: wantedList(),
+}));
+// mapa match_key → {id,status} que comparten todos los botones «Lo quiero» de una página
+app.get('/api/wanted/keys', async () => wantedKeys());
+app.post('/api/wanted', async (req, reply) => {
+  try {
+    return addWanted(req.body || {});
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/wanted/remove', async (req, reply) => {
+  try {
+    return removeWanted(req.body || {});
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// buscar YA (todos los deseos, sin esperar a la cadencia): el botón «Buscar ahora»
+app.post('/api/wanted/run', async (req) => {
+  // arranca en SEGUNDO PLANO y vuelve al instante: cada deseo consulta indexers en vivo y
+  // una tanda puede tardar minutos. La UI sigue el progreso sondeando /api/wanted.
+  runWantedWatch({ force: req.body?.force !== false }).catch((e) => app.log.warn(e));
+  return { started: true, status: wantedStatus };
+});
+
 // ¿Lidarr configurado? La UI oculta sus caminos si no lo está (Lidarr es opcional).
 app.get('/api/lidarr/enabled', async () => {
   const { url, key } = lidarrConfig();
@@ -1306,6 +1339,21 @@ function scheduleAutoImport() {
   }, 30 * 1000);
 }
 
+// Vigilancia de «Lo quiero»: cada cierto tiempo busca en los indexers los discos que has
+// marcado y agarra el primero que aparezca. Es el temporizador que hace que un disco
+// estrenado el viernes de madrugada esté descargado cuando te levantes. Barato: si no hay
+// deseos vigilando, runWantedWatch sale enseguida.
+function scheduleWantedWatch() {
+  let lastRun = 0;
+  setInterval(() => {
+    const cfg = wantedConfig();
+    if (!cfg.enabled || wantedStatus.running) return;
+    if (Date.now() - lastRun < cfg.intervalMin * 60 * 1000) return;
+    lastRun = Date.now();
+    runWantedWatch().catch((e) => console.warn('[wanted] barrido falló:', String(e.message || e)));
+  }, 60 * 1000);
+}
+
 // Errores fatales: los logueamos para que se VEAN. Antes, un error no capturado
 // tumbaba el proceso y en los logs solo aparecía el crash del destructor de
 // better-sqlite3, ocultando la causa real. No salimos: preferimos seguir vivos.
@@ -1332,6 +1380,7 @@ app
     console.log(`[Liderarrr] escuchando en http://0.0.0.0:${PORT}`);
     scheduleNightly();
     scheduleAutoImport();
+    scheduleWantedWatch();
     // backfill de multidiscos: reagrupa cajas sobre lo ya escaneado, sin exigir un
     // reescaneo completo. Diferido para no retrasar el primer request. Solo lectura.
     setImmediate(() => {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Library, Download, ExternalLink, RefreshCw, Loader2, Check, Disc3 } from 'lucide-react';
 import { api } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, Button, AddToChallengeButton } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, Button, AddToChallengeButton, WantButton } from '../components.jsx';
 
 // Página «Streaming» (1.0): la brecha entre tu COLECCIÓN LOCAL y tu BIBLIOTECA GUARDADA de
 // Spotify. Dos lados: lo que tienes en streaming y no en disco (→ descargar) y lo que tienes
@@ -35,6 +35,7 @@ function StreamingRow({ r, added, busy, onDownload }) {
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <AddToChallengeButton artist={r.artist} title={r.title} />
+        <WantButton artist={r.artist} title={r.title} releaseDate={r.release_date} cover={r.cover} origin="streaming" />
         {done ? (
           <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
             <Check size={13} /> pedido

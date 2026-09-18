@@ -505,6 +505,32 @@ CREATE TABLE IF NOT EXISTS spotify_saved_albums (
   synced_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_spotsaved_key ON spotify_saved_albums(match_key);
+
+-- «Lo quiero» (1.0): lista de deseos VIGILADA. Cualquier disco que marques —lo busques,
+-- salga en el calendario o lo veas en el radar— queda aquí y un barrido periódico lo busca
+-- en tus indexers hasta encontrarlo. Es lo que hace que un disco que sale el viernes de
+-- madrugada aparezca descargado por la mañana sin que tengas que estar tú. match_key
+-- (matchKey artista+título) es la clave: dedupe, marcado en la UI y cierre contra la
+-- biblioteca. status: watching (vigilando) | grabbed (pedido) | owned (ya en disco).
+CREATE TABLE IF NOT EXISTS wanted_albums (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  match_key TEXT UNIQUE,
+  artist TEXT,
+  title TEXT,
+  rg_mbid TEXT,
+  year INTEGER,
+  release_date TEXT,         -- YYYY-MM-DD si se conoce: no se busca antes de que salga
+  cover TEXT,
+  origin TEXT,               -- de dónde lo marcaste (busqueda | calendario | radar | …)
+  status TEXT DEFAULT 'watching',
+  tries INTEGER DEFAULT 0,
+  last_try_at INTEGER,
+  last_reason TEXT,          -- por qué no se pudo agarrar la última vez
+  release_title TEXT,        -- release agarrada, cuando la hay
+  added_at INTEGER,
+  updated_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_wanted_status ON wanted_albums(status);
 `);
 
 // --- migraciones ligeras ----------------------------------------------------

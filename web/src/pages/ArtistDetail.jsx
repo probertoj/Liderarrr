@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink, ChevronDown, ChevronRight, Link2, Search, X, Image as ImageIcon, Upload } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { AlbumCard, ArtistPhoto, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, useLidarrEnabled } from '../components.jsx';
+import { AlbumCard, ArtistPhoto, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, WantButton, useLidarrEnabled } from '../components.jsx';
 
 export default function ArtistDetail() {
   const { id } = useParams();
@@ -810,6 +810,16 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
               >
                 Buscar
               </button>
+              <WantButton
+                artist={artistName}
+                title={m.title}
+                rg_mbid={m.rg_mbid}
+                year={m.year}
+                releaseDate={m.first_release}
+                origin="artista"
+                label=""
+                className="text-xs p-1.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center shrink-0"
+              />
               {done ? (
                 <span className="text-emerald-400 text-xs inline-flex items-center gap-1 shrink-0">
                   <Check size={14} /> {m.in_lidarr ? 'en Lidarr' : 'pedido'}

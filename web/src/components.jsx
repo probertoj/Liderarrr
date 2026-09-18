@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Component } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy, Star, User, Loader2, ExternalLink } from 'lucide-react';
+import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy, Star, User, Loader2, ExternalLink, Heart } from 'lucide-react';
 import { api, coverUrl, artistPhotoUrl, fmtBytes } from './api.js';
 import { matchKey } from './matchkey.js';
 
@@ -441,6 +441,98 @@ export function AddToChallengeButton({ artist, title, label = 'Reto', className,
         />
       )}
     </>
+  );
+}
+
+// «LO QUIERO»: lista de deseos VIGILADA. Mismo patrón que la pertenencia a retos —un mapa
+// cacheado a nivel de módulo, compartido por todos los botones de la página, una sola
+// petición—. match_key(artista,álbum) → {id, status}. Al marcar/desmarcar se recarga y
+// todos los corazones de la página se enteran.
+let _wanted = null;
+let _wantedPromise = null;
+const _wantedSubs = new Set();
+function loadWanted(force) {
+  if (!force && _wanted) return Promise.resolve(_wanted);
+  if (!force && _wantedPromise) return _wantedPromise;
+  _wantedPromise = api
+    .wantedKeys()
+    .then((m) => {
+      _wanted = m || {};
+      _wantedPromise = null;
+      _wantedSubs.forEach((fn) => fn(_wanted));
+      return _wanted;
+    })
+    .catch(() => {
+      _wantedPromise = null;
+      return _wanted || {};
+    });
+  return _wantedPromise;
+}
+export function useWanted() {
+  const [map, setMap] = useState(_wanted);
+  useEffect(() => {
+    const fn = (m) => setMap(m);
+    _wantedSubs.add(fn);
+    loadWanted(false).then((m) => setMap(m));
+    return () => _wantedSubs.delete(fn);
+  }, []);
+  return { wantedOf: (artist, title) => (map ? map[matchKey(artist, title)] || null : null), reload: () => loadWanted(true) };
+}
+
+// Botón «Lo quiero»: un clic y Liderarr vigila ese disco en tus indexers hasta encontrarlo
+// (el barrido corre cada hora y en el refresco nocturno). Va EN TODAS PARTES donde aparezca
+// un disco que aún no tienes: búsqueda, calendario, radar, brecha de streaming…
+// Es un interruptor: si ya lo quieres, vuelve a pulsar para dejar de vigilarlo.
+export function WantButton({ artist, title, rg_mbid, year, releaseDate, cover, origin, label = 'Lo quiero', className, size = 'sm' }) {
+  const { wantedOf, reload } = useWanted();
+  const [busy, setBusy] = useState(false);
+  const w = wantedOf(artist, title);
+  const iconOnly = label === '';
+  const base =
+    size === 'md'
+      ? 'text-sm px-3 py-1.5 rounded-lg border inline-flex items-center gap-1.5'
+      : 'text-xs px-1.5 py-0.5 rounded border inline-flex items-center gap-1';
+  const tone = w
+    ? 'border-rose-500/50 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25'
+    : 'border-ink-700 bg-ink-850 hover:bg-ink-800';
+  // Ya marcado, el botón dice en qué punto está: vigilando → pedido → ya en tu disco.
+  const estado = w?.status === 'grabbed' ? 'Pedido' : w?.status === 'owned' ? 'Ya lo tienes' : 'Vigilando';
+  const toggle = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBusy(true);
+    try {
+      if (w) await api.unwantAlbum({ artist, title });
+      else await api.wantAlbum({ artist, title, rg_mbid, year, release_date: releaseDate, cover, origin });
+      await reload();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      title={
+        w
+          ? w.status === 'grabbed'
+            ? 'Ya está pedido y descargándose · pulsa para dejar de vigilarlo'
+            : w.status === 'owned'
+              ? 'Ya está en tu disco · pulsa para quitarlo de la lista'
+              : `Vigilando «${title}»: se descargará en cuanto aparezca en tus trackers · pulsa para dejar de vigilarlo`
+          : 'Lo quiero: Liderarr lo buscará solo hasta encontrarlo'
+      }
+      className={`${className ? `${className} ${w ? 'text-rose-400 border-rose-500/40' : ''}` : `${base} ${tone}`} disabled:opacity-50`}
+    >
+      {busy ? (
+        <Loader2 size={size === 'md' ? 14 : 12} className="animate-spin" />
+      ) : (
+        <Heart size={size === 'md' ? 14 : 12} className={w ? 'fill-current' : ''} />
+      )}{' '}
+      {iconOnly ? '' : w ? estado : label}
+    </button>
   );
 }
 
@@ -1126,12 +1218,23 @@ export function QuickSearch() {
                 {al.owned ? (
                   <span className="text-xs text-emerald-400/70 shrink-0">lo tienes</span>
                 ) : (
-                  <button
-                    onClick={() => setSearch(`${al.artist} ${al.title}`)}
-                    className="text-xs px-2 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 shrink-0"
-                  >
-                    <Download size={12} /> Descargar
-                  </button>
+                  <>
+                    <WantButton
+                      artist={al.artist}
+                      title={al.title}
+                      rg_mbid={al.rg_mbid}
+                      year={al.year}
+                      origin="busqueda"
+                      label=""
+                      className="text-xs p-1 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center shrink-0"
+                    />
+                    <button
+                      onClick={() => setSearch(`${al.artist} ${al.title}`)}
+                      className="text-xs px-2 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 shrink-0"
+                    >
+                      <Download size={12} /> Descargar
+                    </button>
+                  </>
                 )}
               </div>
             ))}

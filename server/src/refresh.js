@@ -9,6 +9,7 @@ import { refreshAllLabels } from './followlabels.js';
 import { refreshAllCurators } from './radar.js';
 import { runAutoImport, autoImportEnabled, autoImportStatus } from './autoimport.js';
 import { runAutoGrab, autoGrabConfig, autoGrabStatus } from './autograb.js';
+import { runWantedWatch, wantedConfig, wantedStatus, wantedCounts } from './wanted.js';
 import { refreshExternalReleases } from './newreleases.js';
 import { refreshGlobalReleases } from './globalradar.js';
 import { refreshSpotifyLibrary, spotifyUserConnected } from './spotifyuser.js';
@@ -171,6 +172,18 @@ function buildSteps() {
       run: async () => {
         const r = await refreshArtistSuggestions();
         return r.skipped ? r.skipped : `${r.count} sugerencias de ${r.seeds} semillas`;
+      },
+    },
+    {
+      key: 'wanted',
+      label: 'Buscar los discos de «Lo quiero»',
+      enabled: () => wantedConfig().enabled && wantedCounts().watching > 0,
+      run: async () => {
+        // force: en la pasada nocturna se revisan TODOS los deseos, sin esperar a la
+        // cadencia de reintento. Es la ronda grande del día.
+        const r = await runWantedWatch({ force: true, limit: 60 });
+        if (r.error) throw new Error(r.error);
+        return `${wantedStatus.grabbed} agarrados de ${wantedStatus.checked} deseos revisados`;
       },
     },
     {
