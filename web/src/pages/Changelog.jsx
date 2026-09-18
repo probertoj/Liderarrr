@@ -9,6 +9,22 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.0.0',
+    title: '1.0 — vivir sin Lidarr, de verdad',
+    items: [
+      'Liderarr ya no necesita a Lidarr para nada: escanea tu música, la identifica, te dice qué te falta, vigila los estrenos, los descarga solo y los coloca en su sitio.',
+      'Nueva página «Streaming»: conecta tu cuenta de Spotify y cruza tus álbumes guardados con tu colección local. Ves lo que tienes en streaming y no en disco (para descargarlo) y lo que tienes en disco y no en streaming (con «Guardar en Spotify» de un clic).',
+      'Nuevo botón ♥ «Lo quiero» en cualquier disco que aún no tengas —al buscarlo, en el calendario, en el radar, en los huecos de un artista o en la brecha de streaming—. Liderarr lo busca solo en tus indexers hasta que aparece y lo agarra, aunque no sigas al artista.',
+      '«Lo quiero» se adelanta al estreno: empieza a vigilar 16 h antes de la fecha oficial, porque un disco que sale el viernes aparece en los trackers el jueves por la mañana. Un estreno de madrugada te lo encuentras descargado por la mañana, con aviso.',
+      'Su lista vive en Lanzamientos → ♥ Lo quiero, con el estado de cada deseo (sale el…, sin release, pedido, ya en tu disco).',
+      'Lanzamientos abre ahora en «📅 Mes», la vista panorámica, y en todas sus listas los discos que YA tienes se agrupan arriba plegados («Ya los tienes en disco · N») en vez de mezclarse con lo que te falta.',
+      'Cada lanzamiento trae botón a Spotify además del enlace a la fuente, y «Novedades de Spotify» pasa a llamarse «💿 Discos nuevos» (que es lo que es: álbumes y EPs; los singles van en «🎵 Canciones nuevas»).',
+      'Arreglado el móvil: en Lanzamientos y Streaming las filas se apilan en pantallas estrechas, así que el título del disco se lee entero y los botones ya no se salen de la pantalla.',
+      'El aviso nocturno de novedades ya no repite los mismos estrenos cada día.',
+      'El auto-import funciona con cualquier cliente de descargas (Deluge, rTorrent, Transmission…), no solo qBittorrent: barre la carpeta e importa lo que esté completo.',
+    ],
+  },
+  {
     version: '0.9.24',
     title: 'Retos por todas partes, buscador global y más detalle',
     items: [

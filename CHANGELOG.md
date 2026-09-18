@@ -7,9 +7,45 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
-## [Sin publicar]
+## [1.0.0] — 2026-09-18
+
+**La 1.0.** Liderarr ya no necesita a Lidarr para nada: escanea, identifica, te dice qué te
+falta, vigila los estrenos, los descarga solo y los coloca en su sitio. Esta versión cierra el
+círculo con las dos piezas que faltaban: saber qué tienes en **streaming y no en disco** (y al
+revés), y **«Lo quiero»**, una lista de deseos que se descarga sola en cuanto el disco aparece
+en tus trackers.
 
 ### Añadido
+- **Integración con tu biblioteca de Spotify (la brecha disco ↔ streaming)** — la feature de
+  1.0. Conectas tu cuenta por **OAuth de usuario** (solo lectura, `user-library-read`) y
+  Liderarr cruza tus **álbumes guardados** en Spotify con tu colección local:
+  - Nueva página **«Streaming»**: dos lados. **En Spotify, no en tu disco** → botón Descargar
+    (+ enlace a Spotify, + «Añadir a reto»). **En tu disco, no en Spotify** → «Guardar en
+    Spotify» (abre el buscador de Spotify para que lo añadas). Con contadores (guardados /
+    en disco / en ambos / en la brecha).
+  - **Conexión en Ajustes → «Biblioteca de Spotify»**: flujo «pega el código» (por las reglas
+    de Spotify 2025, el redirect debe ser HTTPS o loopback `http://127.0.0.1:puerto`; una IP de
+    LAN no vale). El usuario registra el redirect que se le indica, aprueba, y pega el `code`.
+    Si sirve Liderarr por HTTPS y registra `…/callback`, se completa solo.
+  - Backend: `spotifyuser.js` (OAuth code + refresh token cifrado, `refreshSpotifyLibrary`,
+    `spotifyGap`), tabla `spotify_saved_albums`, rutas `/api/spotify/user/*`,
+    `/api/spotify/library/refresh[/status]`, `/api/spotify/gap`, y paso nocturno para
+    resincronizar la biblioteca. Refresco de biblioteca no bloqueante con progreso.
+  - El lado «en tu disco, no en Spotify» puede tener miles de álbumes: **filtro de texto +
+    render por lotes** («Mostrar más») para que no congele el navegador.
+  - Toggle opcional **«Solo álbumes»**: deja fuera singles/EPs/recopilatorios (streaming por
+    `album_type` de Spotify; local por `primary_type`). Apagado por defecto.
+  - **«Guardar en Spotify» de un clic** en el lado «en tu disco, no en Spotify»: busca el álbum
+    en Spotify y lo añade a tu biblioteca (scope `user-library-modify`). Si conectaste solo con
+    lectura, avisa de reconectar. Queda el enlace ↗ para hacerlo a mano. Maneja el 429
+    (rate-limit) con reintentos y Retry-After.
+  - **El catálogo (Canciones nuevas / Descubre) ya no usa Spotify, solo Deezer.** Antes se
+    consultaba Spotify artista por artista de la colección (miles de peticiones), lo que agotaba
+    la cuota de la app —capada en «modo desarrollo»— y provocaba 429 al usar la biblioteca de
+    Spotify. Deezer ya cubre eso, así que la cuota de Spotify queda para sincronizar/guardar.
+  - Si Spotify redirige con `error=…` (p. ej. `server_error` por app en modo desarrollo con la
+    cuenta sin añadir a «User Management», o `access_denied`), la app lo detecta y da un mensaje
+    accionable en vez de «no encontré el código».
 - **«Lo quiero»: lista de deseos VIGILADA.** Botón ♥ en todos los discos que aún no tienes —al
   buscarlos, en el calendario (Mes, Próximos, Estrenados, Discos nuevos, Canciones nuevas,
   Descubre, De tus sellos, Radar), en los huecos de un artista y en la brecha de streaming—.
@@ -79,38 +115,6 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   además, Liderarr **barre la carpeta de descargas** e importa lo que esté COMPLETO (estable:
   sin cambios en los últimos 5 min) y aún no importado. El diagnóstico de «Importar descargas»
   deja de ser solo-qBittorrent y muestra «N aún bajando (esperando)».
-
-### Añadido
-- **Integración con tu biblioteca de Spotify (la brecha disco ↔ streaming)** — la feature de
-  1.0. Conectas tu cuenta por **OAuth de usuario** (solo lectura, `user-library-read`) y
-  Liderarr cruza tus **álbumes guardados** en Spotify con tu colección local:
-  - Nueva página **«Streaming»**: dos lados. **En Spotify, no en tu disco** → botón Descargar
-    (+ enlace a Spotify, + «Añadir a reto»). **En tu disco, no en Spotify** → «Guardar en
-    Spotify» (abre el buscador de Spotify para que lo añadas). Con contadores (guardados /
-    en disco / en ambos / en la brecha).
-  - **Conexión en Ajustes → «Biblioteca de Spotify»**: flujo «pega el código» (por las reglas
-    de Spotify 2025, el redirect debe ser HTTPS o loopback `http://127.0.0.1:puerto`; una IP de
-    LAN no vale). El usuario registra el redirect que se le indica, aprueba, y pega el `code`.
-    Si sirve Liderarr por HTTPS y registra `…/callback`, se completa solo.
-  - Backend: `spotifyuser.js` (OAuth code + refresh token cifrado, `refreshSpotifyLibrary`,
-    `spotifyGap`), tabla `spotify_saved_albums`, rutas `/api/spotify/user/*`,
-    `/api/spotify/library/refresh[/status]`, `/api/spotify/gap`, y paso nocturno para
-    resincronizar la biblioteca. Refresco de biblioteca no bloqueante con progreso.
-  - El lado «en tu disco, no en Spotify» puede tener miles de álbumes: **filtro de texto +
-    render por lotes** («Mostrar más») para que no congele el navegador.
-  - Toggle opcional **«Solo álbumes»**: deja fuera singles/EPs/recopilatorios (streaming por
-    `album_type` de Spotify; local por `primary_type`). Apagado por defecto.
-  - **«Guardar en Spotify» de un clic** en el lado «en tu disco, no en Spotify»: busca el álbum
-    en Spotify y lo añade a tu biblioteca (scope `user-library-modify`). Si conectaste solo con
-    lectura, avisa de reconectar. Queda el enlace ↗ para hacerlo a mano. Maneja el 429
-    (rate-limit) con reintentos y Retry-After.
-  - **El catálogo (Canciones nuevas / Descubre) ya no usa Spotify, solo Deezer.** Antes se
-    consultaba Spotify artista por artista de la colección (miles de peticiones), lo que agotaba
-    la cuota de la app —capada en «modo desarrollo»— y provocaba 429 al usar la biblioteca de
-    Spotify. Deezer ya cubre eso, así que la cuota de Spotify queda para sincronizar/guardar.
-  - Si Spotify redirige con `error=…` (p. ej. `server_error` por app en modo desarrollo con la
-    cuenta sin añadir a «User Management», o `access_denied`), la app lo detecta y da un mensaje
-    accionable en vez de «no encontré el código».
 
 ---
 
