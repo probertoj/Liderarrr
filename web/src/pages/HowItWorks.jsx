@@ -55,8 +55,10 @@ export default function HowItWorks() {
         <Step n="4b" Icon={Heart} title="«Lo quiero» (lista de deseos vigilada)">
           El ♥ que verás en cualquier disco que aún no tengas —al buscarlo, en el calendario, en el radar, en la
           brecha de streaming— lo pone en vigilancia: Liderarr lo busca solo en tus indexers cada hora hasta que
-          aparece, y lo agarra. Si todavía no ha salido, espera a su fecha de estreno. Un disco que sale el viernes de
-          madrugada te lo encuentras descargado por la mañana. La lista está en Lanzamientos → ♥ Lo quiero.
+          aparece, y lo agarra. Un estreno del <strong className="text-neutral-400">viernes</strong> se empieza a vigilar
+          el jueves por la mañana, porque es cuando aparece de verdad en los trackers (sale antes en Oceanía y las promos
+          se filtran): te lo encuentras descargado sin haber estado tú pendiente. La lista está en Lanzamientos → ♥ Lo
+          quiero.
         </Step>
         <Step n="5" Icon={Radio} title="Radar de novedades (Lanzamientos)">
           Estrenos de tu colección, separados en <strong className="text-neutral-400">Discos nuevos</strong> (álbumes y
@@ -99,9 +101,9 @@ export default function HowItWorks() {
           <div>
             <div className="text-sm text-neutral-200 mb-0.5">Cada hora · vigilancia de «Lo quiero»</div>
             <div className="text-xs text-neutral-500 leading-relaxed">
-              Busca en tus indexers los discos de tu lista de deseos que ya han salido y agarra la mejor release en
-              cuanto aparece. Reintenta con más calma según pasan los días, y te avisa por notificación cuando pilla
-              algo. Si no tienes nada en la lista, no hace nada.
+              Busca en tus indexers los discos de tu lista de deseos cuya ventana ya está abierta (por defecto, desde 16 h
+              antes del estreno) y agarra la mejor release en cuanto aparece. Reintenta con más calma según pasan los días,
+              y te avisa por notificación cuando pilla algo. Si no tienes nada en la lista, no hace nada.
             </div>
           </div>
         </div>

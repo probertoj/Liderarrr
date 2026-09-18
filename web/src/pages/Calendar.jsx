@@ -814,8 +814,9 @@ function WantedPanel({ onSearch }) {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-xs text-neutral-500 min-w-0 flex-1">
             Los discos que marcas con <span className="text-rose-300">♥ Lo quiero</span> quedan vigilados: cada hora (y
-            en el refresco nocturno) Liderarr los busca en tus indexers y agarra la mejor release en cuanto aparece. Si
-            aún no ha salido, espera a su fecha de estreno. Tú te enteras por la notificación.
+            en el refresco nocturno) Liderarr los busca en tus indexers y agarra la mejor release en cuanto aparece. Un
+            estreno del viernes se empieza a vigilar el jueves por la mañana, que es cuando suele aparecer. Tú te enteras
+            por la notificación.
             {!data.enabled && <span className="text-amber-400/90"> · La vigilancia está desactivada en Ajustes.</span>}
           </p>
           <button

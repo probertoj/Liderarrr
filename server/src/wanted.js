@@ -13,19 +13,47 @@ import { sendNotification } from './notify.js';
 // (hardlink a la biblioteca). Aquí solo está la LISTA y la CADENCIA de reintento.
 
 const HOUR = 3600 * 1000;
+const DAY = 24 * HOUR;
 
-// Cadencia de reintento: agresiva recién salido el disco, relajada con el tiempo. Sin
-// esto, un deseo que nunca aparece machacaría los indexers para siempre.
-//   tries < 6  → cada 1 h  (las primeras horas tras el estreno)
-//   tries < 18 → cada 3 h  (el resto de los primeros días)
-//   resto      → cada 12 h (vigilancia de fondo, indefinida)
-function retryDelay(tries) {
-  if (tries < 6) return 1 * HOUR;
-  if (tries < 18) return 3 * HOUR;
-  return 12 * HOUR;
+// ADELANTO sobre la fecha de estreno. Un disco que sale el VIERNES suele aparecer en los
+// indexers el jueves por la mañana (hora europea): sale antes en Australia/Nueva Zelanda, y
+// las promos se filtran. Si esperásemos a la medianoche del viernes llegaríamos medio día
+// tarde, justo cuando se reparte. Por defecto 16 h: para un estreno del viernes la vigilancia
+// arranca el jueves a las 08:00, con margen de sobra antes de las 11:00 típicas.
+const leadHours = () => {
+  const raw = getSetting('wanted_lead_hours');
+  if (raw == null || raw === '') return 16;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 16;
+};
+
+// Medianoche LOCAL del día de estreno (la fecha viene como YYYY-MM-DD, sin hora).
+function releaseInstant(dateStr) {
+  const t = new Date(`${dateStr}T00:00:00`).getTime();
+  return Number.isNaN(t) ? null : t;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Cuándo se abre la vigilancia de este deseo: el adelanto sobre su estreno o, si lo marcaste
+// después (un disco viejo que quieres hoy), el momento en que lo marcaste. Es el ancla de la
+// cadencia: así un disco de 1996 marcado hoy también se busca a menudo los primeros días.
+function windowStart(w) {
+  const rel = w.release_date ? releaseInstant(w.release_date) : null;
+  const open = rel == null ? 0 : rel - leadHours() * HOUR;
+  return Math.max(open, w.added_at || 0);
+}
+
+// Cadencia de reintento, medida desde que se abrió la ventana (NO por número de intentos: así
+// no se degrada por haber empezado a mirar antes del estreno). Sin freno, un deseo que nunca
+// aparece machacaría los indexers para siempre.
+//   primeras 48 h → cada 1 h   (la ventana caliente: el reparto del jueves/viernes)
+//   primera semana → cada 3 h
+//   después        → cada 12 h (vigilancia de fondo, indefinida)
+function retryDelay(w) {
+  const age = Date.now() - windowStart(w);
+  if (age < 2 * DAY) return 1 * HOUR;
+  if (age < 7 * DAY) return 3 * HOUR;
+  return 12 * HOUR;
+}
 
 export function wantedConfig() {
   return {
@@ -129,24 +157,29 @@ function requestedIndex() {
   return (w) => (w.rg_mbid && rg.has(w.rg_mbid)) || keys.has(w.match_key);
 }
 
-// ¿Ya ha salido? Buscar un disco antes de su estreno es gastar llamadas al indexer para
-// nada, así que ni el barrido automático ni el «Buscar ahora» manual lo intentan.
-function isReleased(w) {
-  return !w.release_date || w.release_date <= today();
+// ¿Está abierta ya la vigilancia? Buscar un disco días antes de que exista es gastar llamadas
+// al indexer para nada; buscarlo solo a partir de su fecha oficial llega tarde (aparecen el día
+// antes). El adelanto de leadHours() es el punto medio.
+function windowOpen(w) {
+  return Date.now() >= windowStart(w);
 }
 
-// ¿Toca buscar este deseo ahora? Ya estrenado y con la cadencia de reintento cumplida.
+// ¿Toca buscar este deseo ahora? Ventana abierta y cadencia de reintento cumplida.
 function isDue(w) {
-  if (w.status !== 'watching' || !isReleased(w)) return false;
+  if (w.status !== 'watching' || !windowOpen(w)) return false;
   if (!w.last_try_at) return true;
-  return Date.now() - w.last_try_at >= retryDelay(w.tries || 0);
+  return Date.now() - w.last_try_at >= retryDelay(w);
 }
 
 // Texto para la UI: por qué este deseo aún no se ha buscado / qué pasó la última vez.
 function pendingReason(w) {
   if (w.status === 'owned') return 'ya en tu disco';
   if (w.status === 'grabbed') return w.release_title ? `pedido: ${w.release_title}` : 'pedido';
-  if (w.release_date && w.release_date > today()) return `sale el ${w.release_date}`;
+  if (!windowOpen(w)) {
+    const desde = new Date(windowStart(w));
+    const cuando = desde.toLocaleString('es', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return `sale el ${w.release_date} · empieza a buscar el ${cuando}`;
+  }
   if (!w.last_try_at) return 'en cola para buscar';
   return w.last_reason || 'buscando';
 }
@@ -186,7 +219,7 @@ export async function runWantedWatch({ limit, force = false } = {}) {
     const candidates = db
       .prepare("SELECT * FROM wanted_albums WHERE status = 'watching' ORDER BY COALESCE(last_try_at, 0)")
       .all()
-      .filter((w) => (force ? isReleased(w) : isDue(w))); // force salta la cadencia, NO la fecha de estreno
+      .filter((w) => (force ? windowOpen(w) : isDue(w))); // force salta la cadencia, NO la ventana de estreno
 
     const grabbedNow = [];
     for (const w of candidates) {

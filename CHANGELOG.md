@@ -16,9 +16,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   Al marcarlo, Liderarr lo **busca solo en tus indexers cada hora** (y en el refresco nocturno)
   y agarra la mejor release en cuanto aparece, aunque no sigas al artista: un disco que sale el
   viernes de madrugada te lo encuentras descargado por la mañana, con notificación.
-  - **No busca antes de tiempo**: si se conoce la fecha de estreno, espera a que llegue.
-  - **Cadencia con freno**: cada hora las primeras horas, cada 3 h los primeros días y cada 12 h
-    después, para no machacar los indexers con un deseo que no aparece nunca.
+  - **Se adelanta al estreno**: la vigilancia abre **16 h antes** de la fecha oficial (ajustable),
+    porque un disco que sale el viernes aparece en los indexers el **jueves por la mañana** —sale
+    antes en Oceanía y las promos se filtran—. Con 16 h, un estreno del viernes se vigila desde el
+    jueves a las 08:00. Antes de esa ventana no se gasta ni una llamada al indexer.
+  - **Cadencia con freno**, medida desde que se abre la ventana (no por número de intentos): cada
+    hora las primeras 48 h, cada 3 h la primera semana y cada 12 h después, para no machacar los
+    indexers con un deseo que no aparece nunca. Un disco viejo marcado hoy ancla la cadencia en el
+    momento de marcarlo, así que también se busca a menudo los primeros días.
   - **No pide dos veces lo mismo**: salta lo que ya está en el ledger de descargas, y cierra solo
     los deseos cuyo disco ya está en tu biblioteca (`owned`).
   - Pestaña **Lanzamientos → ♥ Lo quiero** con el estado de cada deseo (sale el…, sin release,

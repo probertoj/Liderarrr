@@ -1029,8 +1029,9 @@ export default function Settings() {
         <p className="text-xs text-neutral-500 mb-3">
           Los discos que marcas con ♥ <b className="font-normal text-neutral-400">Lo quiero</b> (al buscarlos, en el
           calendario, en el radar…) quedan vigilados: cada cierto tiempo Liderarr los busca en tus indexers y agarra la
-          mejor release en cuanto aparece, aunque no sigas al artista. Si el disco aún no ha salido, espera a su fecha de
-          estreno. La lista vive en <b className="font-normal text-neutral-400">Lanzamientos → ♥ Lo quiero</b>.
+          mejor release en cuanto aparece, aunque no sigas al artista. Empieza a buscar un poco <b className="font-normal
+          text-neutral-400">antes</b> del estreno, porque en los trackers aparecen el día anterior. La lista vive en{' '}
+          <b className="font-normal text-neutral-400">Lanzamientos → ♥ Lo quiero</b>.
         </p>
         <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer">
           <input
@@ -1046,6 +1047,12 @@ export default function Settings() {
           </Field>
           <Field label="Máximo por ronda" hint="Cuántos deseos busca en cada pasada (cada búsqueda consulta indexers en vivo).">
             <input type="number" value={s.wanted_watch_per_run || '12'} onChange={set('wanted_watch_per_run')} className={input} />
+          </Field>
+          <Field
+            label="Adelanto sobre el estreno (horas)"
+            hint="Cuánto antes de la fecha oficial empieza a buscar. 16 h = un estreno del viernes se vigila desde el jueves a las 08:00 (suelen aparecer sobre las 11:00)."
+          >
+            <input type="number" value={s.wanted_lead_hours || '16'} onChange={set('wanted_lead_hours')} className={input} />
           </Field>
         </div>
       </section>
