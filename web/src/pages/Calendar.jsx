@@ -20,41 +20,43 @@ function ReleaseRow({ r, added, busy, followed, onAdd, onFollow, onSearch, lidar
   const isFollowed = (followKey && followed[followKey]) || r.tracked;
   const canFollow = !!(r.artist_id || r.artist_mbid);
   return (
-    <div className="card px-3 py-2 flex items-center gap-3 text-sm">
-      <img
-        src={`https://coverartarchive.org/release-group/${r.rg_mbid}/front-250`}
-        alt=""
-        loading="lazy"
-        onError={(e) => {
-          e.currentTarget.style.visibility = 'hidden';
-        }}
-        className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="truncate clamp-mobile" title={`${r.artist} — ${r.title}`}>
-          {r.artist_id ? (
-            <Link to={`/artista/${r.artist_id}`} className="hover:text-gold-400">
-              {r.artist}
-            </Link>
-          ) : (
-            <span>{r.artist}</span>
-          )}
-          <span className="text-neutral-500"> — {r.title}</span>
-        </div>
-        <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
-          <span>
-            {r.first_release || 'fecha por confirmar'}
-            {r.primary_type && r.primary_type !== 'Album' ? ` · ${r.primary_type}` : ''}
-            {r.is_owned ? ' · ya lo tienes' : ''}
-          </span>
-          {r.labels && (
-            <span className="inline-flex items-center gap-1 text-gold-400/80" title="De un sello que sigues">
-              <Tag size={11} /> {r.labels.split(',').join(', ')}
+    <div className="card px-3 py-2 release-row text-sm">
+      <div className="release-main">
+        <img
+          src={`https://coverartarchive.org/release-group/${r.rg_mbid}/front-250`}
+          alt=""
+          loading="lazy"
+          onError={(e) => {
+            e.currentTarget.style.visibility = 'hidden';
+          }}
+          className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="truncate clamp-mobile" title={`${r.artist} — ${r.title}`}>
+            {r.artist_id ? (
+              <Link to={`/artista/${r.artist_id}`} className="hover:text-gold-400">
+                {r.artist}
+              </Link>
+            ) : (
+              <span>{r.artist}</span>
+            )}
+            <span className="text-neutral-500"> — {r.title}</span>
+          </div>
+          <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
+            <span>
+              {r.first_release || 'fecha por confirmar'}
+              {r.primary_type && r.primary_type !== 'Album' ? ` · ${r.primary_type}` : ''}
+              {r.is_owned ? ' · ya lo tienes' : ''}
             </span>
-          )}
+            {r.labels && (
+              <span className="inline-flex items-center gap-1 text-gold-400/80" title="De un sello que sigues">
+                <Tag size={11} /> {r.labels.split(',').join(', ')}
+              </span>
+            )}
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="release-actions">
         {isFollowed ? (
           <span className="text-xs text-gold-400/80 inline-flex items-center gap-1">
             <Star size={12} /> siguiendo
@@ -119,41 +121,43 @@ function ReleaseRow({ r, added, busy, followed, onAdd, onFollow, onSearch, lidar
 function ExternalReleaseRow({ r, added, busy, onAdd, onSearch, onDismiss }) {
   const done = added[`ext${r.id}`];
   return (
-    <div className="card px-3 py-2 flex items-center gap-3 text-sm">
-      <img
-        src={r.cover || ''}
-        alt=""
-        loading="lazy"
-        onError={(e) => {
-          e.currentTarget.style.visibility = 'hidden';
-        }}
-        className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="truncate clamp-mobile" title={`${r.artist} — ${r.title}`}>
-          {r.artist_id ? (
-            <Link to={`/artista/${r.artist_id}`} className="hover:text-gold-400">
-              {r.artist}
-            </Link>
-          ) : (
-            <span>{r.artist}</span>
-          )}
-          <span className="text-neutral-500"> — {r.title}</span>
-        </div>
-        <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
-          <span>
-            {r.release_date}
-            {r.record_type && r.record_type !== 'album' ? ` · ${r.record_type.toUpperCase()}` : ''}
-          </span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-ink-700 text-neutral-500 uppercase">{r.source}</span>
-          {r.ahead && (
-            <span className="text-amber-400/80" title="MusicBrainz aún no lo lista">⚡ MB no lo tiene</span>
-          )}
-          {r.reason && <span className="text-sky-400/80">{r.reason}</span>}
-          {r.owned && <span className="text-emerald-400/70">ya lo tienes</span>}
+    <div className="card px-3 py-2 release-row text-sm">
+      <div className="release-main">
+        <img
+          src={r.cover || ''}
+          alt=""
+          loading="lazy"
+          onError={(e) => {
+            e.currentTarget.style.visibility = 'hidden';
+          }}
+          className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="truncate clamp-mobile" title={`${r.artist} — ${r.title}`}>
+            {r.artist_id ? (
+              <Link to={`/artista/${r.artist_id}`} className="hover:text-gold-400">
+                {r.artist}
+              </Link>
+            ) : (
+              <span>{r.artist}</span>
+            )}
+            <span className="text-neutral-500"> — {r.title}</span>
+          </div>
+          <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
+            <span>
+              {r.release_date}
+              {r.record_type && r.record_type !== 'album' ? ` · ${r.record_type.toUpperCase()}` : ''}
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-ink-700 text-neutral-500 uppercase">{r.source}</span>
+            {r.ahead && (
+              <span className="text-amber-400/80" title="MusicBrainz aún no lo lista">⚡ MB no lo tiene</span>
+            )}
+            {r.reason && <span className="text-sky-400/80">{r.reason}</span>}
+            {r.owned && <span className="text-emerald-400/70">ya lo tienes</span>}
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="release-actions">
         <button
           onClick={() => onSearch(`${r.artist} ${r.title}`)}
           className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1"
@@ -412,48 +416,50 @@ function RadarRow({ r, onSearch, onFollowMbid, onQueue, lidarrOn }) {
   };
 
   return (
-    <div className="card px-3 py-2 flex items-center gap-3 text-sm">
-      <img
-        src={r.image}
-        alt=""
-        loading="lazy"
-        onError={(e) => {
-          e.currentTarget.style.visibility = 'hidden';
-        }}
-        className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="truncate flex items-center gap-1.5" title={`${r.artist} — ${r.title}`}>
-          {r.source === 'hipersonica' && r.type && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full border shrink-0 ${TIER_STYLE[r.type] || 'border-ink-700 text-neutral-400'}`}>
-              {r.type}
+    <div className="card px-3 py-2 release-row text-sm">
+      <div className="release-main">
+        <img
+          src={r.image}
+          alt=""
+          loading="lazy"
+          onError={(e) => {
+            e.currentTarget.style.visibility = 'hidden';
+          }}
+          className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="truncate flex items-center gap-1.5" title={`${r.artist} — ${r.title}`}>
+            {r.source === 'hipersonica' && r.type && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full border shrink-0 ${TIER_STYLE[r.type] || 'border-ink-700 text-neutral-400'}`}>
+                {r.type}
+              </span>
+            )}
+            <span className="truncate clamp-mobile">
+              <span>{r.artist}</span>
+              <span className="text-neutral-500"> — {r.title}</span>
             </span>
-          )}
-          <span className="truncate clamp-mobile">
-            <span>{r.artist}</span>
-            <span className="text-neutral-500"> — {r.title}</span>
-          </span>
-        </div>
-        <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
-          <span>
-            {r.release_date}
-            {r.type && r.type !== 'album' && r.source !== 'hipersonica' ? ` · ${r.type}` : ''}
-            {r.label ? ` · ${r.label}` : ''}
-          </span>
-          <span className="text-neutral-700">vía {r.curator}</span>
-          {r.tracked_artist && (
-            <span className="inline-flex items-center gap-1 text-gold-400/80">
-              <Star size={11} /> sigues al artista
+          </div>
+          <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
+            <span>
+              {r.release_date}
+              {r.type && r.type !== 'album' && r.source !== 'hipersonica' ? ` · ${r.type}` : ''}
+              {r.label ? ` · ${r.label}` : ''}
             </span>
-          )}
-          {r.tracked_label && (
-            <span className="inline-flex items-center gap-1 text-gold-400/80">
-              <Tag size={11} /> sello seguido
-            </span>
-          )}
+            <span className="text-neutral-700">vía {r.curator}</span>
+            {r.tracked_artist && (
+              <span className="inline-flex items-center gap-1 text-gold-400/80">
+                <Star size={11} /> sigues al artista
+              </span>
+            )}
+            {r.tracked_label && (
+              <span className="inline-flex items-center gap-1 text-gold-400/80">
+                <Tag size={11} /> sello seguido
+              </span>
+            )}
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="release-actions">
         {!r.tracked_artist && (
           <button
             onClick={followArtist}
@@ -876,34 +882,36 @@ function WantedPanel({ onSearch }) {
       ) : (
         <div className="space-y-1.5">
           {items.map((w) => (
-            <div key={w.id} className="card px-3 py-2 flex items-center gap-3 text-sm">
-              <img
-                src={w.cover || ''}
-                alt=""
-                loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.style.visibility = 'hidden';
-                }}
-                className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="truncate clamp-mobile" title={`${w.artist} — ${w.title}`}>
-                  {w.artist}
-                  <span className="text-neutral-500"> — {w.title}</span>
-                </div>
-                <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
-                  {w.status === 'owned' ? (
-                    <span className="text-emerald-400/80">✓ ya está en tu disco</span>
-                  ) : w.status === 'grabbed' ? (
-                    <span className="text-emerald-400/80">✓ {w.pending}</span>
-                  ) : (
-                    <span>{w.pending}</span>
-                  )}
-                  {w.tries > 0 && w.status === 'watching' && <span className="text-neutral-700">{w.tries} intentos</span>}
-                  {w.origin && <span className="text-neutral-700">desde {w.origin}</span>}
+            <div key={w.id} className="card px-3 py-2 release-row text-sm">
+              <div className="release-main">
+                <img
+                  src={w.cover || ''}
+                  alt=""
+                  loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.style.visibility = 'hidden';
+                  }}
+                  className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate clamp-mobile" title={`${w.artist} — ${w.title}`}>
+                    {w.artist}
+                    <span className="text-neutral-500"> — {w.title}</span>
+                  </div>
+                  <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
+                    {w.status === 'owned' ? (
+                      <span className="text-emerald-400/80">✓ ya está en tu disco</span>
+                    ) : w.status === 'grabbed' ? (
+                      <span className="text-emerald-400/80">✓ {w.pending}</span>
+                    ) : (
+                      <span>{w.pending}</span>
+                    )}
+                    {w.tries > 0 && w.status === 'watching' && <span className="text-neutral-700">{w.tries} intentos</span>}
+                    {w.origin && <span className="text-neutral-700">desde {w.origin}</span>}
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="release-actions">
                 <button
                   onClick={() => onSearch(`${w.artist} ${w.title}`)}
                   className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1"

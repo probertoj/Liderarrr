@@ -189,3 +189,46 @@ body {
     text-overflow: clip;
   }
 }
+
+/* FILA DE LANZAMIENTO. Estructura compartida por todas las listas de «Lanzamientos»
+   (próximos, estrenados, discos/canciones nuevas, descubre, sellos, radar, «Lo quiero» y el
+   día del calendario «Mes»): [carátula | artista — título | botones].
+
+   En escritorio va todo en una línea. En pantallas estrechas NO cabe: las filas llevan hasta
+   siete botones (Seguir, Buscar, Reto, Lo quiero, Descargar, fuente, Spotify, descartar) y,
+   al ser un bloque `shrink-0`, aplastaban la columna del texto hasta 0 px —el disco quedaba
+   ilegible— y se salían de la pantalla. Por debajo de 640 px la fila se APILA: carátula y
+   texto arriba con todo el ancho, botones debajo envolviendo en varias líneas. */
+.release-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.release-row > .release-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1;
+}
+.release-row > .release-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+@media (max-width: 639px) {
+  .release-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  /* la carátula, arriba: con el título ocupando dos o tres líneas, centrarla la dejaba
+     flotando a media altura, lejos del texto al que acompaña. */
+  .release-row > .release-main {
+    align-items: flex-start;
+  }
+  .release-row > .release-actions {
+    flex-wrap: wrap;
+  }
+}

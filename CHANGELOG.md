@@ -58,6 +58,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   «Spotify») actualizados, con referencias cruzadas entre ambas pestañas.
 
 ### Arreglado
+- **Lanzamientos en el móvil: los discos volvían a ser legibles.** Las filas llevan hasta siete
+  botones (Seguir, Buscar, Reto, Lo quiero, Descargar, fuente, Spotify, descartar) en un bloque
+  que no encogía, así que en pantallas estrechas aplastaban la columna del texto **hasta 0 px**
+  —el título del disco no se leía— y se salían de la pantalla. Por debajo de 640 px la fila ahora
+  se apila: carátula y título arriba con todo el ancho, botones debajo envolviendo en varias
+  líneas. Vale para las siete listas y para el detalle del día en «📅 Mes», que además le faltaba
+  el ajuste de título a varias líneas en táctil que sí tenían las demás. En escritorio no cambia
+  nada. (Medido a 375 px: columna de texto 0 → 265 px, sin desbordes.)
 - **El aviso nocturno de novedades ya no repite lo mismo cada día.** Contaba como «nuevo» todo
   lo que tocaba en cada pasada: (1) el `upsert` refresca filas que ya existían y eso contaba
   como cambio, y (2) las **singles de 45 días a 6 meses** se guardaban con la ventana de 6

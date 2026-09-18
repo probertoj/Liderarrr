@@ -277,31 +277,33 @@ export default function MonthCalendar({ onSearch }) {
             {selEvents.map((e, i) => {
               const key = `${e.date}:${nkey(e.artist)}:${nkey(e.title)}`;
               return (
-                <div key={i} className="card px-3 py-2 flex items-center gap-3 text-sm">
-                  <div className="flex flex-col gap-1 shrink-0">
-                    {e.kinds.map((k) => (
-                      <span key={k} className="w-2 h-2 rounded-full" style={{ background: KIND[k].dot }} title={KIND[k].label} />
-                    ))}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate">
-                      {e.artist_id ? (
-                        <Link to={`/artista/${e.artist_id}`} className="hover:text-gold-400">
-                          {e.artist}
-                        </Link>
-                      ) : (
-                        <span>{e.artist}</span>
-                      )}
-                      <span className="text-neutral-500"> — {e.title}</span>
+                <div key={i} className="card px-3 py-2 release-row text-sm">
+                  <div className="release-main">
+                    <div className="flex flex-col gap-1 shrink-0">
+                      {e.kinds.map((k) => (
+                        <span key={k} className="w-2 h-2 rounded-full" style={{ background: KIND[k].dot }} title={KIND[k].label} />
+                      ))}
                     </div>
-                    <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
-                      <span>{e.kinds.map((k) => KIND[k].label).join(' · ')}</span>
-                      {e.reason && <span className="text-sky-400/80">{e.reason}</span>}
-                      {e.ahead && <span className="text-amber-400/80" title="MusicBrainz aún no lo lista">⚡ MB no lo tiene</span>}
-                      {e.is_owned && <span className="text-emerald-400/70">ya lo tienes</span>}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate clamp-mobile" title={`${e.artist} — ${e.title}`}>
+                        {e.artist_id ? (
+                          <Link to={`/artista/${e.artist_id}`} className="hover:text-gold-400">
+                            {e.artist}
+                          </Link>
+                        ) : (
+                          <span>{e.artist}</span>
+                        )}
+                        <span className="text-neutral-500"> — {e.title}</span>
+                      </div>
+                      <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
+                        <span>{e.kinds.map((k) => KIND[k].label).join(' · ')}</span>
+                        {e.reason && <span className="text-sky-400/80">{e.reason}</span>}
+                        {e.ahead && <span className="text-amber-400/80" title="MusicBrainz aún no lo lista">⚡ MB no lo tiene</span>}
+                        {e.is_owned && <span className="text-emerald-400/70">ya lo tienes</span>}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="release-actions">
                     <button
                       onClick={() => onSearch(`${e.artist} ${e.title}`)}
                       className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1"
