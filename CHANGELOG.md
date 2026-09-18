@@ -66,6 +66,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   líneas. Vale para las siete listas y para el detalle del día en «📅 Mes», que además le faltaba
   el ajuste de título a varias líneas en táctil que sí tenían las demás. En escritorio no cambia
   nada. (Medido a 375 px: columna de texto 0 → 265 px, sin desbordes.)
+  Mismo arreglo en **Streaming** (las dos caras de la brecha), que usaba la misma fila.
 - **El aviso nocturno de novedades ya no repite lo mismo cada día.** Contaba como «nuevo» todo
   lo que tocaba en cada pasada: (1) el `upsert` refresca filas que ya existían y eso contaba
   como cambio, y (2) las **singles de 45 días a 6 meses** se guardaban con la ventana de 6

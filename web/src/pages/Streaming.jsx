@@ -12,28 +12,30 @@ import { PageTitle, Spinner, ErrorMsg, Button, AddToChallengeButton, WantButton 
 function StreamingRow({ r, added, busy, onDownload }) {
   const done = added[r.id];
   return (
-    <div className="card px-3 py-2 flex items-center gap-3 text-sm">
-      <img
-        src={r.cover || ''}
-        alt=""
-        loading="lazy"
-        onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
-        className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="truncate clamp-mobile" title={`${r.artist} — ${r.title}`}>
-          <span>{r.artist}</span>
-          <span className="text-neutral-500"> — {r.title}</span>
-        </div>
-        <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
-          {r.release_date && <span>{r.release_date.slice(0, 4)}</span>}
-          {r.album_type && r.album_type !== 'album' && (
-            <span className="uppercase text-[10px] px-1.5 py-0.5 rounded-full border border-ink-700">{r.album_type}</span>
-          )}
-          {r.added_at && <span className="text-neutral-700">guardado {r.added_at.slice(0, 10)}</span>}
+    <div className="card px-3 py-2 release-row text-sm">
+      <div className="release-main">
+        <img
+          src={r.cover || ''}
+          alt=""
+          loading="lazy"
+          onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
+          className="w-10 h-10 rounded object-cover bg-ink-850 shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="truncate clamp-mobile" title={`${r.artist} — ${r.title}`}>
+            <span>{r.artist}</span>
+            <span className="text-neutral-500"> — {r.title}</span>
+          </div>
+          <div className="text-xs text-neutral-600 flex items-center gap-2 flex-wrap">
+            {r.release_date && <span>{r.release_date.slice(0, 4)}</span>}
+            {r.album_type && r.album_type !== 'album' && (
+              <span className="uppercase text-[10px] px-1.5 py-0.5 rounded-full border border-ink-700">{r.album_type}</span>
+            )}
+            {r.added_at && <span className="text-neutral-700">guardado {r.added_at.slice(0, 10)}</span>}
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="release-actions">
         <AddToChallengeButton artist={r.artist} title={r.title} />
         <WantButton artist={r.artist} title={r.title} releaseDate={r.release_date} cover={r.cover} origin="streaming" />
         {done ? (
@@ -67,7 +69,7 @@ function StreamingRow({ r, added, busy, onDownload }) {
 
 function LocalRow({ r, saved, busy, onSave }) {
   return (
-    <div className="card px-3 py-2 flex items-center gap-3 text-sm">
+    <div className="card px-3 py-2 release-row text-sm">
       <div className="min-w-0 flex-1">
         <div className="truncate clamp-mobile" title={`${r.artist} — ${r.title}`}>
           {r.album_id ? (
@@ -82,7 +84,7 @@ function LocalRow({ r, saved, busy, onSave }) {
         </div>
         {r.year ? <div className="text-xs text-neutral-600">{r.year}</div> : null}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="release-actions">
         <AddToChallengeButton artist={r.artist} title={r.title} />
         {saved ? (
           <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
