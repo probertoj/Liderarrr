@@ -899,7 +899,9 @@ function WantedPanel({ onSearch }) {
 }
 
 export default function Calendar() {
-  const [view, setView] = useState('upcoming'); // upcoming | recent | labels | radar
+  // Arranca en «Mes»: es la vista panorámica (todas las fuentes en un calendario), no una
+  // lista más. Las demás pestañas son cortes concretos de lo mismo.
+  const [view, setView] = useState('mes'); // mes | upcoming | recent | novedades | canciones | descubre | labels | radar | quiero
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
   const [all, setAll] = useState(false);

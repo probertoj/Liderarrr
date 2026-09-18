@@ -32,6 +32,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
     registro de descargas y el auto-import por hardlink. Sin Lidarr.
 
 ### Cambiado
+- **«Lanzamientos» abre en «📅 Mes»** en vez de en «Próximos»: es la vista panorámica (todas las
+  fuentes en un calendario), mientras que las demás pestañas son cortes concretos de lo mismo.
 - **Botón «Spotify» en cada lanzamiento** (Discos nuevos, Canciones nuevas y Descubre): abre
   la búsqueda del disco/canción en Spotify para escucharlo al momento, junto al enlace de la
   fuente (Deezer, que pasa a un estilo neutro). Es un enlace de **búsqueda** a propósito:
