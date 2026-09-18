@@ -32,6 +32,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
     registro de descargas y el auto-import por hardlink. Sin Lidarr.
 
 ### Cambiado
+- **Lo que ya tienes en disco se agrupa arriba, plegado y cerrado por defecto**, en TODAS las
+  listas de Lanzamientos (Próximos, Estrenados recientemente, Discos nuevos, Canciones nuevas,
+  Descubre, De tus sellos y Radar). Un estreno que ya has descargado deja de ser noticia, pero
+  tampoco desaparece: queda contado y a un clic («Ya los tienes en disco · N»), por si quieres
+  comprobar que entró. El abierto/cerrado se recuerda entre pestañas y entre visitas.
+  - Esto **unifica** tres filtros que antes decían cosas distintas en cada pestaña («Ocultar lo
+    que ya tengo» en Radar, «Mostrar también los que ya tengo» en Discos nuevos, «Incluir las
+    que ya tengo» en Canciones y Descubre): un solo criterio, sin casillas.
+  - El titular ahora cuenta lo que te **falta** y suma aparte lo que ya tienes.
+  - La vista «📅 Mes» no cambia: es un calendario, y ahí sí importa ver qué salió cada día,
+    tengas el disco o no (sigue con sus toggles por fuente).
 - **«Lanzamientos» abre en «📅 Mes»** en vez de en «Próximos»: es la vista panorámica (todas las
   fuentes en un calendario), mientras que las demás pestañas son cortes concretos de lo mismo.
 - **Botón «Spotify» en cada lanzamiento** (Discos nuevos, Canciones nuevas y Descubre): abre

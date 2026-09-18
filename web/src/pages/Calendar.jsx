@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarClock, Plus, Check, Loader2, ExternalLink, Search, Star, Tag, X, RefreshCw, Radio, Heart } from 'lucide-react';
+import { CalendarClock, Plus, Check, Loader2, ExternalLink, Search, Star, Tag, X, RefreshCw, Radio, Heart, ChevronDown, ChevronRight } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, SearchModal, QuickSearch, AddToChallengeButton, WantButton, useLidarrEnabled } from '../components.jsx';
 import MonthCalendar from './MonthCalendar.jsx';
@@ -756,6 +756,31 @@ function CuratorManager({ curators, onChange }) {
   );
 }
 
+// «Ya los tienes en disco», plegable y CERRADO por defecto. Criterio común a todas las
+// listas de Lanzamientos: lo que ya está en tu disco no es noticia —la sección existe para
+// enseñarte lo que te FALTA—, pero tampoco se esconde del todo: queda arriba, contado y a un
+// clic, por si quieres comprobar que un estreno ya entró. El estado abierto/cerrado se
+// recuerda entre pestañas y entre visitas (localStorage), como los filtros del calendario.
+const OWNED_OPEN_KEY = 'liderarrr:calendar:ownedOpen';
+
+function OwnedSection({ count, open, onToggle, children }) {
+  if (!count) return null;
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-2 text-sm text-emerald-400/70 hover:text-emerald-300 mb-2"
+        title={open ? 'Ocultar los que ya tienes' : 'Ver los que ya tienes'}
+      >
+        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <Check size={13} />
+        Ya los tienes en disco <span className="text-neutral-600">· {count}</span>
+      </button>
+      {open && <div className="space-y-1.5 mb-2">{children}</div>}
+    </div>
+  );
+}
+
 // Pestaña «Lo quiero»: la lista de deseos vigilada. Aquí ves qué está esperando Liderarr,
 // por qué aún no lo ha pillado (no ha salido, sin release, ya pedido…) y puedes forzar un
 // barrido. El trabajo de verdad lo hace el temporizador del servidor cada hora.
@@ -913,8 +938,25 @@ export default function Calendar() {
   const [search, setSearch] = useState(null);
   const [labels, setLabels] = useState([]);
   const [curators, setCurators] = useState([]);
-  const [unowned, setUnowned] = useState(false);
-  const [novIncludeOwned, setNovIncludeOwned] = useState(false);
+  // Lo que ya tienes NO se filtra en el servidor: viene siempre y la UI lo agrupa arriba,
+  // plegado (ver OwnedSection). Un solo criterio para todas las pestañas, en vez de un
+  // «ocultar lo que tengo» aquí y un «incluir lo que tengo» allá.
+  const [ownedOpen, setOwnedOpen] = useState(() => {
+    try {
+      return localStorage.getItem(OWNED_OPEN_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleOwned = () =>
+    setOwnedOpen((v) => {
+      try {
+        localStorage.setItem(OWNED_OPEN_KEY, v ? '0' : '1');
+      } catch {
+        /* modo privado: solo se pierde el recuerdo */
+      }
+      return !v;
+    });
   const [songDays, setSongDays] = useState(7); // ventana de «Canciones nuevas» (singles)
   const [discoverDays, setDiscoverDays] = useState(14); // ventana del radar de descubrimiento
   const [discoverAll, setDiscoverAll] = useState(false); // mostrar también lo sin relación contigo
@@ -932,18 +974,18 @@ export default function Calendar() {
         : view === 'labels'
           ? api.labelReleases(since)
           : view === 'radar'
-            ? api.radar(since, unowned)
+            ? api.radar(since, false)
             : view === 'novedades'
-              ? api.newReleases(novIncludeOwned)
+              ? api.newReleases(true)
               : view === 'canciones'
-                ? api.newSongs(songDays, novIncludeOwned)
+                ? api.newSongs(songDays, true)
                 : view === 'descubre'
-                  ? api.globalReleases(discoverDays, discoverAll, novIncludeOwned)
+                  ? api.globalReleases(discoverDays, discoverAll, true)
                   : api.upcoming(all);
     load.then(setRows).catch((e) => setErr(e.message));
     if (view === 'labels') loadLabels();
     if (view === 'radar') loadCurators();
-  }, [view, all, since, unowned, novIncludeOwned, songDays, discoverDays, discoverAll]);
+  }, [view, all, since, songDays, discoverDays, discoverAll]);
 
   const lidarrOn = useLidarrEnabled();
 
@@ -1030,7 +1072,7 @@ export default function Calendar() {
       }
       if (st.total) setDiscMsg(`Buscando… ${st.done}/${st.total} artistas afines · ${st.added} novedades`);
       try {
-        setRows(await api.globalReleases(discoverDays, discoverAll, novIncludeOwned));
+        setRows(await api.globalReleases(discoverDays, discoverAll, true));
       } catch {
         /* recarga best-effort */
       }
@@ -1050,12 +1092,22 @@ export default function Calendar() {
     { label: 'Últimos 7 días', value: daysAgo(7) },
   ];
 
+  // ¿Ya está en tu disco? Las filas de MusicBrainz lo traen como `is_owned` y las de feed
+  // externo (Deezer) como `owned`. Una sola vara para las dos.
+  const isOwnedRow = (r) => !!(r.is_owned || r.owned);
+  // Reparto común a TODAS las listas: lo que ya tienes se saca de los grupos por mes/semana y
+  // se junta en la sección plegable de arriba, ordenado por fecha descendente.
+  const ownedRows = (rows || [])
+    .filter(isOwnedRow)
+    .sort((a, b) => (b.first_release || b.release_date || '').localeCompare(a.first_release || a.release_date || ''));
+  const freshRows = (rows || []).filter((r) => !isOwnedRow(r));
+
   // En el Radar, los pre-pedidos / futuros van a su propia sección arriba (no
   // mezclados con lo ya estrenado dentro de la ventana), ordenados por fecha de
   // estreno ascendente (lo que sale antes, primero).
   const radarUpcoming =
     view === 'radar'
-      ? (rows || [])
+      ? freshRows
           .filter((r) => r.is_upcoming)
           .sort((a, b) => (a.release_date || '').localeCompare(b.release_date || ''))
       : [];
@@ -1070,7 +1122,7 @@ export default function Calendar() {
   };
   const isFeed = view === 'novedades' || view === 'canciones'; // agrupan por semana + fila externa
   const months = {};
-  for (const r of rows || []) {
+  for (const r of freshRows) {
     if (view === 'radar' && r.is_upcoming) continue; // van en radarUpcoming
     const key = isFeed ? weekKey(r.release_date) : (r.first_release || r.release_date || '????').slice(0, 7);
     (months[key] ||= []).push(r);
@@ -1102,7 +1154,7 @@ export default function Calendar() {
   const reloadRadar = async () => {
     await loadCurators();
     try {
-      setRows(await api.radar(since, unowned));
+      setRows(await api.radar(since, false));
     } catch (e) {
       setErr(e.message);
     }
@@ -1117,7 +1169,7 @@ export default function Calendar() {
   useEffect(() => () => clearInterval(novPoll.current), []); // limpia el sondeo al desmontar
   const reloadNovRows = async () => {
     try {
-      setRows(await (view === 'canciones' ? api.newSongs(songDays, novIncludeOwned) : api.newReleases(novIncludeOwned)));
+      setRows(await (view === 'canciones' ? api.newSongs(songDays, true) : api.newReleases(true)));
     } catch {
       /* recarga best-effort mientras barre */
     }
@@ -1161,7 +1213,7 @@ export default function Calendar() {
         title="Lanzamientos"
         sub={
           rows && view !== 'mes' && view !== 'quiero'
-            ? `${rows.length} ${
+            ? `${freshRows.length} ${
                 view === 'upcoming'
                   ? 'por estrenar'
                   : view === 'labels'
@@ -1175,7 +1227,7 @@ export default function Calendar() {
                           : view === 'canciones'
                             ? 'singles en la ventana'
                             : 'estrenados en la ventana'
-              }`
+              }${ownedRows.length ? ` · ${ownedRows.length} que ya tienes` : ''}`
             : ''
         }
       />
@@ -1198,18 +1250,6 @@ export default function Calendar() {
             Todos los artistas (no solo los que sigo)
           </label>
         )}
-        {view === 'radar' && (
-          <label className="flex items-center gap-2 text-sm text-neutral-400 ml-auto cursor-pointer">
-            <input type="checkbox" checked={unowned} onChange={(e) => setUnowned(e.target.checked)} />
-            Ocultar lo que ya tengo
-          </label>
-        )}
-        {view === 'novedades' && (
-          <label className="flex items-center gap-2 text-sm text-neutral-400 ml-auto cursor-pointer">
-            <input type="checkbox" checked={novIncludeOwned} onChange={(e) => setNovIncludeOwned(e.target.checked)} />
-            Mostrar también los que ya tengo
-          </label>
-        )}
         {view === 'canciones' && (
           <div className="flex items-center gap-2 ml-auto flex-wrap">
             {[
@@ -1227,10 +1267,6 @@ export default function Calendar() {
                 {o.label}
               </button>
             ))}
-            <label className="flex items-center gap-2 text-sm text-neutral-400 cursor-pointer">
-              <input type="checkbox" checked={novIncludeOwned} onChange={(e) => setNovIncludeOwned(e.target.checked)} />
-              Incluir las que ya tengo
-            </label>
           </div>
         )}
         {view === 'descubre' && (
@@ -1255,10 +1291,6 @@ export default function Calendar() {
               <input type="checkbox" checked={discoverAll} onChange={(e) => setDiscoverAll(e.target.checked)} />
               También sin relación
             </label>
-            <label className="flex items-center gap-2 text-sm text-neutral-400 cursor-pointer">
-              <input type="checkbox" checked={novIncludeOwned} onChange={(e) => setNovIncludeOwned(e.target.checked)} />
-              Incluir las que ya tengo
-            </label>
           </div>
         )}
       </div>
@@ -1276,8 +1308,8 @@ export default function Calendar() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-xs text-neutral-500 min-w-0 flex-1">
               Álbumes y EPs recién estrenados (últimos ~6 meses) por los artistas de tu colección (los sigas o no),
-              vía Deezer, que aún no tienes — semana a semana. Los singles sueltos van en «🎵 Canciones nuevas». Se
-              llenan solos en el refresco; búscalos ahora si quieres.
+              vía Deezer — semana a semana. Los que ya tienes en disco se agrupan plegados arriba. Los singles sueltos
+              van en «🎵 Canciones nuevas». Se llenan solos en el refresco; búscalos ahora si quieres.
             </p>
             <button
               onClick={refreshNov}
@@ -1297,7 +1329,7 @@ export default function Calendar() {
               Singles (canciones sueltas) recién publicados por los artistas de tu colección (los sigas o no), vía
               Deezer. Los álbumes y EPs van en «💿 Discos nuevos». Se recogen en el refresco, que barre la colección
               por rotación (varias pasadas la cubren entera); búscalos ahora si quieres. Elige la ventana de días
-              arriba.
+              arriba. Las que ya tienes se agrupan plegadas arriba del todo.
             </p>
             <button
               onClick={refreshNov}
@@ -1316,8 +1348,8 @@ export default function Calendar() {
             <p className="text-xs text-neutral-500 min-w-0 flex-1">
               Descubrimiento: estrenos recientes (vía Deezer) de artistas <em>parecidos</em> a lo que escuchas (similares
               de Last.fm) y de artistas de tus <em>sellos seguidos</em>, que aún no tienes; más el feed «New Releases» de
-              Spotify cuando está disponible. Ordenado por afinidad. Marca «También sin relación» para ver lo global sin
-              relación directa. Se actualiza en el refresco nocturno o aquí.
+              Spotify cuando está disponible. Ordenado por afinidad, con lo que ya tienes plegado arriba. Marca «También
+              sin relación» para ver lo global sin relación directa. Se actualiza en el refresco nocturno o aquí.
             </p>
             <button
               onClick={refreshDiscover}
@@ -1392,6 +1424,11 @@ export default function Calendar() {
         </div>
       ) : view === 'descubre' ? (
         <div className="space-y-6">
+          <OwnedSection count={ownedRows.length} open={ownedOpen} onToggle={toggleOwned}>
+            {ownedRows.map((r) => (
+              <ExternalReleaseRow key={r.id} r={r} added={added} busy={busy} onAdd={addExternal} onSearch={setSearch} onDismiss={dismissGlobal} />
+            ))}
+          </OwnedSection>
           {[
             { min: 90, label: 'De artistas que sigues o tienes' },
             { min: 70, max: 89, label: 'De tus sellos seguidos' },
@@ -1400,7 +1437,7 @@ export default function Calendar() {
           ]
             .map((tier) => ({
               ...tier,
-              items: (rows || []).filter((r) => r.affinity >= tier.min && (tier.max == null || r.affinity <= tier.max)),
+              items: freshRows.filter((r) => r.affinity >= tier.min && (tier.max == null || r.affinity <= tier.max)),
             }))
             .filter((tier) => tier.items.length > 0)
             .map((tier) => (
@@ -1426,6 +1463,27 @@ export default function Calendar() {
         </div>
       ) : (
         <div className="space-y-6">
+          <OwnedSection count={ownedRows.length} open={ownedOpen} onToggle={toggleOwned}>
+            {ownedRows.map((r) =>
+              view === 'radar' ? (
+                <RadarRow key={r.id} r={r} lidarrOn={lidarrOn} onSearch={setSearch} onFollowMbid={api.followMbid} onQueue={() => pollLidarrQueue(setQueue)} />
+              ) : isFeed ? (
+                <ExternalReleaseRow key={r.id} r={r} added={added} busy={busy} onAdd={addExternal} onSearch={setSearch} onDismiss={dismissExternal} />
+              ) : (
+                <ReleaseRow
+                  key={r.rg_mbid}
+                  r={r}
+                  added={added}
+                  busy={busy}
+                  followed={followed}
+                  onAdd={add}
+                  onFollow={follow}
+                  onSearch={setSearch}
+                  lidarrOn={lidarrOn}
+                />
+              )
+            )}
+          </OwnedSection>
           {view === 'radar' && radarUpcoming.length > 0 && (
             <div>
               <h2 className="text-sm text-gold-400/80 mb-2">Próximos / pre-pedidos</h2>
