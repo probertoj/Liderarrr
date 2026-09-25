@@ -42,7 +42,7 @@ function buildSteps() {
   return [
     {
       key: 'autoimport',
-      label: 'Auto-importar descargas terminadas (qBittorrent)',
+      label: 'Auto-importar descargas terminadas',
       enabled: () => autoImportEnabled(),
       run: async () => {
         await runAutoImport();
@@ -121,7 +121,7 @@ function buildSteps() {
       key: 'newreleases',
       // barre estrenos/singles de TODA la colección (seguidos + artistas con álbumes), por
       // rotación; se activa si sigues a alguien O si tienes algún artista en la biblioteca.
-      label: 'Novedades y singles de tu colección (Deezer/Spotify)',
+      label: 'Discos y canciones nuevas de tu colección (Deezer)',
       enabled: () =>
         !!db.prepare("SELECT 1 FROM tracked_artists WHERE facet = 'artist' LIMIT 1").get() ||
         !!db.prepare("SELECT 1 FROM albums WHERE match_state != 'dismissed' LIMIT 1").get(),
