@@ -179,7 +179,7 @@ El menú está agrupado con guiños musicales; aquí va cada sección con lo que
 | **Ficha de álbum** | Carátula, pistas, calidad y un panel tipo *Roon*: **créditos** y roles, **reseña** (Last.fm) y **valoración** (Discogs), **recomendaciones**, y otras **versiones/ediciones** (MusicBrainz + Discogs). Puedes renombrar el título, corregir el artista, añadir carátula, gestionar copias y cajas, y **crear su ficha en MusicBrainz** si no existe. Enlaces directos a MusicBrainz, Discogs, Record Club y Spotify. |
 | **Artistas** | Ranking por nº de álbumes/pistas, con foto (Deezer). Filtros combinables **«Seguidos»** + **«Faltan discos»** y orden **«Más discos por completar»**. Los artistas locales (sin MBID) conviven con los de MusicBrainz. |
 | **Ficha de artista** | Discografía por tipo (álbum, EP, single, directo…), con lo que tienes marcado **en vivo**, ámbito de completismo configurable, **«Descargar todos»** los que faltan y ♥ por disco. |
-| **Álbumes incompletos** | *La feature estrella:* álbumes a los que les falta alguna pista (las que hay en disco vs. las que deberían), ordenados por cuántas faltan. |
+| **Álbumes incompletos** | Álbumes a los que les falta alguna pista (las que hay en disco vs. las que deberían), ordenados por cuántas faltan. El agujero que no se ve hasta que le das al play. |
 | **Calidad y disco** | Formatos, sin pérdida vs. con pérdida, sin ReplayGain, sin carátula, formatos mezclados, **duplicados** (clicables) y los más pesados. |
 | **Candidatos a upgrade** | Álbumes que podrías mejorar de calidad (p. ej. de MP3 a FLAC), con descarga nativa a un clic. |
 | **Sellos** | Sigue sellos discográficos y ve su catálogo cruzado con lo que tienes; el sello aparece también en la ficha del álbum. |

@@ -4,8 +4,8 @@ import { PackageOpen } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Cover, Spinner, ErrorMsg } from '../components.jsx';
 
-// La feature estrella: álbumes a los que les falta alguna pista, ordenados por
-// cuántas. El dolor real de una discoteca digital.
+// Álbumes a los que les falta alguna pista, ordenados por cuántas. El agujero que no se
+// ve hasta que le das al play: el dolor real de una discoteca digital.
 export default function Incomplete() {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
