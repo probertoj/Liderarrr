@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Shapes, ArrowLeft, Search, Sparkles, ExternalLink, Download, Check, Loader2 } from 'lucide-react';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Shapes, ArrowLeft, Search, Sparkles, ExternalLink, Download, Check, Loader2, EyeOff, Eye, X } from 'lucide-react';
 import { api } from '../api.js';
 import {
   PageTitle,
@@ -47,15 +47,39 @@ const tono = (slug) => TONO[slug] || 'from-ink-700/40 to-ink-900/5 border-ink-70
 export default function Genres() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
+  const [tax, setTax] = useState(null); // taxonomía + tus reglas (para el editor)
+  const [editando, setEditando] = useState(null); // etiqueta cruda que estás colocando
 
+  const recargar = () => api.genres().then(setData).catch((e) => setErr(e.message));
   useEffect(() => {
-    api.genres().then(setData).catch((e) => setErr(e.message));
+    recargar();
+    api.genreTaxonomy().then(setTax).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const colocar = async (tag, slug, sub, ignored) => {
+    try {
+      await api.mapGenreTag(tag, slug, sub, ignored);
+      setEditando(null);
+      await recargar();
+      api.genreTaxonomy().then(setTax).catch(() => {});
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+  const esconder = async (slug, hidden) => {
+    try {
+      await api.hideGenre(slug, hidden);
+      await recargar();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
 
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!data) return <Spinner />;
 
-  const { genres, unclassified, stats } = data;
+  const { genres, unclassified, stats, hidden = [] } = data;
 
   return (
     <div>
@@ -78,8 +102,20 @@ export default function Genres() {
             <Link
               key={g.slug}
               to={`/generos/${g.slug}`}
-              className={`rounded-xl border bg-gradient-to-br p-4 hover:brightness-125 transition ${tono(g.slug)}`}
+              className={`relative group rounded-xl border bg-gradient-to-br p-4 hover:brightness-125 transition ${tono(g.slug)}`}
             >
+              {/* esconder un género que no te interesa. No borra nada: vuelve desde abajo. */}
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  esconder(g.slug, true);
+                }}
+                title={`Esconder ${g.name} de esta portada`}
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-neutral-200 transition-opacity"
+              >
+                <EyeOff size={14} />
+              </button>
               <div className="text-base text-neutral-100">{g.name}</div>
               <div className="text-xs text-neutral-400 mt-0.5">{g.count.toLocaleString('es')} discos</div>
               {g.children.length > 0 && (
@@ -92,23 +128,115 @@ export default function Genres() {
         </div>
       )}
 
+      {hidden.length > 0 && (
+        <div className="card p-3 mt-4">
+          <div className="text-xs text-neutral-500 mb-2">Géneros escondidos</div>
+          <div className="flex flex-wrap gap-1.5">
+            {hidden.map((h) => (
+              <button
+                key={h.slug}
+                onClick={() => esconder(h.slug, false)}
+                title="Volver a mostrarlo"
+                className="text-xs px-2 py-0.5 rounded-full border border-ink-800 bg-ink-850 text-neutral-500 hover:text-gold-300 hover:border-gold-500/40 inline-flex items-center gap-1"
+              >
+                <Eye size={11} /> {h.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {unclassified.length > 0 && (
         <div className="card p-4 mt-6">
           <h2 className="text-sm text-neutral-300 mb-1">Etiquetas sin clasificar</h2>
           <p className="text-xs text-neutral-600 mb-3">
             {stats.unclassifiedTags} etiquetas de tus ficheros que no se reconocen como ningún género conocido
             ({stats.unclassifiedAlbums.toLocaleString('es')} apariciones). No se colocan a la fuerza en ningún sitio:
-            preferimos dejarlas aquí a la vista antes que meter un disco en un género que no es. Si ves alguna que
-            debería contar, dilo y se añade al diccionario.
+            antes dejarlas aquí a la vista que meter un disco en un género que no es.{' '}
+            <b className="font-normal text-neutral-400">Pincha una para colocarla tú</b> — el cambio cuenta al
+            instante, sin reescanear nada.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {unclassified.map((u) => (
-              <span key={u.name} className="text-xs px-2 py-0.5 rounded-full border border-ink-800 bg-ink-850 text-neutral-500">
+              <button
+                key={u.name}
+                onClick={() => setEditando(editando === u.name ? null : u.name)}
+                title={`Decidir a qué género va «${u.name}»`}
+                className={`text-xs px-2 py-0.5 rounded-full border ${
+                  editando === u.name
+                    ? 'border-gold-500/50 bg-gold-500/15 text-gold-300'
+                    : 'border-ink-800 bg-ink-850 text-neutral-500 hover:border-gold-500/40 hover:text-neutral-300'
+                }`}
+              >
                 {u.name} <span className="text-neutral-700">{u.count}</span>
-              </span>
+              </button>
             ))}
           </div>
+
+          {editando && tax && <ColocarEtiqueta tag={editando} tax={tax} onColocar={colocar} onCerrar={() => setEditando(null)} />}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Editor de una etiqueta sin clasificar: eliges a qué género (y subgénero) va, o la marcas
+// como ruido. Es la versión de Liderarr del «renombrar géneros de fichero» de Roon, y lo que
+// convierte la lista de «sin clasificar» en trabajo hecho en vez de en una queja.
+function ColocarEtiqueta({ tag, tax, onColocar, onCerrar }) {
+  const [slug, setSlug] = useState('');
+  const top = tax.taxonomy.find((t) => t.slug === slug);
+  return (
+    <div className="mt-3 rounded-lg border border-gold-500/30 bg-gold-500/5 p-3">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="text-sm text-neutral-200">
+          ¿Qué es «<span className="text-gold-300">{tag}</span>»?
+        </div>
+        <button onClick={onCerrar} className="text-neutral-600 hover:text-neutral-300" aria-label="Cerrar">
+          <X size={15} />
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {tax.taxonomy.map((t) => (
+          <button
+            key={t.slug}
+            onClick={() => setSlug(t.slug === slug ? '' : t.slug)}
+            className={`text-xs px-2 py-1 rounded-full border ${
+              slug === t.slug ? 'border-gold-500/50 bg-gold-500/15 text-gold-300' : 'border-ink-800 bg-ink-850 text-neutral-400'
+            }`}
+          >
+            {t.name}
+          </button>
+        ))}
+        <button
+          onClick={() => onColocar(tag, null, null, true)}
+          title="No es un género (ruido del ripeador): que no vuelva a salir aquí"
+          className="text-xs px-2 py-1 rounded-full border border-ink-800 bg-ink-850 text-neutral-500 hover:text-neutral-300"
+        >
+          No es un género
+        </button>
+      </div>
+      {top && (
+        <>
+          <div className="text-xs text-neutral-500 mb-1.5">¿Algo más concreto? (opcional)</div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => onColocar(tag, top.slug, null, false)}
+              className="text-xs px-2 py-1 rounded-full border border-gold-500/40 bg-gold-500/10 text-gold-300"
+            >
+              Todo {top.name}
+            </button>
+            {top.children.map((c) => (
+              <button
+                key={c}
+                onClick={() => onColocar(tag, top.slug, c, false)}
+                className="text-xs px-2 py-1 rounded-full border border-ink-800 bg-ink-850 text-neutral-400 hover:border-gold-500/40"
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -119,8 +247,11 @@ export default function Genres() {
 export function GenreDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const [sub, setSub] = useState(null);
+  // el subgénero puede venir en la URL: es como entran los chips de la ficha de disco/artista
+  const [params] = useSearchParams();
+  const [sub, setSub] = useState(params.get('sub'));
   const [sort, setSort] = useState('recientes');
+  const [decade, setDecade] = useState(null);
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [recs, setRecs] = useState(null);
@@ -129,9 +260,9 @@ export function GenreDetail() {
 
   useEffect(() => {
     setData(null);
-    setRecs(null);
-    api.genre(slug, { sub, sort }).then(setData).catch((e) => setErr(e.message));
-  }, [slug, sub, sort]);
+    setRecs(null); // al cambiar de recorte, las recomendaciones anteriores ya no valen
+    api.genre(slug, { sub, sort, decade }).then(setData).catch((e) => setErr(e.message));
+  }, [slug, sub, sort, decade]);
 
   const verRecomendaciones = async () => {
     setRecsLoading(true);
@@ -162,7 +293,10 @@ export function GenreDetail() {
       {data.subgenres.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-4">
           <button
-            onClick={() => setSub(null)}
+            onClick={() => {
+              setSub(null);
+              setDecade(null);
+            }}
             className={`text-xs px-2 py-1 rounded-full border ${!sub ? 'border-gold-500/50 bg-gold-500/15 text-gold-300' : 'border-ink-800 bg-ink-850 text-neutral-400'}`}
           >
             Todo {data.name}
@@ -170,7 +304,10 @@ export function GenreDetail() {
           {data.subgenres.map((c) => (
             <button
               key={c.sub}
-              onClick={() => setSub(c.sub === sub ? null : c.sub)}
+              onClick={() => {
+                setSub(c.sub === sub ? null : c.sub);
+                setDecade(null);
+              }}
               className={`text-xs px-2 py-1 rounded-full border ${
                 sub === c.sub ? 'border-gold-500/50 bg-gold-500/15 text-gold-300' : 'border-ink-800 bg-ink-850 text-neutral-400'
               }`}
@@ -223,6 +360,12 @@ export function GenreDetail() {
             de Last.fm no esté funcionando — compruébala en Ajustes.
           </p>
         )}
+        {recs?.fallbackFrom && (
+          <p className="text-xs text-amber-400/80 mt-3">
+            Last.fm no tiene nada etiquetado como «{recs.fallbackFrom}», así que lo de abajo es lo mejor de
+            «{recs.tag}», el género padre.
+          </p>
+        )}
         {recs?.items?.length > 0 && (
           <>
             <p className="text-[11px] text-neutral-600 mt-3">
@@ -251,6 +394,30 @@ export function GenreDetail() {
               </Link>
             ))}
           </div>
+        </div>
+      )}
+
+      {data.decades.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          <button
+            onClick={() => setDecade(null)}
+            className={`text-xs px-2 py-1 rounded-lg border ${
+              !decade ? 'border-gold-500/50 bg-gold-500/10 text-gold-300' : 'border-ink-800 bg-ink-850 text-neutral-500'
+            }`}
+          >
+            Todas las décadas
+          </button>
+          {data.decades.map((d) => (
+            <button
+              key={d.decada}
+              onClick={() => setDecade(d.decada === decade ? null : d.decada)}
+              className={`text-xs px-2 py-1 rounded-lg border ${
+                decade === d.decada ? 'border-gold-500/50 bg-gold-500/10 text-gold-300' : 'border-ink-800 bg-ink-850 text-neutral-500'
+              }`}
+            >
+              {d.decada}s <span className="text-neutral-600">{d.n}</span>
+            </button>
+          ))}
         </div>
       )}
 

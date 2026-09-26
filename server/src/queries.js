@@ -121,7 +121,7 @@ function librarySort(sort) {
 
 // Discoteca: parrilla filtrable. Colapsa duplicados (rg_mbid, o artista+título
 // normalizado) a un representante con badge ×N, como la página de artista.
-export function library({ q, genre, decade, year, format, state, lossless, sort, dupesOnly, flat, limit = 500, offset = 0 } = {}) {
+export function library({ q, genre, decade, year, format, state, lossless, sort, dupesOnly, flat, ids, limit = 500, offset = 0 } = {}) {
   const where = [DESCRIPTIVE];
   const args = {};
   if (q) {
@@ -154,13 +154,21 @@ export function library({ q, genre, decade, year, format, state, lossless, sort,
   }
   // trae TODO el conjunto filtrado (sin paginar) para poder colapsar los duplicados
   // que cruzan la frontera de página.
-  const rows = db
+  let rows = db
     .prepare(
       `SELECT a.id, a.title, a.album_artist, a.year, a.artist_id, a.match_state, a.cover,
         a.track_file_count, a.track_count, a.size_bytes, a.rg_mbid, a.disc_group, a.added_at
        FROM albums a WHERE ${where.join(' AND ')}`
     )
     .all(args);
+  // Recorte por CONJUNTO DE IDS (lo usa la página de Géneros, que decide qué discos entran
+  // con su propia lógica). Se filtra aquí, en JS, y no en el SQL, porque la consulta ya trae
+  // todo sin paginar para poder colapsar duplicados — y porque un IN(?,?,…) de miles de
+  // huecos se sale del tope de variables de SQLite.
+  if (ids) {
+    const set = ids instanceof Set ? ids : new Set(ids);
+    rows = rows.filter((r) => set.has(r.id));
+  }
 
   // modo PLANO (para el modo selección de la Discoteca al combinar multidiscos): sin
   // colapsar nada, para poder elegir cada disco individual (aunque compartan título).

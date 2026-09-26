@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink, ChevronDown, ChevronRight, Link2, Search, X, Image as ImageIcon, Upload } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { AlbumCard, ArtistPhoto, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, WantButton, ReleaseYear, useLidarrEnabled } from '../components.jsx';
+import { AlbumCard, ArtistPhoto, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, WantButton, ReleaseYear, GenreChips, useLidarrEnabled } from '../components.jsx';
 
 export default function ArtistDetail() {
   const { id } = useParams();
@@ -146,6 +146,8 @@ export default function ArtistDetail() {
               </>
             )}
           </p>
+          {/* de qué va este artista, según lo que tienes suyo: lleva a la sección de Géneros */}
+          <GenreChips genres={artist.genres} className="mt-1" />
           </div>
         </div>
         <div className="flex gap-2">

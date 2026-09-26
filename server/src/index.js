@@ -22,7 +22,7 @@ import { recordGrab, magnetHash, downloadsList, activeRequestRgs, clearImported 
 import { runAutoImport, autoImportStatus, autoImportEnabled } from './autoimport.js';
 import { runAutoGrab, autoGrabConfig, autoGrabStatus, searchAndGrabBest } from './autograb.js';
 import { addWanted, removeWanted, wantedList, wantedKeys, wantedCounts, wantedConfig, wantedStatus, runWantedWatch } from './wanted.js';
-import { genreTree, genreDetail, genreRecommendations } from './genres.js';
+import { genreTree, genreDetail, genreRecommendations, albumGenres, artistGenres, mapGenreTag, unmapGenreTag, mappedTags, hideGenre, taxonomy } from './genres.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground, releaseGroupOfRelease } from './musicbrainz.js';
 import { buildReleaseSeed, findPossibleDuplicate } from './mbseed.js';
 import { acoustidTest } from './acoustid.js';
@@ -263,6 +263,7 @@ app.get('/api/albums/:id', async (req, reply) => {
   const lid = lidarrConfig();
   const owned = lid.url && lid.key ? lidarrOwnedIds() : new Set();
   a.inLidarr = a.rg_mbid ? owned.has(a.rg_mbid) : false;
+  a.genres = albumGenres(a.id); // puerta a la sección de Géneros desde la ficha
   return a;
 });
 // grupo de duplicados de un álbum (para el panel al pinchar ×N en la Discoteca)
@@ -288,6 +289,7 @@ app.get('/api/artists/:id', async (req, reply) => {
   const a = q.artistDetail(id);
   if (!a) return reply.code(404).send({ error: 'No encontrado' });
   a.tracked = isTracked(id);
+  a.genres = artistGenres(id); // para saltar a la sección de Géneros desde su ficha
   const comp = artistCompleteness(id);
   a.completeness = {
     pct: comp.pct,
@@ -561,10 +563,30 @@ app.delete('/api/discover/dismiss/:rgMbid', async (req) => undismissGap(req.para
 // Explorar la colección por género, al estilo del árbol de Roon. Los géneros se normalizan en
 // vivo desde las etiquetas de tus ficheros (ver genres.js): nada que reescanear.
 app.get('/api/genres', async () => genreTree());
+// la taxonomía y las reglas que has puesto tú (para el editor de géneros)
+app.get('/api/genres/taxonomy', async () => ({ taxonomy: taxonomy(), mapped: mappedTags() }));
+// mandar una etiqueta cruda a un género, o marcarla como ruido
+app.post('/api/genres/map', async (req, reply) => {
+  try {
+    return mapGenreTag(req.body?.tag, { slug: req.body?.slug || null, sub: req.body?.sub || null, ignored: !!req.body?.ignored });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/genres/unmap', async (req) => unmapGenreTag(req.body?.tag));
+// esconder / recuperar un género de primer nivel
+app.post('/api/genres/hide', async (req, reply) => {
+  try {
+    return hideGenre(req.body?.slug, req.body?.hidden !== false);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 app.get('/api/genres/:slug', async (req, reply) => {
   const d = genreDetail(req.params.slug, {
     sub: req.query?.sub || null,
     sort: req.query?.sort || 'recientes',
+    decade: req.query?.decade || null,
     limit: Math.min(Number(req.query?.limit) || 120, 500),
     offset: Number(req.query?.offset) || 0,
   });

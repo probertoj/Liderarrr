@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import * as lastfm from './lastfm.js';
 import { matchKey } from './matchkey.js';
+import { library } from './queries.js';
 
 // GÉNEROS (1.1) — explorar la colección por género, al estilo del árbol de Roon.
 //
@@ -113,6 +114,13 @@ export const TAXONOMY = [
     children: ['Ópera', 'Música de cámara', 'Orquestal', 'Barroco', 'Contemporánea', 'Piano solo'],
   },
   {
+    // 67 discos en una colección real: es un género de verdad, aunque sea uno al que solo se
+    // entra en diciembre.
+    slug: 'navidad',
+    name: 'Navidad',
+    children: ['Villancicos', 'Navidad pop'],
+  },
+  {
     slug: 'bso',
     name: 'Bandas sonoras',
     children: ['Cine', 'Televisión', 'Videojuegos', 'Musicales'],
@@ -140,14 +148,22 @@ const SPLIT_RE = /\s*[/;,|]\s*|\s+&\s+|\s+-\s+|\s+[yo]\s+/i;
 function norm(s) {
   return String(s || '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '') // fuera los acentos: «Electrónica» = «Electronica»
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '');
+    // Se quita la PUNTUACIÓN, no las letras. Con [^a-z0-9] los géneros que iTunes escribe en
+    // japonés («ロック», «ポップス») se quedaban en cadena vacía y no casaban nunca, por muchos
+    // sinónimos que se añadieran: \p{L} respeta cualquier alfabeto.
+    .replace(/[^\p{L}\p{N}]+/gu, '');
 }
 
 // Etiquetas que no dicen nada: no son un género ni merecen salir en «sin clasificar». Casi
 // siempre las mete el ripeador cuando el campo venía vacío.
-const VACIAS = new Set(['varios', 'various', 'other', 'otros', 'unknown', 'desconocido', 'miscellaneous', 'misc', 'general', 'music', 'musica', 'none', 'singenero']);
+const VACIAS = new Set([
+  'varios', 'various', 'other', 'otros', 'unknown', 'desconocido', 'miscellaneous', 'misc',
+  'general', 'music', 'musica', 'none', 'singenero',
+  // la misma idea en otros idiomas, tal cual sale de iTunes
+  'altrigeneri', 'その他', 'autres', 'sonstige', 'otrosgeneros',
+]);
 
 // Diccionario: forma normalizada de la etiqueta → [slug del primer nivel, subgénero canónico].
 // El subgénero puede ser null = «encaja en el primer nivel pero sin más detalle».
@@ -313,6 +329,47 @@ const ALIASES_MEDIDOS = {
   ],
   latina: [['america latina', null], ['latinoamerica', null]],
 };
+// Segunda pasada sobre la cola real, ya con el normalizador arreglado para alfabetos no
+// latinos. Sale de mirar la lista de «sin clasificar» de una colección de 33.000 discos.
+const ALIASES_COLA = {
+  indie: [
+    ['オルタナティヴ＆インディー', null], ['alternative en indie', null], ['alternativ und indie', null],
+    ['slacker rock', 'Rock alternativo'], ['pop indie', 'Indie pop'], ['indie1', 'Indie rock'],
+    ['flacindie', 'Indie rock'], ['british alternative rock', 'Rock alternativo'],
+    ['alternative rb', 'Rock alternativo'], ['twee', 'Twee'],
+  ],
+  rock: [
+    ['ロック', null], ['space rock', 'Rock psicodélico'], ['psychedelic pop', 'Rock psicodélico'],
+    ['beat', 'Rock and roll'], ['mod', 'Rock and roll'], ['rock clasico', 'Rock clásico'],
+  ],
+  pop: [
+    ['ポップス', null], ['jpop', null], ['j pop', null], ['english pop', null],
+    ['variete internacional', 'Pop vocal'], ['chanson francesa', 'Chanson'],
+  ],
+  electronica: [
+    ['elettronica', null], ['electronique', null], ['breakcore', 'Drum and bass'],
+    ['digital hardcore', 'Breakbeat'], ['tech house', 'House'], ['garage house', 'House'],
+    ['dub techno', 'Techno'], ['electroclash', 'Electropop'], ['club', 'House'],
+    ['lounge', 'Downtempo'], ['minimalism', 'Ambient'],
+  ],
+  jazz: [['jazz contemporaneo', null], ['acid jazz', 'Jazz fusión'], ['contemporary jazz', null]],
+  punk: [['garage punk', 'Punk rock'], ['acid punk', 'Punk rock'], ['punk blues', 'Punk rock']],
+  country: [['alt country rock', 'Alt-country'], ['country rock', 'Alt-country']],
+  blues: [['desert blues', null]],
+  bso: [
+    ['bandes originales de films', 'Cine'], ['film soundtracks', 'Cine'],
+    ['bandas originales de peliculas', 'Cine'],
+  ],
+  mundo: [['africa', null], ['asia', null]],
+  navidad: [
+    ['musicas navidenas', null], ['musica navidena', null], ['christmas', null],
+    ['navidad', null], ['villancicos', 'Villancicos'], ['holiday', null],
+  ],
+};
+for (const [slug, pares] of Object.entries(ALIASES_COLA)) {
+  for (const [raw, sub] of pares) put(raw, slug, sub);
+}
+
 for (const [slug, pares] of Object.entries(ALIASES_MEDIDOS)) {
   for (const [raw, sub] of pares) put(raw, slug, sub);
 }
@@ -322,6 +379,16 @@ for (const [slug, pares] of Object.entries(ALIASES)) {
 }
 
 const TOP_BY_SLUG = new Map(TAXONOMY.map((t) => [t.slug, t]));
+
+// Reglas del usuario (tabla genre_tag_map): mandan SOBRE el diccionario. Se leen en cada
+// pasada porque cambian desde la UI y el efecto tiene que verse al instante.
+function reglasUsuario() {
+  const map = new Map();
+  for (const r of db.prepare('SELECT tag, slug, sub, ignored FROM genre_tag_map').all()) {
+    map.set(norm(r.tag), r);
+  }
+  return map;
+}
 
 // Una etiqueta cruda → lista de {top, sub} canónicos. Devuelve [] si no se reconoce nada:
 // quien llama decide qué hacer con lo no clasificado (aquí, mostrarlo aparte, nunca inventar).
@@ -355,6 +422,7 @@ export function canonicalize(raw) {
 // en una tabla a propósito: el diccionario evoluciona con cada versión y una tabla obligaría a
 // reescanear para ver las mejoras. Sobre 33.000 discos tarda milisegundos.
 function buildIndex() {
+  const reglas = reglasUsuario();
   const rows = db
     .prepare(
       `SELECT at.album_id, t.name
@@ -371,11 +439,18 @@ function buildIndex() {
     if (!etiqueta) continue;
     let hits = cache.get(etiqueta);
     if (!hits) {
-      hits = canonicalize(etiqueta);
+      const n = norm(etiqueta);
+      const regla = reglas.get(n);
+      // una regla tuya gana siempre: o la manda a un género, o la marca como ruido
+      hits = regla ? (regla.ignored || !regla.slug ? [] : [{ top: regla.slug, sub: regla.sub || null }]) : canonicalize(etiqueta);
       cache.set(etiqueta, hits);
+      cache.set(`norm:${etiqueta}`, regla?.ignored ? 'varios' : n); // las ignoradas, fuera de «sin clasificar»
     }
     if (!hits.length) {
-      sinClasificar.set(etiqueta, (sinClasificar.get(etiqueta) || 0) + 1);
+      // «Varios», «Other», «その他»… no son un género: no clasifican, pero tampoco merecen
+      // ensuciar la lista de «sin clasificar», que es para lo que SÍ es un género y no
+      // reconocemos todavía.
+      if (!VACIAS.has(cache.get(`norm:${etiqueta}`))) sinClasificar.set(etiqueta, (sinClasificar.get(etiqueta) || 0) + 1);
       continue;
     }
     let set = porAlbum.get(r.album_id);
@@ -394,6 +469,7 @@ export function genreTree() {
   const cuenta = new Map();
   for (const set of porAlbum.values()) for (const k of set) cuenta.set(k, (cuenta.get(k) || 0) + 1);
 
+  const ocultos = new Set(db.prepare('SELECT slug FROM genre_hidden').all().map((r) => r.slug));
   const tops = TAXONOMY.map((t) => ({
     slug: t.slug,
     name: t.name,
@@ -403,7 +479,7 @@ export function genreTree() {
       .filter((c) => c.count > 0)
       .sort((a, b) => b.count - a.count),
   }))
-    .filter((t) => t.count > 0)
+    .filter((t) => t.count > 0 && !ocultos.has(t.slug))
     .sort((a, b) => b.count - a.count);
 
   const otros = [...sinClasificar.entries()]
@@ -413,6 +489,7 @@ export function genreTree() {
   const totalAlbums = db.prepare("SELECT COUNT(*) c FROM albums WHERE match_state != 'dismissed'").get().c;
   return {
     genres: tops,
+    hidden: [...ocultos].map((slug) => ({ slug, name: TOP_BY_SLUG.get(slug)?.name || slug })).filter((h) => h.name),
     unclassified: otros.slice(0, 60),
     stats: {
       albums: totalAlbums,
@@ -442,26 +519,78 @@ export function isGenre(slug) {
   return TOP_BY_SLUG.has(slug);
 }
 
+// --- géneros de UN disco o de UN artista ---------------------------------------
+// Para poder saltar a la sección desde donde estás mirando: «esto es dream pop, ¿qué más
+// tengo de dream pop?». No usan buildIndex (que recorre la colección entera): canonizan solo
+// las etiquetas que hagan falta.
+
+const tagsDe = db.prepare(
+  `SELECT t.name FROM album_tags at JOIN tags t ON t.id = at.tag_id AND t.type = 'genre' WHERE at.album_id = ?`
+);
+
+function aGeneros(nombres) {
+  const fuera = new Map(); // clave → {slug, sub, name}
+  for (const raw of nombres) {
+    for (const h of canonicalize(raw)) {
+      const top = TOP_BY_SLUG.get(h.top);
+      if (!top) continue;
+      const clave = `${h.top}::${h.sub || ''}`;
+      if (!fuera.has(clave)) fuera.set(clave, { slug: h.top, sub: h.sub, name: h.sub || top.name });
+    }
+  }
+  // el género de primer nivel sobra si ya está su subgénero en la lista (más concreto manda)
+  const conSub = new Set([...fuera.values()].filter((g) => g.sub).map((g) => g.slug));
+  return [...fuera.values()].filter((g) => g.sub || !conSub.has(g.slug));
+}
+
+export function albumGenres(albumId) {
+  return aGeneros(tagsDe.all(albumId).map((r) => r.name));
+}
+
+// Los géneros de un artista salen de sus discos, con cuántos hay de cada uno: así en su ficha
+// se ve de qué va, y no solo lo que dijera la etiqueta de un disco suelto.
+export function artistGenres(artistId, limit = 8) {
+  const rows = db
+    .prepare(
+      `SELECT at.album_id, t.name
+         FROM albums a
+         JOIN album_tags at ON at.album_id = a.id
+         JOIN tags t ON t.id = at.tag_id AND t.type = 'genre'
+        WHERE a.match_state != 'dismissed'
+          AND (a.artist_id = @id OR a.id IN (SELECT album_id FROM album_artists WHERE artist_id = @id))`
+    )
+    .all({ id: artistId });
+  const porAlbum = new Map();
+  for (const r of rows) {
+    if (!porAlbum.has(r.album_id)) porAlbum.set(r.album_id, []);
+    porAlbum.get(r.album_id).push(r.name);
+  }
+  const cuenta = new Map();
+  for (const nombres of porAlbum.values()) {
+    for (const g of aGeneros(nombres)) {
+      const clave = `${g.slug}::${g.sub || ''}`;
+      const e = cuenta.get(clave) || { ...g, count: 0 };
+      e.count++;
+      cuenta.set(clave, e);
+    }
+  }
+  return [...cuenta.values()].sort((a, b) => b.count - a.count).slice(0, limit);
+}
+
 // --- detalle de un género -----------------------------------------------------
 
-// Lo que hace falta para pintar una tarjeta de disco (mismo trato que la Discoteca).
-const ALBUM_COLS = `a.id, a.title, a.album_artist, a.year, a.artist_id, a.match_state,
-  a.disc_count AS discs,
-  (SELECT COUNT(*) FROM tracks t WHERE t.album_id = a.id) AS track_count,
-  (SELECT COUNT(*) FROM tracks t WHERE t.album_id = a.id AND t.path IS NOT NULL) AS track_file_count`;
-
 // Tus discos de un género, con sus artistas y subgéneros. `sort`: recientes | antiguos | titulo.
-export function genreDetail(slug, { sub = null, sort = 'recientes', limit = 120, offset = 0 } = {}) {
+export function genreDetail(slug, { sub = null, sort = 'recientes', limit = 120, offset = 0, decade = null } = {}) {
   const top = TOP_BY_SLUG.get(slug);
   if (!top) return null;
   const { porAlbum } = buildIndex();
   const clave = sub ? `${slug}::${sub}` : slug;
 
-  const ids = [];
+  const ids = new Set();
   const cuentaSub = new Map();
   for (const [id, set] of porAlbum) {
     if (!set.has(clave)) continue;
-    ids.push(id);
+    ids.add(id);
     // Los subgéneros se cuentan SOBRE el recorte actual: al entrar en uno ves cómo se reparte
     // lo que estás mirando, no la colección entera.
     for (const k of set) {
@@ -470,47 +599,59 @@ export function genreDetail(slug, { sub = null, sort = 'recientes', limit = 120,
       cuentaSub.set(nombre, (cuentaSub.get(nombre) || 0) + 1);
     }
   }
-  const total = ids.length;
-  if (!total) return { slug, name: top.name, sub, total, albums: [], artists: [], decades: [], subgenres: [] };
-
-  const orden =
-    sort === 'antiguos'
-      ? 'COALESCE(a.year, 9999) ASC, a.title COLLATE NOCASE'
-      : sort === 'titulo'
-        ? 'a.title COLLATE NOCASE'
-        : 'COALESCE(a.year, 0) DESC, a.title COLLATE NOCASE';
-
-  // SQLite tiene tope de variables por consulta, así que los ids van a una tabla temporal en
-  // vez de a un IN (?,?,…) de miles de huecos.
-  db.exec('CREATE TEMP TABLE IF NOT EXISTS _genre_ids (id INTEGER PRIMARY KEY)');
-  db.exec('DELETE FROM _genre_ids');
-  const ins = db.prepare('INSERT OR IGNORE INTO _genre_ids (id) VALUES (?)');
-  db.transaction((arr) => arr.forEach((i) => ins.run(i)))(ids);
-
-  const albums = db
-    .prepare(`SELECT ${ALBUM_COLS} FROM albums a JOIN _genre_ids g ON g.id = a.id ORDER BY ${orden} LIMIT ? OFFSET ?`)
-    .all(limit, offset);
-  const artists = db
-    .prepare(
-      `SELECT ar.id, ar.name, COUNT(*) AS albums
-         FROM albums a JOIN _genre_ids g ON g.id = a.id
-         JOIN artists ar ON ar.id = a.artist_id
-        GROUP BY ar.id ORDER BY albums DESC, ar.name COLLATE NOCASE LIMIT 30`
-    )
-    .all();
-  const decadas = db
-    .prepare(
-      `SELECT (a.year / 10) * 10 AS decada, COUNT(*) AS n
-         FROM albums a JOIN _genre_ids g ON g.id = a.id
-        WHERE a.year IS NOT NULL GROUP BY decada ORDER BY decada`
-    )
-    .all();
-
   const subgenres = [...cuentaSub.entries()]
     .map(([name, count]) => ({ sub: name, count }))
     .sort((a, b) => b.count - a.count);
+  if (!ids.size) return { slug, name: top.name, sub, decade: null, total: 0, albums: [], artists: [], decades: [], subgenres };
 
-  return { slug, name: top.name, sub, total, albums, artists, decades: decadas, subgenres };
+  // Los discos los sirve library(), NO una consulta propia: así el género cuenta lo mismo que
+  // la Discoteca. Con una consulta cruda, las copias del mismo disco (dos rips, una caja en
+  // varias carpetas) salían repetidas una y otra vez en la parrilla — y además inflaban los
+  // contadores de artista. library() ya sabe colapsar ediciones, copias y cajas.
+  const { albums: colapsados } = library({ ids, limit: 100000 });
+  const porTitulo = (a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es', { sensitivity: 'base' });
+  colapsados.sort(
+    sort === 'antiguos'
+      ? (a, b) => (a.year || 9999) - (b.year || 9999) || porTitulo(a, b)
+      : sort === 'titulo'
+        ? porTitulo
+        : (a, b) => (b.year || 0) - (a.year || 0) || porTitulo(a, b)
+  );
+
+  // Reparto por décadas ANTES de filtrar por década: los botones tienen que seguir ahí
+  // cuando ya has elegido una.
+  const porDecada = new Map();
+  for (const a of colapsados) {
+    if (!a.year) continue;
+    const d = Math.floor(a.year / 10) * 10;
+    porDecada.set(d, (porDecada.get(d) || 0) + 1);
+  }
+  const decades = [...porDecada.entries()].map(([decada, n]) => ({ decada, n })).sort((a, b) => a.decada - b.decada);
+
+  const filtrados = decade ? colapsados.filter((a) => a.year && Math.floor(a.year / 10) * 10 === Number(decade)) : colapsados;
+
+  // Artistas del recorte, contados sobre los discos YA colapsados (si no, un artista con
+  // tres copias del mismo disco parecía tener tres discos).
+  const porArtista = new Map();
+  for (const a of filtrados) {
+    if (!a.artist_id) continue;
+    const e = porArtista.get(a.artist_id) || { id: a.artist_id, name: a.album_artist, albums: 0 };
+    e.albums++;
+    porArtista.set(a.artist_id, e);
+  }
+  const artists = [...porArtista.values()].sort((x, y) => y.albums - x.albums || String(x.name).localeCompare(String(y.name), 'es')).slice(0, 40);
+
+  return {
+    slug,
+    name: top.name,
+    sub,
+    decade: decade ? Number(decade) : null,
+    total: filtrados.length,
+    albums: filtrados.slice(offset, offset + limit),
+    artists,
+    decades,
+    subgenres,
+  };
 }
 
 // «Los buenos de este género que aún no tienes». La lista sale de Last.fm (tag.getTopAlbums: lo
@@ -594,13 +735,35 @@ const SUB_TAG = {
   Afrobeat: 'afrobeat',
 };
 
+// Nombre de subgénero → tag de Last.fm cuando no está en SUB_TAG. Sus tags son libres y casi
+// todo subgénero tiene el suyo («slowcore», «twee», «noise pop»), así que el propio nombre en
+// minúsculas y sin acentos acierta mucho más que rendirse al género padre.
+function tagDeSubgenero(sub) {
+  return String(sub)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 export async function genreRecommendations(slug, { sub = null, limit = 40 } = {}) {
   const top = TOP_BY_SLUG.get(slug);
   if (!top) return null;
-  const tag = (sub && SUB_TAG[sub]) || LASTFM_TAG[slug] || top.name;
+  const tagPadre = LASTFM_TAG[slug] || top.name;
+  const tagSub = sub ? SUB_TAG[sub] || tagDeSubgenero(sub) : null;
+  let tag = tagSub || tagPadre;
   if (!lastfm.lastfmConfigured()) return { tag, configured: false, items: [] };
 
-  const populares = await lastfm.tagTopAlbums(tag, Math.max(limit * 2, 60));
+  let populares = await lastfm.tagTopAlbums(tag, Math.max(limit * 2, 60));
+  // Si el subgénero no da nada en Last.fm se tira del género padre, pero se DICE: antes caía
+  // al padre en silencio y la pantalla prometía «lo mejor de Slowcore» mientras enseñaba lo
+  // mejor de «indie».
+  let desde = null;
+  if (tagSub && populares.length === 0) {
+    desde = tagSub;
+    tag = tagPadre;
+    populares = await lastfm.tagTopAlbums(tag, Math.max(limit * 2, 60));
+  }
   // lo que ya tienes, por matchKey (la misma vara que retos, radar y «Lo quiero»)
   const tuyos = new Set(
     db
@@ -617,5 +780,43 @@ export async function genreRecommendations(slug, { sub = null, limit = 40 } = {}
     items.push(p);
     if (items.length >= limit) break;
   }
-  return { tag, configured: true, items, considered: populares.length };
+  return { tag, fallbackFrom: desde, configured: true, items, considered: populares.length };
+}
+
+// --- géneros a la carta -------------------------------------------------------
+
+// Manda una etiqueta cruda a un género (o la marca como ruido). Es lo que hace accionable la
+// lista de «sin clasificar»: la ves, dices qué es, y cuenta desde ese momento.
+export function mapGenreTag(tag, { slug = null, sub = null, ignored = false } = {}) {
+  const t = String(tag || '').trim();
+  if (!t) throw new Error('Falta la etiqueta');
+  if (!ignored && !TOP_BY_SLUG.has(slug)) throw new Error('Género desconocido');
+  if (!ignored && sub && !TOP_BY_SLUG.get(slug).children.includes(sub)) throw new Error('Subgénero desconocido');
+  db.prepare(
+    `INSERT INTO genre_tag_map (tag, slug, sub, ignored, created_at) VALUES (@tag, @slug, @sub, @ignored, @now)
+     ON CONFLICT(tag) DO UPDATE SET slug = excluded.slug, sub = excluded.sub, ignored = excluded.ignored`
+  ).run({ tag: t, slug: ignored ? null : slug, sub: ignored ? null : sub || null, ignored: ignored ? 1 : 0, now: Date.now() });
+  return { ok: true };
+}
+
+export function unmapGenreTag(tag) {
+  return { removed: db.prepare('DELETE FROM genre_tag_map WHERE tag = ?').run(String(tag || '')).changes };
+}
+
+export function mappedTags() {
+  return db.prepare('SELECT tag, slug, sub, ignored FROM genre_tag_map ORDER BY tag COLLATE NOCASE').all();
+}
+
+// Esconder un género de primer nivel de la portada. No borra nada: sus discos siguen ahí y
+// vuelve con un clic.
+export function hideGenre(slug, hidden = true) {
+  if (!TOP_BY_SLUG.has(slug)) throw new Error('Género desconocido');
+  if (hidden) db.prepare('INSERT OR IGNORE INTO genre_hidden (slug) VALUES (?)').run(slug);
+  else db.prepare('DELETE FROM genre_hidden WHERE slug = ?').run(slug);
+  return { ok: true, slug, hidden };
+}
+
+// La taxonomía entera, para que la UI pueda ofrecer a qué género mandar una etiqueta.
+export function taxonomy() {
+  return TAXONOMY.map((t) => ({ slug: t.slug, name: t.name, children: t.children }));
 }

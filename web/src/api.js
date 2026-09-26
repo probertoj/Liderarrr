@@ -112,15 +112,20 @@ export const api = {
   wantedRun: () => req('/wanted/run', { method: 'POST', body: { force: true } }),
   // Géneros (1.1): árbol, detalle de un género y «los buenos que aún no tienes».
   genres: () => req('/genres'),
-  genre: (slug, { sub, sort, limit, offset } = {}) => {
+  genre: (slug, { sub, sort, limit, offset, decade } = {}) => {
     const p = new URLSearchParams();
     if (sub) p.set('sub', sub);
     if (sort) p.set('sort', sort);
+    if (decade) p.set('decade', String(decade));
     if (limit) p.set('limit', String(limit));
     if (offset) p.set('offset', String(offset));
     const qs = p.toString();
     return req(`/genres/${encodeURIComponent(slug)}${qs ? `?${qs}` : ''}`);
   },
+  genreTaxonomy: () => req('/genres/taxonomy'),
+  mapGenreTag: (tag, slug, sub, ignored) => req('/genres/map', { method: 'POST', body: { tag, slug, sub, ignored } }),
+  unmapGenreTag: (tag) => req('/genres/unmap', { method: 'POST', body: { tag } }),
+  hideGenre: (slug, hidden) => req('/genres/hide', { method: 'POST', body: { slug, hidden } }),
   genreRecommendations: (slug, sub) =>
     req(`/genres/${encodeURIComponent(slug)}/recommendations${sub ? `?sub=${encodeURIComponent(sub)}` : ''}`),
   lidarrEnabled: () => req('/lidarr/enabled'),

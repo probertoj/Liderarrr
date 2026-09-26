@@ -531,6 +531,22 @@ CREATE TABLE IF NOT EXISTS wanted_albums (
   updated_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_wanted_status ON wanted_albums(status);
+
+-- Géneros a la carta (1.1). Roon deja renombrar los géneros que vienen de las etiquetas y
+-- esconder los que no te interesan; esto es lo mismo. «genre_tag_map» manda una etiqueta CRUDA
+-- a un género canónico (o la marca como ruido), y es lo que convierte la lista de «sin
+-- clasificar» en algo accionable: ves «Slacker Rock 9», dices que es indie, y cuenta.
+-- «genre_hidden» esconde un género de primer nivel de la portada sin borrar nada.
+CREATE TABLE IF NOT EXISTS genre_tag_map (
+  tag TEXT PRIMARY KEY,      -- etiqueta cruda, tal cual viene del fichero
+  slug TEXT,                 -- género de primer nivel; NULL + ignored=1 = es ruido
+  sub TEXT,                  -- subgénero opcional
+  ignored INTEGER DEFAULT 0,
+  created_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS genre_hidden (
+  slug TEXT PRIMARY KEY
+);
 `);
 
 // --- migraciones ligeras ----------------------------------------------------

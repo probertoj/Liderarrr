@@ -10,6 +10,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 ## [Sin publicar]
 
 ### Añadido
+- **Géneros, segunda vuelta** (camino a la 1.1), con lo que salió de usarla de verdad:
+  - **Entrar a un género desde donde estás**: la ficha del disco y la del artista muestran sus
+    géneros como enlaces («esto es dream pop, ¿qué más tengo de dream pop?»). Los del artista
+    salen de sus discos, con cuántos hay de cada uno.
+  - **Filtro por década** dentro de cada género y subgénero.
+  - **Géneros a la carta**, como en Roon: pincha una etiqueta de «sin clasificar» y dices tú a
+    qué género va —o que no es un género—; y puedes **esconder** de la portada los géneros que no
+    te interesen (sin borrar nada, vuelven con un clic). El cambio cuenta al instante.
+  - **La Navidad es un género** (67 discos en una colección real lo justifican).
+
+### Añadido
 - **Página de «Géneros»** (camino a la 1.1): explorar la colección por género al estilo del árbol
   de Roon, de lo ancho («Rock») a lo concreto («Shoegaze»), y al lado **los discos buenos de ese
   género que aún NO tienes**.
@@ -34,6 +45,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   encima (o lo tocas, en el móvil).
 
 ### Arreglado
+- **Los géneros que iTunes escribe en japonés no se reconocían nunca.** El normalizador quitaba
+  todo lo que no fuera `[a-z0-9]`, así que «ロック» o «ポップス» se quedaban en cadena VACÍA y no
+  casaban por muchos sinónimos que se añadieran. Era un fallo del normalizador disfrazado de
+  diccionario incompleto. Ahora respeta cualquier alfabeto (`\p{L}`) y solo quita la puntuación.
+- **Dentro de un género los discos salían repetidos.** La parrilla listaba filas de la tabla
+  `albums`, así que las copias del mismo disco (dos rips, una caja en varias carpetas) aparecían
+  una y otra vez — e inflaban además el contador de artistas. Ahora los sirve la misma función
+  que la Discoteca, que ya sabe colapsar copias, ediciones y cajas: el género cuenta lo mismo
+  que el resto de la app (un «Dream pop» de 42 pasa a sus 31 discos reales, 9 con badge ×N).
+- **Al filtrar por subgénero, las recomendaciones eran del género padre y no se decía.** La
+  pantalla prometía «lo mejor de Slowcore» mientras enseñaba lo mejor de «indie». Ahora se
+  consulta el tag del subgénero (Last.fm tiene casi todos) y, si de verdad no hay nada, se cae
+  al padre **avisando**.
+- La clasificación sube del 80% al **81%** y la cola sin clasificar baja de 1.047 apariciones a
+  501, con los sinónimos sacados de mirar esa cola en una colección real.
 - **En «Huecos» la fecha salía siempre como «s/f»** (1.0.1). Las dos vistas que listan discos que
   te faltan sirven formas distintas: la ficha de artista manda las filas de `release_groups` en
   crudo (`first_release`) y «Huecos» un objeto ya derivado (`year`). Al arreglar la fecha en la

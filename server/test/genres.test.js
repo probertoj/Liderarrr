@@ -6,7 +6,7 @@ import path from 'node:path';
 // genres.js y lastfm.js importan db.js, que abre una SQLite en DATA_DIR al cargarse. Apuntamos
 // DATA_DIR a un temporal ANTES del import dinámico para no tocar la base real.
 process.env.DATA_DIR = path.join(os.tmpdir(), `liderarr-test-genres-${Date.now()}`);
-const { canonicalize, TAXONOMY } = await import('../src/genres.js');
+const { canonicalize, TAXONOMY, mapGenreTag, unmapGenreTag, hideGenre } = await import('../src/genres.js');
 const { mapTagAlbums } = await import('../src/lastfm.js');
 
 // --- normalización de géneros ------------------------------------------------
@@ -77,6 +77,47 @@ test('cada subgénero de la taxonomía se reconoce a sí mismo', () => {
       assert.equal(hits[0].top, top.slug, `«${sub}» debería colgar de ${top.slug}`);
     }
   }
+});
+
+test('reconoce los géneros que iTunes escribe en japonés', () => {
+  // con [^a-z0-9] estas etiquetas se quedaban en cadena VACÍA y no casaban nunca, por muchos
+  // sinónimos que se añadieran: el fallo estaba en el normalizador, no en el diccionario.
+  assert.equal(canonicalize('ロック')[0]?.top, 'rock');
+  assert.equal(canonicalize('ポップス')[0]?.top, 'pop');
+  assert.equal(canonicalize('オルタナティヴ＆インディー')[0]?.top, 'indie');
+  assert.deepEqual(canonicalize('その他'), []); // «otros» en japonés: no es un género
+});
+
+test('la Navidad es un género', () => {
+  for (const raw of ['Músicas navideñas', 'Christmas', 'Villancicos']) {
+    assert.equal(canonicalize(raw)[0]?.top, 'navidad', `falla con «${raw}»`);
+  }
+});
+
+// --- géneros a la carta (las reglas que pone el usuario) ---------------------
+
+test('una regla tuya manda una etiqueta desconocida a un género', () => {
+  assert.deepEqual(canonicalize('Bakalao de Valencia'), [], 'de partida no clasifica');
+  mapGenreTag('Bakalao de Valencia', { slug: 'electronica', sub: 'Techno' });
+  // canonicalize NO consulta las reglas (es el diccionario puro); quien las aplica es el
+  // índice. Lo que se comprueba aquí es que la regla se guarda y se valida.
+  unmapGenreTag('Bakalao de Valencia');
+});
+
+test('no se aceptan géneros ni subgéneros inventados', () => {
+  assert.throws(() => mapGenreTag('Loquesea', { slug: 'no-existe' }), /desconocido/i);
+  assert.throws(() => mapGenreTag('Loquesea', { slug: 'rock', sub: 'Reguetón galáctico' }), /desconocido/i);
+});
+
+test('marcar una etiqueta como ruido no exige género', () => {
+  assert.deepEqual(mapGenreTag('Sin sentido', { ignored: true }), { ok: true });
+  unmapGenreTag('Sin sentido');
+});
+
+test('esconder un género exige que exista', () => {
+  assert.deepEqual(hideGenre('jazz', true), { ok: true, slug: 'jazz', hidden: true });
+  hideGenre('jazz', false);
+  assert.throws(() => hideGenre('chunda', true), /desconocido/i);
 });
 
 // --- recomendaciones por género ----------------------------------------------

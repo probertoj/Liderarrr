@@ -444,6 +444,28 @@ export function AddToChallengeButton({ artist, title, label = 'Reto', className,
   );
 }
 
+// Géneros de un disco o de un artista, como puerta a la sección de Géneros: «esto es dream pop,
+// ¿qué más tengo de dream pop?». Vienen ya canonizados del servidor (las etiquetas crudas de los
+// ficheros traen 1.081 grafías distintas y no servirían de enlace).
+export function GenreChips({ genres, className = '' }) {
+  if (!genres?.length) return null;
+  return (
+    <div className={`flex flex-wrap gap-1.5 ${className}`}>
+      {genres.map((g) => (
+        <Link
+          key={`${g.slug}:${g.sub || ''}`}
+          to={`/generos/${g.slug}${g.sub ? `?sub=${encodeURIComponent(g.sub)}` : ''}`}
+          title={`Ver todo lo que tienes de ${g.name}`}
+          className="text-xs px-2 py-0.5 rounded-full border border-ink-700 bg-ink-850 text-neutral-400 hover:border-gold-500/40 hover:text-gold-300"
+        >
+          {g.name}
+          {g.count ? <span className="text-neutral-600"> {g.count}</span> : null}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 // Fecha de estreno de un disco que AÚN NO TIENES, en su propia insignia. Saber de qué año es
 // un disco que te falta es media decisión de bajarlo, y antes iba como texto gris pegado al
 // título — cuando iba: las filas de huecos leían `year`, que las discografías de MusicBrainz

@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy, Database, Radio } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { openMbReleaseEditor } from '../mb.js';
-import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies, AddToChallengeButton, WantButton, ReleaseYear } from '../components.jsx';
+import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies, AddToChallengeButton, WantButton, ReleaseYear, GenreChips } from '../components.jsx';
 
 // orphan y bootleg son «de primera clase»: material fuera de catálogo (rarezas y
 // directos no oficiales) que cuenta en lo descriptivo pero no en el completismo. En toda
@@ -270,6 +270,9 @@ export default function AlbumDetail() {
             </button>
           </span>
           {album.year && <span className="text-neutral-500"> · {album.year}</span>}
+
+          {/* de qué género es esto, y puerta para ver qué más tienes de lo mismo */}
+          <GenreChips genres={album.genres} className="mt-2" />
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-sm">
             <div>
