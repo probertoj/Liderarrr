@@ -103,10 +103,65 @@ cuando hay una versión nueva.
 
 - 📗 **[Synology DSM (Container Manager)](docs/synology.md)**
 - 📙 **[UNRAID](docs/unraid.md)**
+- 🐧 **Sin Docker:** [aquí abajo](#sin-docker-linux-bare-metal)
+
+### Sin Docker (Linux, bare metal)
+
+Docker es solo el empaquetado cómodo: por dentro Liderarrr es una app **Node** normal, y la
+imagen no es más que `node:22-slim` + `fpcalc`. Si prefieres correrlo a pelo:
+
+```bash
+sudo apt install -y nodejs npm build-essential python3 libchromaprint-tools
+git clone https://github.com/probertoj/Liderarrr.git && cd Liderarrr
+npm install          # compila better-sqlite3 si no hay binario para tu plataforma
+npm run build        # genera web/dist (la interfaz)
+DATA_DIR=/ruta/a/tus/datos PORT=3861 npm start
+```
+
+Y ya lo tienes en `http://IP:3861`. El servidor sirve **la interfaz y la API en el mismo puerto**,
+y todo (ajustes, biblioteca, caché) vive en un único SQLite dentro de `DATA_DIR`.
+
+- **Node 22 o 24.** Si tu distro trae uno más viejo, tira de
+  [NodeSource](https://github.com/nodesource/distributions) o `nvm`.
+- **`libchromaprint-tools`** es lo que aporta el `fpcalc` de AcoustID (identificar por huella del
+  audio). Es **opcional**: sin él la app avisa al arrancar y sigue funcionando, solo que identifica
+  por texto.
+
+Para que arranque solo, una unidad de systemd:
+
+```ini
+# /etc/systemd/system/liderarrr.service
+[Unit]
+Description=Liderarrr
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/Liderarrr
+Environment=DATA_DIR=/opt/Liderarrr/data
+Environment=PORT=3861
+Environment=TZ=Europe/Madrid
+Environment=LIDERARRR_SECRET=una-frase-larga-y-secreta
+ExecStart=/usr/bin/node server/src/index.js
+Restart=on-failure
+User=tu-usuario
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable --now liderarrr
+```
+
+> **La pega frente a Docker:** las actualizaciones te las comes tú —
+> `git pull && npm install && npm run build && sudo systemctl restart liderarrr` — en vez de un
+> `docker compose pull`. Y los hardlinks del auto-import siguen necesitando que las descargas y la
+> biblioteca estén en el **mismo sistema de ficheros**, con o sin contenedor.
 
 > **Persistencia:** todo (ajustes, credenciales, biblioteca, caché) vive en un único fichero
-> SQLite dentro de `/data`. Mientras montes esa carpeta como volumen, tu configuración sobrevive
-> a reinicios y actualizaciones. Liderarrr avisa al arrancar si `/data` no es escribible.
+> SQLite dentro de tu carpeta de datos (`/data` en Docker, `DATA_DIR` sin él). Mientras esa
+> carpeta sobreviva —montada como volumen, o simplemente fuera del directorio del código— tu
+> configuración aguanta reinicios y actualizaciones. Liderarrr avisa al arrancar si no es escribible.
 
 ---
 
