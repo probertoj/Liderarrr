@@ -22,6 +22,7 @@ import { recordGrab, magnetHash, downloadsList, activeRequestRgs, clearImported 
 import { runAutoImport, autoImportStatus, autoImportEnabled } from './autoimport.js';
 import { runAutoGrab, autoGrabConfig, autoGrabStatus, searchAndGrabBest } from './autograb.js';
 import { addWanted, removeWanted, wantedList, wantedKeys, wantedCounts, wantedConfig, wantedStatus, runWantedWatch } from './wanted.js';
+import { genreTree, genreDetail, genreRecommendations } from './genres.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground, releaseGroupOfRelease } from './musicbrainz.js';
 import { buildReleaseSeed, findPossibleDuplicate } from './mbseed.js';
 import { acoustidTest } from './acoustid.js';
@@ -555,6 +556,30 @@ app.get('/api/discover/recent', async (req) =>
 app.get('/api/discover/dismissed', async () => dismissedList());
 app.post('/api/discover/dismiss', async (req) => dismissGap(req.body?.rg_mbid, req.body?.title));
 app.delete('/api/discover/dismiss/:rgMbid', async (req) => undismissGap(req.params.rgMbid));
+
+// --- géneros (1.1) ----------------------------------------------------------
+// Explorar la colección por género, al estilo del árbol de Roon. Los géneros se normalizan en
+// vivo desde las etiquetas de tus ficheros (ver genres.js): nada que reescanear.
+app.get('/api/genres', async () => genreTree());
+app.get('/api/genres/:slug', async (req, reply) => {
+  const d = genreDetail(req.params.slug, {
+    sub: req.query?.sub || null,
+    sort: req.query?.sort || 'recientes',
+    limit: Math.min(Number(req.query?.limit) || 120, 500),
+    offset: Number(req.query?.offset) || 0,
+  });
+  if (!d) return reply.code(404).send({ error: 'Género no encontrado' });
+  return d;
+});
+// «los buenos de este género que aún no tienes» (Last.fm, cruzado con tu colección)
+app.get('/api/genres/:slug/recommendations', async (req, reply) => {
+  const r = await genreRecommendations(req.params.slug, {
+    sub: req.query?.sub || null,
+    limit: Math.min(Number(req.query?.limit) || 40, 100),
+  });
+  if (!r) return reply.code(404).send({ error: 'Género no encontrado' });
+  return r;
+});
 
 // --- sellos seguidos (0.6 fase 2) -------------------------------------------
 app.get('/api/tracked-labels', async () => trackedLabelsList());

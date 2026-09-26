@@ -110,6 +110,19 @@ export const api = {
   wantAlbum: (body) => req('/wanted', { method: 'POST', body }),
   unwantAlbum: (body) => req('/wanted/remove', { method: 'POST', body }),
   wantedRun: () => req('/wanted/run', { method: 'POST', body: { force: true } }),
+  // Géneros (1.1): árbol, detalle de un género y «los buenos que aún no tienes».
+  genres: () => req('/genres'),
+  genre: (slug, { sub, sort, limit, offset } = {}) => {
+    const p = new URLSearchParams();
+    if (sub) p.set('sub', sub);
+    if (sort) p.set('sort', sort);
+    if (limit) p.set('limit', String(limit));
+    if (offset) p.set('offset', String(offset));
+    const qs = p.toString();
+    return req(`/genres/${encodeURIComponent(slug)}${qs ? `?${qs}` : ''}`);
+  },
+  genreRecommendations: (slug, sub) =>
+    req(`/genres/${encodeURIComponent(slug)}/recommendations${sub ? `?sub=${encodeURIComponent(sub)}` : ''}`),
   lidarrEnabled: () => req('/lidarr/enabled'),
 
   // fase 2 — la caza

@@ -145,6 +145,41 @@ export async function topAlbums(name, limit = 3) {
   }
 }
 
+// Parseo de la respuesta de tag.getTopAlbums, aparte y exportado para poder probarlo sin red
+// (la clave de Last.fm va cifrada en la BBDD, así que la llamada real solo se puede ejercitar
+// en la instancia del usuario; el parseo, que es donde están los fallos tontos, no).
+export function mapTagAlbums(data) {
+  const arr = data?.albums?.album || [];
+  return (Array.isArray(arr) ? arr : [arr])
+    .filter((a) => a?.name && a?.artist?.name)
+    .map((a) => ({
+      artist: a.artist.name,
+      album: a.name,
+      mbid: a.mbid || null,
+      url: a.url || null,
+      // Last.fm ordena las imágenes de pequeña a extragrande: la última con contenido es la mayor
+      cover: (a.image || []).filter((i) => i && i['#text']).pop()?.['#text'] || null,
+    }));
+}
+
+// Discos más escuchados de un GÉNERO (tag.getTopAlbums). Es la fuente de «los buenos de este
+// género que aún no tienes»: Last.fm ordena por escuchas reales de millones de personas, que
+// para «qué es canónico en este género» funciona mejor que cualquier heurística nuestra.
+// Devuelve [{ artist, album, mbid, playcount }].
+export async function tagTopAlbums(tag, limit = 50) {
+  if (!lastfmConfigured() || !tag) return [];
+  try {
+    const data = await lfCached(`tagalbums:${tag}:${limit}`.toLowerCase(), {
+      method: 'tag.getTopAlbums',
+      tag,
+      limit: String(limit),
+    });
+    return mapTagAlbums(data);
+  } catch {
+    return [];
+  }
+}
+
 // Scrobbles recientes de un usuario. NO se cachea: es historial vivo. Devuelve
 // una página cruda de user.getRecentTracks (200 por página, más nuevos primero).
 export async function recentTracks(user, { from = 0, page = 1, limit = 200 } = {}) {

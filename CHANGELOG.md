@@ -9,6 +9,30 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Página de «Géneros»** (camino a la 1.1): explorar la colección por género al estilo del árbol
+  de Roon, de lo ancho («Rock») a lo concreto («Shoegaze»), y al lado **los discos buenos de ese
+  género que aún NO tienes**.
+  - **El problema real, medido antes de tocar nada**: el género sale de las etiquetas de tus
+    ficheros, y ahí hay **1.081 cadenas distintas** para 33.000 discos — el mismo género en dos
+    idiomas («Electrónica»/«Electronic»), variantes de caja, compuestos («Hip-Hop/Rap») y una cola
+    infinita. Listar eso tal cual no es explorar nada. Así que se normaliza contra una taxonomía
+    de **18 géneros de primer nivel con subgéneros**, con un diccionario de sinónimos ampliado a
+    partir de la cola real (incluidas las grafías localizadas de iTunes: «Alternatif et Indé»,
+    «オルタナティヴ＆インディー»). Resultado: **80% de los discos clasificados**.
+  - **No se inventa**: lo que no se reconoce NO se fuerza a ningún género; queda en «etiquetas sin
+    clasificar», a la vista y contado. Y las etiquetas vacías de significado («Varios», «Other»,
+    «Unknown») no clasifican ni ensucian esa lista.
+  - Cada género trae sus **subgéneros filtrables**, tus artistas, tus discos ordenables y el
+    reparto por décadas. Un disco puede estar en varios géneros a la vez, como en Roon.
+  - **Recomendaciones por género**: lo más escuchado de ese género en Last.fm (`tag.getTopAlbums`)
+    menos lo que ya tienes, con Buscar, **♥ Lo quiero**, «Añadir a reto» y Descargar. Sirve para
+    cazar los clásicos que te faltan, no solo novedades.
+  - Se calcula **en vivo** desde las etiquetas (170 ms sobre 33.000 discos): no hay tabla que
+    migrar ni hace falta reescanear para que las mejoras del diccionario se noten.
+- **Otro huevo de pascua**: el lema de la barra lateral confiesa la verdad si pasas el ratón por
+  encima (o lo tocas, en el móvil).
+
 ### Arreglado
 - **En «Huecos» la fecha salía siempre como «s/f»** (1.0.1). Las dos vistas que listan discos que
   te faltan sirven formas distintas: la ficha de artista manda las filas de `release_groups` en

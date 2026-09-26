@@ -3,13 +3,15 @@ import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle,
   Sparkles, Settings as SettingsIcon, Menu, X, RefreshCw, Star, Compass, CalendarClock,
-  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud, ExternalLink, Wrench, Rocket, PartyPopper, Radio, Library as LibraryIcon,
+  Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud, ExternalLink, Wrench, Rocket, PartyPopper, Radio, Library as LibraryIcon, Shapes,
 } from 'lucide-react';
 import { api } from './api.js';
 import { Spinner, ErrorBoundary } from './components.jsx';
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Library = lazy(() => import('./pages/Library.jsx'));
+const Genres = lazy(() => import('./pages/Genres.jsx'));
+const GenreDetail = lazy(() => import('./pages/Genres.jsx').then((m) => ({ default: m.GenreDetail })));
 const AlbumDetail = lazy(() => import('./pages/AlbumDetail.jsx'));
 const Artists = lazy(() => import('./pages/Artists.jsx'));
 const ArtistDetail = lazy(() => import('./pages/ArtistDetail.jsx'));
@@ -46,6 +48,7 @@ const NAV = [
       { to: '/incompletos', label: 'Álbumes incompletos', Icon: PackageOpen },
       { to: '/calidad', label: 'Calidad y disco', Icon: HardDrive },
       { to: '/upgrades', label: 'Candidatos a upgrade', Icon: ArrowUpCircle },
+      { to: '/generos', label: 'Géneros', Icon: Shapes },
       { to: '/sellos', label: 'Sellos', Icon: Building2 },
     ],
   },
@@ -218,6 +221,25 @@ function Logo() {
   );
 }
 
+// El lema, con truco. «Liderarrr» sale de Lidarr, y Lidarr sale de que un día alguien decidió
+// que todo lo autohospedado acabara en -arr. Si pasas el ratón por el lema (o lo tocas, en el
+// móvil) la app confiesa a qué se dedica de verdad. No hay soporte. Nunca lo hubo.
+function Lema({ version }) {
+  const [confesando, setConfesando] = useState(false);
+  return (
+    <button
+      type="button"
+      onMouseEnter={() => setConfesando(true)}
+      onMouseLeave={() => setConfesando(false)}
+      onClick={() => setConfesando((v) => !v)}
+      title="…"
+      className={`text-[11px] mt-1.5 text-left transition-colors ${confesando ? 'text-gold-400/80' : 'text-neutral-600'}`}
+    >
+      {confesando ? 'líderes en no dar soporte' : `completismo musical · v${version}`}
+    </button>
+  );
+}
+
 export default function App() {
   const [open, setOpen] = useState(false);
   const [version, setVersion] = useState('');
@@ -262,7 +284,7 @@ export default function App() {
         <div className="px-5 py-5 flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <Logo />
-            <div className="text-[11px] text-neutral-600 mt-1.5">completismo musical · v{version}</div>
+            <Lema version={version} />
           </div>
           {/* Cerrar (solo móvil): además del fondo y de elegir sección. */}
           <button
@@ -350,6 +372,8 @@ export default function App() {
             <Route path="/retos" element={<Challenges />} />
             <Route path="/upgrades" element={<Upgrades />} />
             <Route path="/sellos" element={<Labels />} />
+            <Route path="/generos" element={<Genres />} />
+            <Route path="/generos/:slug" element={<GenreDetail />} />
             <Route path="/diagnostico" element={<Diagnostics />} />
             <Route path="/sin-identificar" element={<Unidentified />} />
             <Route path="/mb-nueva" element={<MbSeedCallback />} />
