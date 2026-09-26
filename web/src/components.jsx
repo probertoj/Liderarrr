@@ -444,6 +444,28 @@ export function AddToChallengeButton({ artist, title, label = 'Reto', className,
   );
 }
 
+// Fecha de estreno de un disco que AÚN NO TIENES, en su propia insignia. Saber de qué año es
+// un disco que te falta es media decisión de bajarlo, y antes iba como texto gris pegado al
+// título — cuando iba: las filas de huecos leían `year`, que las discografías de MusicBrainz
+// (release_groups) no tienen; el campo es `first_release` (YYYY-MM-DD, a veces solo el año),
+// así que la fecha sencillamente no aparecía nunca.
+export function ReleaseYear({ date, className = '' }) {
+  const base = 'text-[11px] px-1.5 py-0.5 rounded border shrink-0 tabular-nums';
+  if (!date)
+    return (
+      <span title="MusicBrainz no da fecha de estreno" className={`${base} border-ink-800 text-neutral-600 ${className}`}>
+        s/f
+      </span>
+    );
+  const d = String(date);
+  const completa = /^\d{4}-\d{2}-\d{2}$/.test(d);
+  return (
+    <span title={completa ? `Estreno: ${d}` : undefined} className={`${base} border-ink-700 bg-ink-850 text-neutral-300 ${className}`}>
+      {d.slice(0, 4)}
+    </span>
+  );
+}
+
 // «LO QUIERO»: lista de deseos VIGILADA. Mismo patrón que la pertenencia a retos —un mapa
 // cacheado a nivel de módulo, compartido por todos los botones de la página, una sola
 // petición—. match_key(artista,álbum) → {id, status}. Al marcar/desmarcar se recarga y
@@ -777,7 +799,9 @@ export function SearchModal({ initialQuery, onClose }) {
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
-      <div className="card p-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      {/* ancho generoso a propósito: el nombre de la release ES la información que decide la
+          descarga (edición, remaster, formato) y en 2xl no cabía ni la mitad. */}
+      <div className="card p-4 w-full max-w-5xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-1">
           <h2 className="text-sm text-neutral-300 flex items-center gap-2">
             <Search size={15} /> Buscar y descargar
@@ -820,7 +844,10 @@ export function SearchModal({ initialQuery, onClose }) {
             {results.map((r) => (
               <div key={`${r.indexerId}:${r.guid}`} className="py-2 flex items-start gap-3 text-sm">
                 <div className="min-w-0 flex-1">
-                  <div className="truncate" title={r.title}>
+                  {/* sin `truncate`: en estos nombres lo que decide la descarga —[Remaster 2015],
+                      [Japanese Edition], [FLAC 24bit], [Vinyl]— va SIEMPRE al final, que era justo
+                      lo que se comía el «…». Mejor dos líneas que un nombre a medias. */}
+                  <div className="break-words leading-snug" title={r.title}>
                     {r.title}
                   </div>
                   <div className="text-xs text-neutral-600 flex flex-wrap gap-x-2 mt-0.5">

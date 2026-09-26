@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy, Database, Radio } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { openMbReleaseEditor } from '../mb.js';
-import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies, AddToChallengeButton } from '../components.jsx';
+import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies, AddToChallengeButton, WantButton, ReleaseYear } from '../components.jsx';
 
 // orphan y bootleg son «de primera clase»: material fuera de catálogo (rarezas y
 // directos no oficiales) que cuenta en lo descriptivo pero no en el completismo. En toda
@@ -1223,8 +1223,8 @@ function Recommendations({ albumId, artistName }) {
         )}
       </div>
       <p className="text-xs text-neutral-600 mt-1">
-        Más de este artista (tu biblioteca), artistas afines y <b className="font-normal text-neutral-500">discos que aún no
-        tienes</b> de ellos, para seguir o descargar (Last.fm).
+        De este artista: lo que ya tienes y <b className="font-normal text-neutral-500">lo que te falta</b>. Y artistas
+        afines con discos suyos que aún no tienes, para seguir o descargar (Last.fm).
       </p>
 
       {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
@@ -1233,7 +1233,10 @@ function Recommendations({ albumId, artistName }) {
         <>
           {data.moreFromArtist?.length > 0 && (
             <div className="mt-4">
-              <h3 className="text-xs uppercase tracking-wider text-neutral-600 mb-2">Más de {data.artist?.name || artistName}</h3>
+              <h3 className="text-xs uppercase tracking-wider text-neutral-600 mb-2">
+                Más de {data.artist?.name || artistName}{' '}
+                <span className="text-emerald-400/70 normal-case tracking-normal">· ya en tu disco</span>
+              </h3>
               <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-3">
                 {data.moreFromArtist.map((al) => (
                   <Link key={al.id} to={`/album/${al.id}`} className="group">
@@ -1245,6 +1248,20 @@ function Recommendations({ albumId, artistName }) {
                     </div>
                     {al.year ? <div className="text-[11px] text-neutral-600">{al.year}</div> : null}
                   </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {data.missingFromArtist?.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-xs uppercase tracking-wider text-neutral-600 mb-2">
+                Te falta de {data.artist?.name || artistName}{' '}
+                <span className="text-neutral-600 normal-case tracking-normal">· {data.missingFromArtist.length}</span>
+              </h3>
+              <div className="space-y-1.5">
+                {data.missingFromArtist.map((m) => (
+                  <MissingFromArtistRow key={m.rg_mbid} m={m} artist={data.artist?.name || artistName} />
                 ))}
               </div>
             </div>
@@ -1292,12 +1309,64 @@ function Recommendations({ albumId, artistName }) {
             </div>
           )}
 
-          {!data.moreFromArtist?.length && !data.similar?.length && !data.recommendedAlbums?.length && (
+          {!data.moreFromArtist?.length && !data.missingFromArtist?.length && !data.similar?.length && !data.recommendedAlbums?.length && (
             <p className="text-sm text-neutral-600 mt-3">
               {data.lastfm ? 'Sin recomendaciones por ahora.' : 'Configura Last.fm en Ajustes para ver artistas afines.'}
             </p>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+// Fila de un disco que te FALTA de este mismo artista. Lo accionable de la sección: bajarlo
+// ahora, ponerlo en «Lo quiero» para que se baje solo, o ir a su ficha de MusicBrainz.
+function MissingFromArtistRow({ m, artist }) {
+  const [state, setState] = useState(null); // busy | done
+  const grab = async () => {
+    setState('busy');
+    try {
+      const res = await api.grabBest(`${artist} ${m.title}`, { rg_mbid: m.rg_mbid, artist, album: m.title });
+      if (!res.grabbed) {
+        alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+        setState(null);
+        return;
+      }
+      setState('done');
+    } catch (e) {
+      alert(e.message);
+      setState(null);
+    }
+  };
+  return (
+    <div className="card px-3 py-2 flex items-center gap-2 text-sm">
+      <ReleaseYear date={m.first_release} />
+      <span className="truncate flex-1 min-w-0" title={m.title}>
+        {m.title}
+        {m.primary_type && m.primary_type !== 'Album' ? <span className="text-neutral-600"> · {m.primary_type}</span> : ''}
+      </span>
+      <a
+        href={`https://musicbrainz.org/release-group/${m.rg_mbid}`}
+        target="_blank"
+        rel="noreferrer"
+        className="text-xs text-gold-400 hover:underline inline-flex items-center gap-0.5 shrink-0"
+      >
+        MB <ExternalLink size={11} />
+      </a>
+      <WantButton artist={artist} title={m.title} rg_mbid={m.rg_mbid} releaseDate={m.first_release} origin="ficha" />
+      {state === 'done' ? (
+        <span className="text-emerald-400 text-xs inline-flex items-center gap-1 shrink-0">
+          <Check size={13} /> pedido
+        </span>
+      ) : (
+        <button
+          onClick={grab}
+          disabled={state === 'busy'}
+          className="text-xs px-1.5 py-0.5 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1 shrink-0 disabled:opacity-50"
+        >
+          {state === 'busy' ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Descargar
+        </button>
       )}
     </div>
   );
@@ -2250,7 +2319,9 @@ function SearchSection({ album }) {
           {results.map((r) => (
             <div key={`${r.indexerId}:${r.guid}`} className="py-2 flex items-start gap-3 text-sm">
               <div className="min-w-0 flex-1">
-                <div className="truncate" title={r.title}>
+                {/* sin `truncate`: [Remaster 2015], [Japanese Edition], [FLAC 24bit]… va SIEMPRE
+                    al final del nombre, que era justo lo que se comía el «…». */}
+                <div className="break-words leading-snug" title={r.title}>
                   {r.title}
                 </div>
                 <div className="text-xs text-neutral-600 flex flex-wrap gap-x-2 mt-0.5">

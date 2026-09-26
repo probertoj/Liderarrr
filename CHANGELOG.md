@@ -7,6 +7,29 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [Sin publicar]
+
+### Arreglado
+- **La fecha de los discos que te faltan no aparecía NUNCA.** «Te faltan N discos» (ficha de
+  artista) y «Huecos» leían `year`, un campo que las discografías de MusicBrainz
+  (`release_groups`) no tienen — el suyo es `first_release`. No es que la fecha se viera poco:
+  no se pintaba nada. Ahora va en su propia insignia a la izquierda del título, con la fecha
+  completa en el tooltip y `s/f` cuando MusicBrainz no la da.
+- **El buscador de releases ya no corta los nombres.** En «Buscar y descargar» —tanto el de la
+  ficha del disco como el modal— el nombre de la release es lo que decide la descarga, y lo que
+  la distingue ([Remaster 2015], [Japanese Edition], [FLAC 24bit], [Vinyl]) va SIEMPRE al final,
+  que era justo lo que se comía el «…». Ahora el nombre se ajusta en varias líneas en vez de
+  cortarse, y el modal es bastante más ancho. En el móvil ocupa dos o tres líneas, sin desbordes.
+
+### Cambiado
+- **Las recomendaciones de la ficha distinguen lo que tienes de lo que te falta.** «Más de este
+  artista» listaba solo discos que **ya tienes** sin decirlo: una parrilla de discos que están en
+  tu casa no recomienda nada. Ahora esa sección se marca «· ya en tu disco» y debajo aparece
+  **«Te falta de …»** con su discografía menos lo que tienes (cruce en vivo, la misma vara que la
+  ficha de artista), cada uno con su año, enlace a MusicBrainz, **♥ Lo quiero** y **Descargar**.
+
+---
+
 ## [1.0.0] — 2026-09-18
 
 **La 1.0.** Liderarr ya no necesita a Lidarr para nada: escanea, identifica, te dice qué te

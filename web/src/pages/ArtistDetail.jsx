@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink, ChevronDown, ChevronRight, Link2, Search, X, Image as ImageIcon, Upload } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { AlbumCard, ArtistPhoto, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, WantButton, useLidarrEnabled } from '../components.jsx';
+import { AlbumCard, ArtistPhoto, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, WantButton, ReleaseYear, useLidarrEnabled } from '../components.jsx';
 
 export default function ArtistDetail() {
   const { id } = useParams();
@@ -792,9 +792,9 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
           const done = added[m.rg_mbid] || m.in_lidarr || m.requested;
           return (
             <div key={m.rg_mbid} className="card px-3 py-2 flex items-center gap-2 text-sm">
-              <span className="truncate flex-1 min-w-0">
+              <ReleaseYear date={m.first_release} />
+              <span className="truncate flex-1 min-w-0" title={m.title}>
                 {m.title}
-                {m.year ? <span className="text-neutral-600"> · {m.year}</span> : ''}
               </span>
               <a
                 href={`https://musicbrainz.org/release-group/${m.rg_mbid}`}

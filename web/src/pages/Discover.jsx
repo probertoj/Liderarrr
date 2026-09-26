@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Compass, Plus, Check, X, RefreshCw, Loader2, ExternalLink } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
-import { PageTitle, Spinner, ErrorMsg, Button, SearchModal, QuickSearch, AddToChallengeButton, WantButton, useLidarrEnabled } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, Button, SearchModal, QuickSearch, AddToChallengeButton, WantButton, ReleaseYear, useLidarrEnabled } from '../components.jsx';
 
 // Huecos: álbumes de estudio que MusicBrainz conoce de tus artistas y que no
 // tienes. Agrupados por artista, con envío a Lidarr (uno o todos) y opción de
@@ -152,9 +152,9 @@ export default function Discover() {
                 const done = added[m.rg_mbid] || m.in_lidarr || m.requested;
                 return (
                   <div key={m.rg_mbid} className="flex items-center justify-between text-sm bg-ink-850/50 rounded px-2.5 py-1.5">
-                    <span className="truncate">
-                      {m.title}
-                      {m.year ? <span className="text-neutral-600"> · {m.year}</span> : ''}
+                    <span className="truncate flex items-center gap-2 min-w-0" title={m.title}>
+                      <ReleaseYear date={m.first_release} />
+                      <span className="truncate">{m.title}</span>
                     </span>
                     <div className="flex items-center gap-1 shrink-0 ml-2">
                       <a

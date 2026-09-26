@@ -1,10 +1,12 @@
 import { db } from './db.js';
 import * as lastfm from './lastfm.js';
+import { artistCompleteness } from './discography.js';
 import { normName, matchKey } from './matchkey.js';
 
 // Recomendaciones desde la ficha del álbum (estilo «Valence Recommendations» de Roon):
-//  - «Más de este artista»: otros álbumes del artista (principal o co-acreditado) que
-//    TIENES en la biblioteca. Local, instantáneo.
+//  - «Más de este artista»: su discografía partida en DOS — lo que ya tienes y lo que te
+//    FALTA. Antes solo se listaba lo que tienes, sin decirlo: una parrilla de discos que ya
+//    están en tu casa no recomienda nada. Lo que te falta es lo accionable (bajarlo, quererlo).
 //  - «Te podría gustar»: artistas similares (Last.fm), marcando cuáles ya tienes/sigues.
 // Bajo demanda desde la ficha.
 export async function albumRecommendations(albumId) {
@@ -30,6 +32,26 @@ export async function albumRecommendations(albumId) {
     seen.add(key);
     moreFromArtist.push({ id: r.id, title: r.title, year: r.year });
     if (moreFromArtist.length >= 18) break;
+  }
+
+  // …y lo que te FALTA de ese mismo artista: su discografía (MusicBrainz) menos lo que
+  // tienes, cruzada EN VIVO por artistCompleteness (misma vara que la ficha de artista, así
+  // no se contradicen). Sin los aún no estrenados, que no se pueden bajar.
+  const missingFromArtist = [];
+  if (a.artist_id) {
+    try {
+      const comp = artistCompleteness(a.artist_id);
+      for (const m of comp.missing.slice(0, 12)) {
+        missingFromArtist.push({
+          rg_mbid: m.rg_mbid,
+          title: m.title,
+          first_release: m.first_release,
+          primary_type: m.primary_type,
+        });
+      }
+    } catch {
+      /* sin discografía calculada aún: la sección simplemente no sale */
+    }
   }
 
   // artistas similares (Last.fm), cruzados con la biblioteca por MBID y por nombre
@@ -74,6 +96,7 @@ export async function albumRecommendations(albumId) {
   return {
     artist: { id: a.artist_id, name: artistName },
     moreFromArtist,
+    missingFromArtist,
     similar,
     recommendedAlbums,
     lastfm: lastfm.lastfmConfigured(),
