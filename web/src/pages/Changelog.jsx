@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.0.1',
+    title: 'Detalles del feedback: fechas, recomendaciones y nombres de release',
+    items: [
+      'La fecha de los discos que te faltan ya se ve, en «Te faltan N discos» de la ficha de artista y en «Huecos». Antes no aparecía nunca: la lista leía un campo que las discografías de MusicBrainz no tienen.',
+      'Las recomendaciones de la ficha ya distinguen lo que tienes de lo que te falta: «Más de X · ya en tu disco» arriba, y debajo «Te falta de X» con su discografía menos tu colección, cada disco con su año, ♥ Lo quiero y Descargar.',
+      'En «Buscar y descargar», los nombres de las releases ya no se cortan: la edición, el remaster y el formato van al final del nombre, que era justo lo que se perdía. Ahora se ajustan en varias líneas y el panel es más ancho.',
+    ],
+  },
+  {
     version: '1.0.0',
     title: '1.0 — vivir sin Lidarr, de verdad',
     items: [

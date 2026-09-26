@@ -7,7 +7,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
-## [Sin publicar]
+## [1.0.1] — 2026-09-26
+
+**Ronda de detalles salida del feedback de usuarios.** Tres cosas pequeñas; la primera resultó no ser un tema de estilo sino un campo que no existía.
 
 ### Arreglado
 - **La fecha de los discos que te faltan no aparecía NUNCA.** «Te faltan N discos» (ficha de
