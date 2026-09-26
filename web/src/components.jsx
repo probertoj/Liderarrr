@@ -457,6 +457,8 @@ export function ReleaseYear({ date, className = '' }) {
         s/f
       </span>
     );
+  // acepta fecha completa (YYYY-MM-DD, release_groups) o un año suelto (payloads que ya lo
+  // traían derivado, como el de Huecos). Con cualquiera de las dos se pinta el año.
   const d = String(date);
   const completa = /^\d{4}-\d{2}-\d{2}$/.test(d);
   return (

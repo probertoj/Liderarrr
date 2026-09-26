@@ -71,6 +71,10 @@ export function gaps({ onlyTracked = true } = {}) {
     byArtist.get(r.artist_id).missing.push({
       rg_mbid: r.rg_mbid,
       title: r.title,
+      // `first_release` es la fecha completa (YYYY-MM-DD); `year` se mantiene porque lo usan
+      // otras vistas. La ficha de artista sirve las filas de release_groups en crudo, así que
+      // ambas formas conviven: quien pinta la fecha acepta las dos.
+      first_release: r.first_release || null,
       year: r.first_release ? Number(String(r.first_release).slice(0, 4)) : null,
       in_lidarr: lid && !!r.in_lidarr,
       requested: reqs.has(r.rg_mbid),

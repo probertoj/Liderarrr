@@ -153,7 +153,7 @@ export default function Discover() {
                 return (
                   <div key={m.rg_mbid} className="flex items-center justify-between text-sm bg-ink-850/50 rounded px-2.5 py-1.5">
                     <span className="truncate flex items-center gap-2 min-w-0" title={m.title}>
-                      <ReleaseYear date={m.first_release} />
+                      <ReleaseYear date={m.first_release || m.year} />
                       <span className="truncate">{m.title}</span>
                     </span>
                     <div className="flex items-center gap-1 shrink-0 ml-2">

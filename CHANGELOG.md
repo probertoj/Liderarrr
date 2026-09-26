@@ -7,6 +7,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [Sin publicar]
+
+### Arreglado
+- **En «Huecos» la fecha salía siempre como «s/f»** (1.0.1). Las dos vistas que listan discos que
+  te faltan sirven formas distintas: la ficha de artista manda las filas de `release_groups` en
+  crudo (`first_release`) y «Huecos» un objeto ya derivado (`year`). Al arreglar la fecha en la
+  1.0.1 se unificó la lectura al campo equivocado para «Huecos». Ahora su endpoint manda también
+  la fecha completa y la insignia acepta las dos formas.
+
+---
+
 ## [1.0.1] — 2026-09-26
 
 **Ronda de detalles salida del feedback de usuarios.** Tres cosas pequeñas; la primera resultó no ser un tema de estilo sino un campo que no existía.
