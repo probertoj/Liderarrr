@@ -609,6 +609,7 @@ app.get('/api/genres/:slug/recommendations', async (req, reply) => {
   const r = await genreRecommendations(req.params.slug, {
     sub: req.query?.sub || null,
     limit: Math.min(Number(req.query?.limit) || 40, 100),
+    page: Math.max(1, Number(req.query?.page) || 1),
   });
   if (!r) return reply.code(404).send({ error: 'Género no encontrado' });
   return r;

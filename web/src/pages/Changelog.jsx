@@ -9,6 +9,21 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.1.0',
+    title: 'Géneros: explora lo que tienes y descubre lo que te falta',
+    items: [
+      'Nueva sección «Géneros»: tu colección por género, de lo ancho (Rock) a lo concreto (Shoegaze), al estilo del árbol de Roon. Un disco puede estar en varios géneros a la vez.',
+      'Al lado de lo tuyo, «lo mejor de este género que aún no tienes»: los discos más escuchados del género en Last.fm quitando los que ya están en tu colección, con ♥ Lo quiero y Descargar. Si no te convence la primera tanda, «Recomendar más» baja otra.',
+      'El género sale de las etiquetas de tus ficheros, que vienen en mil grafías distintas (el mismo género en dos idiomas, variantes de caja, compuestos). Se normalizan contra 19 géneros con subgéneros; lo que no se reconoce NO se fuerza a ningún sitio: queda a la vista en «etiquetas sin clasificar».',
+      'Y lo colocas tú: pincha una etiqueta sin clasificar y dices a qué género va —o que no es un género—. Cuenta al instante, sin reescanear. También puedes esconder de la portada los géneros que no te interesen.',
+      'Desde la ficha de un disco o de un artista, sus géneros son enlaces: «esto es dream pop, ¿qué más tengo de dream pop?».',
+      'Dentro de cada género: subgéneros, filtro por década, tus artistas y tus discos ordenables.',
+      'La Discoteca filtra ahora por esos mismos géneros: elegir «Rock» ya no deja fuera «rock», «Classic Rock» ni «Hard Rock», que en tus ficheros son etiquetas distintas.',
+      'El Resumen se puede acotar a un género: «tu año en shoegaze».',
+      'Arreglado: en «Huecos» la fecha de los discos que te faltan salía siempre como «s/f».',
+    ],
+  },
+  {
     version: '1.0.1',
     title: 'Detalles del feedback: fechas, recomendaciones y nombres de release',
     items: [

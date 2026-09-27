@@ -779,7 +779,7 @@ function tagDeSubgenero(sub) {
     .trim();
 }
 
-export async function genreRecommendations(slug, { sub = null, limit = 40 } = {}) {
+export async function genreRecommendations(slug, { sub = null, limit = 40, page = 1 } = {}) {
   const top = TOP_BY_SLUG.get(slug);
   if (!top) return null;
   const tagPadre = LASTFM_TAG[slug] || top.name;
@@ -787,7 +787,10 @@ export async function genreRecommendations(slug, { sub = null, limit = 40 } = {}
   let tag = tagSub || tagPadre;
   if (!lastfm.lastfmConfigured()) return { tag, configured: false, items: [] };
 
-  let populares = await lastfm.tagTopAlbums(tag, Math.max(limit * 2, 60));
+  // Se pide MÁS de lo que se va a enseñar porque muchos caerán por tenerlos ya; aun así, si
+  // una tanda se queda corta, ahí está «Recomendar más» para pedir la siguiente página.
+  const porTanda = Math.max(limit * 2, 60);
+  let populares = await lastfm.tagTopAlbums(tag, porTanda, page);
   // Si el subgénero no da nada en Last.fm se tira del género padre, pero se DICE: antes caía
   // al padre en silencio y la pantalla prometía «lo mejor de Slowcore» mientras enseñaba lo
   // mejor de «indie».
@@ -795,7 +798,7 @@ export async function genreRecommendations(slug, { sub = null, limit = 40 } = {}
   if (tagSub && populares.length === 0) {
     desde = tagSub;
     tag = tagPadre;
-    populares = await lastfm.tagTopAlbums(tag, Math.max(limit * 2, 60));
+    populares = await lastfm.tagTopAlbums(tag, porTanda, page);
   }
   // lo que ya tienes, por matchKey (la misma vara que retos, radar y «Lo quiero»)
   const tuyos = new Set(
@@ -813,7 +816,9 @@ export async function genreRecommendations(slug, { sub = null, limit = 40 } = {}
     items.push(p);
     if (items.length >= limit) break;
   }
-  return { tag, fallbackFrom: desde, configured: true, items, considered: populares.length };
+  // hasMore mira la TANDA CRUDA, no lo que queda tras quitar lo tuyo: que una página entera
+  // sea de discos que ya tienes no significa que se haya acabado el género.
+  return { tag, fallbackFrom: desde, configured: true, items, considered: populares.length, page, hasMore: populares.length >= porTanda };
 }
 
 // --- géneros a la carta -------------------------------------------------------

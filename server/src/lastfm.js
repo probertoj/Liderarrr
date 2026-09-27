@@ -166,13 +166,16 @@ export function mapTagAlbums(data) {
 // género que aún no tienes»: Last.fm ordena por escuchas reales de millones de personas, que
 // para «qué es canónico en este género» funciona mejor que cualquier heurística nuestra.
 // Devuelve [{ artist, album, mbid, playcount }].
-export async function tagTopAlbums(tag, limit = 50) {
+export async function tagTopAlbums(tag, limit = 50, page = 1) {
   if (!lastfmConfigured() || !tag) return [];
   try {
-    const data = await lfCached(`tagalbums:${tag}:${limit}`.toLowerCase(), {
+    // `page` es lo que permite el «Recomendar más»: cada pulsación pide la siguiente tanda
+    // del ranking del género, y cada página se cachea por separado.
+    const data = await lfCached(`tagalbums:${tag}:${limit}:${page}`.toLowerCase(), {
       method: 'tag.getTopAlbums',
       tag,
       limit: String(limit),
+      page: String(page),
     });
     return mapTagAlbums(data);
   } catch {

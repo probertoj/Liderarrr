@@ -126,8 +126,13 @@ export const api = {
   mapGenreTag: (tag, slug, sub, ignored) => req('/genres/map', { method: 'POST', body: { tag, slug, sub, ignored } }),
   unmapGenreTag: (tag) => req('/genres/unmap', { method: 'POST', body: { tag } }),
   hideGenre: (slug, hidden) => req('/genres/hide', { method: 'POST', body: { slug, hidden } }),
-  genreRecommendations: (slug, sub) =>
-    req(`/genres/${encodeURIComponent(slug)}/recommendations${sub ? `?sub=${encodeURIComponent(sub)}` : ''}`),
+  genreRecommendations: (slug, sub, page) => {
+    const p = new URLSearchParams();
+    if (sub) p.set('sub', sub);
+    if (page && page > 1) p.set('page', String(page));
+    const qs = p.toString();
+    return req(`/genres/${encodeURIComponent(slug)}/recommendations${qs ? `?${qs}` : ''}`);
+  },
   lidarrEnabled: () => req('/lidarr/enabled'),
 
   // fase 2 — la caza

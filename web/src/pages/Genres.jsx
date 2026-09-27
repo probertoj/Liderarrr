@@ -256,6 +256,7 @@ export function GenreDetail() {
   const [err, setErr] = useState(null);
   const [recs, setRecs] = useState(null);
   const [recsLoading, setRecsLoading] = useState(false);
+  const [recsMas, setRecsMas] = useState(false); // «Recomendar más» en curso
   const [search, setSearch] = useState(null);
 
   useEffect(() => {
@@ -272,6 +273,28 @@ export function GenreDetail() {
       setErr(e.message);
     } finally {
       setRecsLoading(false);
+    }
+  };
+
+  // «Recomendar más»: pide la siguiente página del ranking del género y la añade abajo, sin
+  // perder lo que ya estabas mirando. Se descartan los repetidos por si dos páginas solapan.
+  const masRecomendaciones = async () => {
+    if (!recs) return;
+    setRecsMas(true);
+    try {
+      const sig = await api.genreRecommendations(slug, sub, (recs.page || 1) + 1);
+      const vistos = new Set(recs.items.map((r) => `${r.artist}::${r.album}`.toLowerCase()));
+      const nuevos = (sig.items || []).filter((r) => !vistos.has(`${r.artist}::${r.album}`.toLowerCase()));
+      setRecs({
+        ...sig,
+        items: [...recs.items, ...nuevos],
+        considered: (recs.considered || 0) + (sig.considered || 0),
+        agotado: nuevos.length === 0 && !sig.hasMore,
+      });
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setRecsMas(false);
     }
   };
 
@@ -375,6 +398,20 @@ export function GenreDetail() {
               {recs.items.map((r) => (
                 <GenreRecRow key={`${r.artist}::${r.album}`} r={r} onSearch={setSearch} />
               ))}
+            </div>
+            {/* Si en lo de arriba no hay nada que te apetezca, sigue bajando por el ranking */}
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                onClick={masRecomendaciones}
+                disabled={recsMas || recs.agotado}
+                className="text-xs px-2.5 py-1.5 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {recsMas ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                {recsMas ? 'Buscando…' : recs.agotado ? 'No hay más' : 'Recomendar más'}
+              </button>
+              <span className="text-[11px] text-neutral-600">
+                {recs.items.length} recomendaciones · página {recs.page || 1}
+              </span>
             </div>
           </>
         )}

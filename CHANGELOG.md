@@ -7,9 +7,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
-## [Sin publicar]
+## [1.1.0] — 2026-09-27
+
+**Géneros.** Explorar la colección por género al estilo del árbol de Roon —de «Rock» a
+«Shoegaze»— y, al lado de lo tuyo, los discos buenos de ese género que **aún no tienes**.
 
 ### Añadido
+- **«Recomendar más»**: si en las primeras recomendaciones de un género no hay nada que te
+  apetezca, el botón baja otra tanda del ranking y la añade debajo, sin perder lo que ya estabas
+  mirando. Descarta repetidos y avisa cuando de verdad se acaba.
 - **La Discoteca filtra por género canónico.** Su filtro iba contra las etiquetas crudas, así que
   elegir «Rock» dejaba fuera «rock», «Classic Rock», «Hard Rock» y «ロック» — son cadenas distintas
   en los ficheros. Ahora el desplegable ofrece los mismos géneros y subgéneros que la sección
@@ -19,8 +25,6 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   evolución por mes y mosaico, solo de ese género. Como el género sale de las etiquetas de tus
   ficheros, un resumen por género es por definición sobre tu colección — lo que escuchaste y no
   tienes no puede tener género.
-
-### Añadido
 - **Géneros, segunda vuelta** (camino a la 1.1), con lo que salió de usarla de verdad:
   - **Entrar a un género desde donde estás**: la ficha del disco y la del artista muestran sus
     géneros como enlaces («esto es dream pop, ¿qué más tengo de dream pop?»). Los del artista
@@ -30,8 +34,6 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
     qué género va —o que no es un género—; y puedes **esconder** de la portada los géneros que no
     te interesen (sin borrar nada, vuelven con un clic). El cambio cuenta al instante.
   - **La Navidad es un género** (67 discos en una colección real lo justifican).
-
-### Añadido
 - **Página de «Géneros»** (camino a la 1.1): explorar la colección por género al estilo del árbol
   de Roon, de lo ancho («Rock») a lo concreto («Shoegaze»), y al lado **los discos buenos de ese
   género que aún NO tienes**.
