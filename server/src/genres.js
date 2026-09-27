@@ -1,7 +1,7 @@
 import { db } from './db.js';
 import * as lastfm from './lastfm.js';
 import { matchKey } from './matchkey.js';
-import { library } from './queries.js';
+import { libraryRows, collapseCopies } from './queries.js';
 
 // GÉNEROS (1.1) — explorar la colección por género, al estilo del árbol de Roon.
 //
@@ -466,8 +466,28 @@ function buildIndex() {
 // Árbol de géneros con el nº de álbumes tuyos en cada uno. Es la portada de la sección.
 export function genreTree() {
   const { porAlbum, sinClasificar } = buildIndex();
+  // Se cuentan DISCOS, no filas: dos rips del mismo álbum son un disco. Y se colapsa DENTRO
+  // de cada género, no sobre la colección entera: si de un disco tienes dos copias y solo una
+  // lleva la etiqueta del género, colapsando en global podía ganar la copia SIN etiqueta y el
+  // género perdía el disco. Colapsando por género sale el mismo número que al filtrar la
+  // Discoteca por ese género, que es lo que el usuario va a comparar.
+  const filas = libraryRows();
+  const porId = new Map(filas.map((a) => [a.id, a]));
+  const filasDe = new Map(); // clave de género → filas
+  for (const [id, set] of porAlbum) {
+    const fila = porId.get(id);
+    if (!fila) continue;
+    for (const k of set) {
+      if (!filasDe.has(k)) filasDe.set(k, []);
+      filasDe.get(k).push(fila);
+    }
+  }
   const cuenta = new Map();
-  for (const set of porAlbum.values()) for (const k of set) cuenta.set(k, (cuenta.get(k) || 0) + 1);
+  for (const [k, rows] of filasDe) cuenta.set(k, collapseCopies(rows).length);
+
+  // total de discos y cuántos tienen género, ya colapsados
+  const todos = collapseCopies(filas);
+  const clasificados = todos.filter((a) => porAlbum.has(a.id)).length;
 
   const ocultos = new Set(db.prepare('SELECT slug FROM genre_hidden').all().map((r) => r.slug));
   const tops = TAXONOMY.map((t) => ({
@@ -486,14 +506,13 @@ export function genreTree() {
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
 
-  const totalAlbums = db.prepare("SELECT COUNT(*) c FROM albums WHERE match_state != 'dismissed'").get().c;
   return {
     genres: tops,
     hidden: [...ocultos].map((slug) => ({ slug, name: TOP_BY_SLUG.get(slug)?.name || slug })).filter((h) => h.name),
     unclassified: otros.slice(0, 60),
     stats: {
-      albums: totalAlbums,
-      classified: porAlbum.size,
+      albums: todos.length,
+      classified: clasificados,
       unclassifiedTags: otros.length,
       unclassifiedAlbums: otros.reduce((n, o) => n + o.count, 0),
     },
@@ -584,31 +603,44 @@ export function genreDetail(slug, { sub = null, sort = 'recientes', limit = 120,
   const top = TOP_BY_SLUG.get(slug);
   if (!top) return null;
   const { porAlbum } = buildIndex();
-  const clave = sub ? `${slug}::${sub}` : slug;
 
-  const ids = new Set();
-  const cuentaSub = new Map();
+  // Se colapsa el género ENTERO y, aparte, cada subgénero: así los chips y la cabecera dicen
+  // lo mismo, y lo mismo que la Discoteca filtrada por ese género. Una sola lectura de la
+  // tabla para todo el cálculo.
+  const idsTop = new Set();
+  for (const [id, set] of porAlbum) if (set.has(slug)) idsTop.add(id);
+  if (!idsTop.size) return { slug, name: top.name, sub, decade: null, total: 0, albums: [], artists: [], decades: [], subgenres: [] };
+
+  const filas = libraryRows();
+  const delGenero = collapseCopies(filas.filter((a) => idsTop.has(a.id)));
+
+  const filasSub = new Map(); // subgénero → filas (para colapsar cada uno por su cuenta)
   for (const [id, set] of porAlbum) {
-    if (!set.has(clave)) continue;
-    ids.add(id);
-    // Los subgéneros se cuentan SOBRE el recorte actual: al entrar en uno ves cómo se reparte
-    // lo que estás mirando, no la colección entera.
     for (const k of set) {
       if (!k.startsWith(`${slug}::`)) continue;
       const nombre = k.slice(slug.length + 2);
-      cuentaSub.set(nombre, (cuentaSub.get(nombre) || 0) + 1);
+      if (!filasSub.has(nombre)) filasSub.set(nombre, []);
+      filasSub.get(nombre).push(id);
     }
+  }
+  const porId = new Map(filas.map((a) => [a.id, a]));
+  const cuentaSub = new Map();
+  for (const [nombre, ids] of filasSub) {
+    const rows = ids.map((i) => porId.get(i)).filter(Boolean);
+    if (rows.length) cuentaSub.set(nombre, collapseCopies(rows).length);
   }
   const subgenres = [...cuentaSub.entries()]
     .map(([name, count]) => ({ sub: name, count }))
     .sort((a, b) => b.count - a.count);
-  if (!ids.size) return { slug, name: top.name, sub, decade: null, total: 0, albums: [], artists: [], decades: [], subgenres };
 
-  // Los discos los sirve library(), NO una consulta propia: así el género cuenta lo mismo que
-  // la Discoteca. Con una consulta cruda, las copias del mismo disco (dos rips, una caja en
-  // varias carpetas) salían repetidas una y otra vez en la parrilla — y además inflaban los
-  // contadores de artista. library() ya sabe colapsar ediciones, copias y cajas.
-  const { albums: colapsados } = library({ ids, limit: 100000 });
+  // El subgénero se recorta colapsando SU propio conjunto, no filtrando el del padre: si de
+  // un disco hay dos copias y solo una lleva la etiqueta del subgénero, la del padre pudo
+  // quedarse con la otra. Mismo criterio que los chips y que la Discoteca.
+  const clave = sub ? `${slug}::${sub}` : slug;
+  const idsClave = new Set();
+  for (const [id, set] of porAlbum) if (set.has(clave)) idsClave.add(id);
+  let colapsados = sub ? collapseCopies(filas.filter((a) => idsClave.has(a.id))) : delGenero;
+
   const porTitulo = (a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es', { sensitivity: 'base' });
   colapsados.sort(
     sort === 'antiguos'
@@ -618,8 +650,7 @@ export function genreDetail(slug, { sub = null, sort = 'recientes', limit = 120,
         : (a, b) => (b.year || 0) - (a.year || 0) || porTitulo(a, b)
   );
 
-  // Reparto por décadas ANTES de filtrar por década: los botones tienen que seguir ahí
-  // cuando ya has elegido una.
+  // Reparto por décadas ANTES de filtrar por década: los botones siguen ahí al elegir una.
   const porDecada = new Map();
   for (const a of colapsados) {
     if (!a.year) continue;
@@ -630,8 +661,8 @@ export function genreDetail(slug, { sub = null, sort = 'recientes', limit = 120,
 
   const filtrados = decade ? colapsados.filter((a) => a.year && Math.floor(a.year / 10) * 10 === Number(decade)) : colapsados;
 
-  // Artistas del recorte, contados sobre los discos YA colapsados (si no, un artista con
-  // tres copias del mismo disco parecía tener tres discos).
+  // Artistas del recorte, contados sobre discos ya colapsados (si no, un artista con tres
+  // copias del mismo disco parecía tener tres discos).
   const porArtista = new Map();
   for (const a of filtrados) {
     if (!a.artist_id) continue;
@@ -639,7 +670,9 @@ export function genreDetail(slug, { sub = null, sort = 'recientes', limit = 120,
     e.albums++;
     porArtista.set(a.artist_id, e);
   }
-  const artists = [...porArtista.values()].sort((x, y) => y.albums - x.albums || String(x.name).localeCompare(String(y.name), 'es')).slice(0, 40);
+  const artists = [...porArtista.values()]
+    .sort((x, y) => y.albums - x.albums || String(x.name).localeCompare(String(y.name), 'es'))
+    .slice(0, 40);
 
   return {
     slug,
@@ -814,6 +847,32 @@ export function hideGenre(slug, hidden = true) {
   if (hidden) db.prepare('INSERT OR IGNORE INTO genre_hidden (slug) VALUES (?)').run(slug);
   else db.prepare('DELETE FROM genre_hidden WHERE slug = ?').run(slug);
   return { ok: true, slug, hidden };
+}
+
+// Géneros y subgéneros CON discos, aplanados y con su clave, para el desplegable de la
+// Discoteca. Su filtro usaba las etiquetas crudas —las 1.081 grafías— así que elegir «Rock»
+// dejaba fuera «rock», «Classic Rock» y «ロック»; con los canónicos, «Rock» es Rock.
+export function genreOptions() {
+  const arbol = genreTree();
+  const fuera = [];
+  for (const g of arbol.genres) {
+    fuera.push({ value: `g:${g.slug}`, label: g.name, count: g.count, sub: false });
+    for (const c of g.children) {
+      fuera.push({ value: `g:${g.slug}::${c.sub}`, label: `${g.name} · ${c.sub}`, count: c.count, sub: true });
+    }
+  }
+  return fuera;
+}
+
+// Resuelve la clave del desplegable («g:indie» o «g:indie::Shoegaze») a ids de álbum. Devuelve
+// null si la clave no es de las nuestras: entonces manda el filtro por etiqueta cruda de
+// siempre, y los enlaces antiguos siguen funcionando.
+export function idsForGenreKey(key) {
+  const k = String(key || '');
+  if (!k.startsWith('g:')) return null;
+  const [slug, sub] = k.slice(2).split('::');
+  if (!TOP_BY_SLUG.has(slug)) return null;
+  return new Set(albumIdsInGenre(slug, sub || null));
 }
 
 // La taxonomía entera, para que la UI pueda ofrecer a qué género mandar una etiqueta.

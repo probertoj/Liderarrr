@@ -100,20 +100,17 @@ export default function Library() {
           placeholder="Buscar álbum o artista…"
           className={`${sel} flex-1 min-w-[180px]`}
         />
-        <input
-          list="genre-list"
-          value={f.genre}
-          onChange={set('genre')}
-          placeholder="Género"
-          className={`${sel} w-36`}
-        />
-        <datalist id="genre-list">
-          {filters?.genres.map((g) => (
-            <option key={g.name} value={g.name}>
-              {g.n}
+        {/* Géneros CANÓNICOS, los mismos de la sección «Géneros». Antes era un campo libre
+            contra las etiquetas crudas: elegir «Rock» dejaba fuera «rock», «Classic Rock» y
+            «ロック», porque son cadenas distintas en los ficheros. */}
+        <select value={f.genre} onChange={set('genre')} className={`${sel} max-w-[14rem]`}>
+          <option value="">Género</option>
+          {filters?.canonicalGenres?.map((g) => (
+            <option key={g.value} value={g.value}>
+              {g.sub ? `   ${g.label.split(' · ')[1]}` : g.label} ({g.count})
             </option>
           ))}
-        </datalist>
+        </select>
         <select value={f.decade} onChange={set('decade')} className={sel}>
           <option value="">Década</option>
           {filters?.decades.map((d) => (

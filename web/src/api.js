@@ -217,10 +217,11 @@ export const api = {
   albumGap: (since) => req(`/listening/album-gap${since ? `?since=${since}` : ''}`),
   unplayed: () => req('/listening/unplayed'),
   topPlayed: (since, limit) => req(`/listening/top?limit=${limit || 12}${since ? `&since=${since}` : ''}`),
-  wrapped: (since, until) => {
+  wrapped: (since, until, genre) => {
     const p = [];
     if (since) p.push(`since=${since}`);
     if (until) p.push(`until=${until}`);
+    if (genre) p.push(`genre=${encodeURIComponent(genre)}`);
     return req(`/listening/wrapped${p.length ? `?${p.join('&')}` : ''}`);
   },
   challenges: () => req('/challenges'),

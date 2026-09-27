@@ -10,6 +10,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 ## [Sin publicar]
 
 ### Añadido
+- **La Discoteca filtra por género canónico.** Su filtro iba contra las etiquetas crudas, así que
+  elegir «Rock» dejaba fuera «rock», «Classic Rock», «Hard Rock» y «ロック» — son cadenas distintas
+  en los ficheros. Ahora el desplegable ofrece los mismos géneros y subgéneros que la sección
+  «Géneros», con su cuenta. Medido: «Rock» pasa de 4.180 discos a **4.796**. Los enlaces antiguos
+  con una etiqueta cruda siguen funcionando.
+- **El Resumen se puede acotar a un género**: «tu año en shoegaze». Escuchas, artistas, discos,
+  evolución por mes y mosaico, solo de ese género. Como el género sale de las etiquetas de tus
+  ficheros, un resumen por género es por definición sobre tu colección — lo que escuchaste y no
+  tienes no puede tener género.
+
+### Añadido
 - **Géneros, segunda vuelta** (camino a la 1.1), con lo que salió de usarla de verdad:
   - **Entrar a un género desde donde estás**: la ficha del disco y la del artista muestran sus
     géneros como enlaces («esto es dream pop, ¿qué más tengo de dream pop?»). Los del artista
@@ -45,6 +56,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
   encima (o lo tocas, en el móvil).
 
 ### Arreglado
+- **Los números de Géneros no cuadraban entre sí.** La portada y los chips de subgénero contaban
+  FILAS de álbum y el detalle contaba discos colapsados: «Shoegaze 27» en el chip y 21 dentro. Y
+  colapsar sobre la colección entera tampoco valía —si de un disco tienes dos copias y solo una
+  lleva la etiqueta, podía ganar la copia SIN etiqueta y el género perdía el disco—. Ahora se
+  colapsa DENTRO de cada género, con el mismo colapso que usa la Discoteca (extraído a
+  `collapseCopies` en vez de duplicado), así que portada, chip, detalle y Discoteca filtrada dicen
+  los cuatro **21**.
 - **Los géneros que iTunes escribe en japonés no se reconocían nunca.** El normalizador quitaba
   todo lo que no fuera `[a-z0-9]`, así que «ロック» o «ポップス» se quedaban en cadena VACÍA y no
   casaban por muchos sinónimos que se añadieran. Era un fallo del normalizador disfrazado de

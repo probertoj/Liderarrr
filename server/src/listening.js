@@ -132,7 +132,25 @@ export function topPlayed({ since = null, limit = 12 } = {}) {
 // «Resumen» tipo Wrapped: la foto de un periodo (semana/mes/año o todo, vía since/until en
 // ms). Totales, top artistas y álbumes escuchados (con carátula para el mosaico), cuántos
 // discos añadiste a la colección y tu evolución por mes.
-export async function wrapped({ since = null, until = null } = {}) {
+// Resumen acotado a un GÉNERO («tu año en shoegaze»). El puente entre las escuchas (que son
+// texto: artista + álbum) y los géneros (que van por id de álbum) son los discos que TIENES:
+// el género sale de las etiquetas de tus ficheros, así que un resumen por género es, por
+// definición, sobre tu colección. Lo que escuchaste y no tienes no puede tener género.
+//
+// Se agrega en SQL por artista+álbum (14.000 filas en una colección real) y se recorta en JS,
+// en vez de intentar meter la normalización de claves dentro de la consulta.
+async function clavesDeGenero(genreKey) {
+  const { idsForGenreKey } = await import('./genres.js');
+  const ids = idsForGenreKey(genreKey);
+  if (!ids) return null;
+  const claves = new Set();
+  for (const a of db.prepare("SELECT id, album_artist, title FROM albums WHERE match_state != 'dismissed'").all()) {
+    if (ids.has(a.id)) claves.add(albumKey(a.album_artist, a.title));
+  }
+  return { ids, claves };
+}
+
+export async function wrapped({ since = null, until = null, genre = null } = {}) {
   const range = (col = 'ts') => {
     let c = '';
     const a = {};
@@ -147,6 +165,10 @@ export async function wrapped({ since = null, until = null } = {}) {
     return { c, a };
   };
   const rt = range();
+
+  const gen = genre ? await clavesDeGenero(genre) : null;
+  if (gen) return wrappedDeGenero({ rt, range, gen, genre });
+
   const totals = db
     .prepare(
       `SELECT COUNT(*) AS scrobbles, COUNT(DISTINCT LOWER(artist)) AS artists,
@@ -214,6 +236,91 @@ export async function wrapped({ since = null, until = null } = {}) {
     .map((r) => r.y);
 
   return { totals, topArtists, topAlbums, addedCount, addedTop, byMonth, years };
+}
+
+// Variante del resumen acotada a un género. Mismo contrato de salida que wrapped() para que
+// la página no tenga que saber en cuál de los dos está.
+async function wrappedDeGenero({ rt, range, gen, genre }) {
+  const filas = db
+    .prepare(
+      `SELECT artist, album, COUNT(*) AS plays FROM listens
+        WHERE source IN ('lastfm','listenbrainz') AND album <> ''${rt.c}
+        GROUP BY LOWER(artist), LOWER(album)`
+    )
+    .all(rt.a)
+    .filter((r) => gen.claves.has(albumKey(r.artist, r.album)));
+
+  const porArtista = new Map();
+  let scrobbles = 0;
+  for (const r of filas) {
+    scrobbles += r.plays;
+    const k = normArtist(r.artist);
+    const e = porArtista.get(k) || { artist: r.artist, plays: 0 };
+    e.plays += r.plays;
+    porArtista.set(k, e);
+  }
+  const totals = { scrobbles, artists: porArtista.size, albums: filas.length };
+
+  const owned = ownedArtistMap();
+  const topArtists = [...porArtista.values()]
+    .sort((a, b) => b.plays - a.plays)
+    .slice(0, 12)
+    .map((r) => {
+      const o = owned.get(normArtist(r.artist));
+      return { artist: r.artist, plays: r.plays, artist_id: o?.id || null, owned_albums: o?.albums || 0 };
+    });
+
+  const ownedAlbumMap = new Map();
+  for (const a of db.prepare("SELECT id, album_artist, title FROM albums WHERE match_state != 'dismissed'").all()) {
+    const k = albumKey(a.album_artist, a.title);
+    if (!ownedAlbumMap.has(k)) ownedAlbumMap.set(k, a.id);
+  }
+  const topAlbums = filas
+    .sort((a, b) => b.plays - a.plays)
+    .slice(0, 24)
+    .map((r) => {
+      const id = ownedAlbumMap.get(albumKey(r.artist, r.album)) || null;
+      return { artist: r.artist, album: r.album, plays: r.plays, album_id: id, owned: !!id, cover: null };
+    });
+  // aquí no hace falta pedir carátulas a Deezer: por definición son discos que tienes
+
+  // discos del género añadidos en el periodo
+  const ra = range('added_at');
+  const anadidos = db
+    .prepare(
+      `SELECT id, album_artist, title, year FROM albums
+        WHERE match_state != 'dismissed' AND added_at IS NOT NULL${ra.c} ORDER BY added_at DESC`
+    )
+    .all(ra.a)
+    .filter((a) => gen.ids.has(a.id));
+
+  const porMes = db
+    .prepare(
+      `SELECT strftime('%Y-%m', ts/1000, 'unixepoch') AS month, artist, album, COUNT(*) AS plays
+         FROM listens WHERE source IN ('lastfm','listenbrainz') AND album <> ''${rt.c}
+        GROUP BY month, LOWER(artist), LOWER(album)`
+    )
+    .all(rt.a)
+    .filter((r) => gen.claves.has(albumKey(r.artist, r.album)));
+  const mapaMes = new Map();
+  for (const r of porMes) mapaMes.set(r.month, (mapaMes.get(r.month) || 0) + r.plays);
+  const byMonth = [...mapaMes.entries()].map(([month, plays]) => ({ month, plays })).sort((a, b) => a.month.localeCompare(b.month));
+
+  const years = db
+    .prepare("SELECT DISTINCT CAST(strftime('%Y', ts/1000, 'unixepoch') AS INTEGER) AS y FROM listens WHERE source IN ('lastfm','listenbrainz') ORDER BY y DESC")
+    .all()
+    .map((r) => r.y);
+
+  return {
+    genre,
+    totals,
+    topArtists,
+    topAlbums,
+    addedCount: anadidos.length,
+    addedTop: anadidos.slice(0, 12),
+    byMonth,
+    years,
+  };
 }
 
 // La brecha: artistas que escuchas mucho y de los que tienes poco o nada.

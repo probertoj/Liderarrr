@@ -121,6 +121,58 @@ function librarySort(sort) {
 
 // Discoteca: parrilla filtrable. Colapsa duplicados (rg_mbid, o artista+título
 // normalizado) a un representante con badge ×N, como la página de artista.
+// Colapso de COPIAS, extraído para poder reutilizarlo fuera de la Discoteca. Recibe filas de
+// álbum y devuelve una por disco real: las copias de la misma edición se funden en la mejor
+// (badge ×N) y los discos de una caja multidisco, en la caja. La sección de Géneros lo usa
+// para contar lo mismo que la Discoteca — antes era interno de library(), los géneros
+// contaban filas, y los números de una vista y otra no cuadraban.
+export function collapseCopies(rows) {
+  const groups = new Map();
+  for (const a of rows) {
+    // Caja multidisco aparte; el resto se colapsa por EDICION (artista + titulo base +
+    // numero de pistas), no por release-group: asi el badge xN son copias de la MISMA
+    // edicion, y ediciones distintas del disco (original vs deluxe) salen por separado.
+    const key = a.disc_group ? `dg:${a.disc_group}` : `ed:${String(a.album_artist || '').toLowerCase().trim()}|${editionKey(a)}`;
+    const g = groups.get(key);
+    if (g) g.push(a);
+    else groups.set(key, [a]);
+  }
+  const collapsed = [];
+  for (const copies of groups.values()) {
+    if (copies.length === 1) {
+      collapsed.push(copies[0]);
+      continue;
+    }
+    let best = copies[0];
+    for (const c of copies) if (libScore(c) > libScore(best)) best = c;
+    // ¿caja multidisco? entonces NO son duplicados: agrega las cuentas de todos los
+    // discos y márcala como caja. Si no, es duplicado difuso (badge ×N).
+    if (copies[0].disc_group && copies.every((c) => c.disc_group === copies[0].disc_group)) {
+      // Total de la caja según el CONTENIDO: si todos los discos declaran el MISMO
+      // track_count y es mayor que sus ficheros (etiquetas con el total de la caja
+      // «contaminado»), el total es ese valor (MÁX). Si no —discos limpios con su propia
+      // cuenta, o combinación manual—, el total es la SUMA. «have» siempre es la suma de
+      // ficheros. Así una caja limpia (p. ej. Seamonsters CD1/CD2/CD3) sale 53/53, no 53/19.
+      best = { ...best, ...discBoxCounts(copies), discs: copies.length };
+    } else {
+      best.dup = { copies: copies.length };
+    }
+    collapsed.push(best);
+  }
+  return collapsed;
+}
+
+// Todas las filas de álbum que cuentan (sin filtros), con las columnas que espera el colapso.
+export function libraryRows() {
+  return db
+    .prepare(
+      `SELECT a.id, a.title, a.album_artist, a.year, a.artist_id, a.match_state, a.cover,
+        a.track_file_count, a.track_count, a.size_bytes, a.rg_mbid, a.disc_group, a.added_at
+       FROM albums a WHERE ${DESCRIPTIVE}`
+    )
+    .all();
+}
+
 export function library({ q, genre, decade, year, format, state, lossless, sort, dupesOnly, flat, ids, limit = 500, offset = 0 } = {}) {
   const where = [DESCRIPTIVE];
   const args = {};
@@ -177,38 +229,7 @@ export function library({ q, genre, decade, year, format, state, lossless, sort,
     return { total: rows.length, albums: rows.slice(offset, offset + limit) };
   }
 
-  const groups = new Map();
-  for (const a of rows) {
-    // Caja multidisco aparte; el resto se colapsa por EDICION (artista + titulo base +
-    // numero de pistas), no por release-group: asi el badge xN son copias de la MISMA
-    // edicion, y ediciones distintas del disco (original vs deluxe) salen por separado.
-    const key = a.disc_group ? `dg:${a.disc_group}` : `ed:${String(a.album_artist || '').toLowerCase().trim()}|${editionKey(a)}`;
-    const g = groups.get(key);
-    if (g) g.push(a);
-    else groups.set(key, [a]);
-  }
-  const collapsed = [];
-  for (const copies of groups.values()) {
-    if (copies.length === 1) {
-      collapsed.push(copies[0]);
-      continue;
-    }
-    let best = copies[0];
-    for (const c of copies) if (libScore(c) > libScore(best)) best = c;
-    // ¿caja multidisco? entonces NO son duplicados: agrega las cuentas de todos los
-    // discos y márcala como caja. Si no, es duplicado difuso (badge ×N).
-    if (copies[0].disc_group && copies.every((c) => c.disc_group === copies[0].disc_group)) {
-      // Total de la caja según el CONTENIDO: si todos los discos declaran el MISMO
-      // track_count y es mayor que sus ficheros (etiquetas con el total de la caja
-      // «contaminado»), el total es ese valor (MÁX). Si no —discos limpios con su propia
-      // cuenta, o combinación manual—, el total es la SUMA. «have» siempre es la suma de
-      // ficheros. Así una caja limpia (p. ej. Seamonsters CD1/CD2/CD3) sale 53/53, no 53/19.
-      best = { ...best, ...discBoxCounts(copies), discs: copies.length };
-    } else {
-      best.dup = { copies: copies.length };
-    }
-    collapsed.push(best);
-  }
+  const collapsed = collapseCopies(rows);
   // filtro "solo con duplicados": los que tienen copias difusas (badge ×N). Las cajas
   // multidisco no cuentan (llevan .discs, no .dup), que es justo lo que se quiere.
   const result = dupesOnly ? collapsed.filter((a) => a.dup) : collapsed;

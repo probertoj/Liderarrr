@@ -22,7 +22,7 @@ import { recordGrab, magnetHash, downloadsList, activeRequestRgs, clearImported 
 import { runAutoImport, autoImportStatus, autoImportEnabled } from './autoimport.js';
 import { runAutoGrab, autoGrabConfig, autoGrabStatus, searchAndGrabBest } from './autograb.js';
 import { addWanted, removeWanted, wantedList, wantedKeys, wantedCounts, wantedConfig, wantedStatus, runWantedWatch } from './wanted.js';
-import { genreTree, genreDetail, genreRecommendations, albumGenres, artistGenres, mapGenreTag, unmapGenreTag, mappedTags, hideGenre, taxonomy } from './genres.js';
+import { genreTree, genreDetail, genreRecommendations, albumGenres, artistGenres, mapGenreTag, unmapGenreTag, mappedTags, hideGenre, taxonomy, genreOptions, idsForGenreKey } from './genres.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground, releaseGroupOfRelease } from './musicbrainz.js';
 import { buildReleaseSeed, findPossibleDuplicate } from './mbseed.js';
 import { acoustidTest } from './acoustid.js';
@@ -253,8 +253,19 @@ app.get('/api/stats/overview', async () => q.overview());
 app.get('/api/stats/charts', async () => q.charts());
 app.get('/api/stats/recent', async () => q.recent());
 
-app.get('/api/library', async (req) => q.library(req.query || {}));
-app.get('/api/library/filters', async () => q.filterOptions());
+app.get('/api/library', async (req) => {
+  const params = { ...(req.query || {}) };
+  // El filtro de género de la Discoteca pasa a hablar en GÉNEROS CANÓNICOS («g:indie»), que
+  // es lo que ve el usuario en la sección de Géneros. Si llega una etiqueta cruda (un enlace
+  // guardado de antes), sigue funcionando como siempre.
+  const ids = idsForGenreKey(params.genre);
+  if (ids) {
+    params.ids = ids;
+    delete params.genre;
+  }
+  return q.library(params);
+});
+app.get('/api/library/filters', async () => ({ ...q.filterOptions(), canonicalGenres: genreOptions() }));
 app.get('/api/albums/:id', async (req, reply) => {
   const a = q.albumDetail(Number(req.params.id));
   if (!a) return reply.code(404).send({ error: 'No encontrado' });
@@ -778,7 +789,7 @@ app.get('/api/listening/wrapped', async (req) => {
   if (!hasScrobbles()) return { empty: true };
   const since = req.query?.since ? Number(req.query.since) : null;
   const until = req.query?.until ? Number(req.query.until) : null;
-  return await wrapped({ since, until });
+  return await wrapped({ since, until, genre: req.query?.genre || null });
 });
 // imagen compartible (SVG) del mosaico del Resumen; el cliente la rasteriza a PNG
 app.get('/api/listening/wrapped/image', async (req, reply) => {

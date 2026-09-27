@@ -21,13 +21,20 @@ export default function Wrapped() {
     [now]
   );
   const [sel, setSel] = useState(presets[3]); // por defecto: último año
+  const [genre, setGenre] = useState(''); // «tu año en shoegaze»
+  const [genreOpts, setGenreOpts] = useState([]);
   const [data, setData] = useState(null);
   const [imgBusy, setImgBusy] = useState(false);
 
   useEffect(() => {
     setData(null);
-    api.wrapped(sel.since, sel.until).then(setData).catch(() => setData({ empty: true }));
-  }, [sel]);
+    api.wrapped(sel.since, sel.until, genre || undefined).then(setData).catch(() => setData({ empty: true }));
+  }, [sel, genre]);
+
+  // los géneros canónicos para el selector (los mismos de la sección «Géneros»)
+  useEffect(() => {
+    api.libraryFilters().then((f) => setGenreOpts(f.canonicalGenres || [])).catch(() => {});
+  }, []);
 
   // Descarga una imagen (PNG) del mosaico: pide el SVG al servidor (con las portadas ya
   // embebidas) y lo rasteriza en un canvas para descargar un PNG compartible.
@@ -102,7 +109,11 @@ export default function Wrapped() {
 
   return (
     <div>
-      <PageTitle icon={PartyPopper} title="Resumen" sub={`Tu ${sel.label.toLowerCase()} en música`} />
+      <PageTitle
+        icon={PartyPopper}
+        title="Resumen"
+        sub={`Tu ${sel.label.toLowerCase()} en ${genre ? genreOpts.find((g) => g.value === genre)?.label || 'música' : 'música'}`}
+      />
 
       <QuickSearch />
 
@@ -114,6 +125,24 @@ export default function Wrapped() {
           <Chip key={y} p={yearPreset(y)} />
         ))}
         <Chip p={{ key: 'all', label: 'Todo el tiempo', since: null, until: null }} />
+        {/* Acotar el resumen a un género: «tu año en shoegaze». Solo cuenta lo que TIENES —el
+            género sale de las etiquetas de tus ficheros, así que lo que escuchaste y no tienes
+            no puede tenerlo. */}
+        {genreOpts.length > 0 && (
+          <select
+            value={genre}
+            onChange={(e) => setGenre(e.target.value)}
+            title="Acotar el resumen a un género de tu colección"
+            className="text-sm px-3 py-1.5 rounded-lg border border-ink-800 bg-ink-850 text-neutral-400 max-w-[15rem] ml-auto"
+          >
+            <option value="">Todos los géneros</option>
+            {genreOpts.map((g) => (
+              <option key={g.value} value={g.value}>
+                {g.sub ? `   ${g.label.split(' · ')[1]}` : g.label}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {!data ? (
