@@ -465,7 +465,26 @@ function buildIndex() {
 }
 
 // Árbol de géneros con el nº de álbumes tuyos en cada uno. Es la portada de la sección.
-export function genreTree() {
+// El árbol recorre la colección entera y colapsa copias: ~470 ms sobre 33.000 discos. Es
+// asumible al entrar en la sección, pero no si lo pide también el buscador en cada página. Se
+// memoiza unos minutos; cambia poco (solo al escanear o al tocar tus reglas de género) y
+// cualquier regla que pongas invalida la caché al instante.
+let _arbol = null;
+let _arbolAt = 0;
+const ARBOL_TTL = 5 * 60 * 1000;
+export function invalidateGenreCache() {
+  _arbol = null;
+}
+
+export function genreTree({ fresh = false } = {}) {
+  if (!fresh && _arbol && Date.now() - _arbolAt < ARBOL_TTL) return _arbol;
+  const arbol = computeGenreTree();
+  _arbol = arbol;
+  _arbolAt = Date.now();
+  return arbol;
+}
+
+function computeGenreTree() {
   const { porAlbum, sinClasificar } = buildIndex();
   // Se cuentan DISCOS, no filas: dos rips del mismo álbum son un disco. Y se colapsa DENTRO
   // de cada género, no sobre la colección entera: si de un disco tienes dos copias y solo una
@@ -844,10 +863,12 @@ export function mapGenreTag(tag, { slug = null, sub = null, ignored = false } = 
     `INSERT INTO genre_tag_map (tag, slug, sub, ignored, created_at) VALUES (@tag, @slug, @sub, @ignored, @now)
      ON CONFLICT(tag) DO UPDATE SET slug = excluded.slug, sub = excluded.sub, ignored = excluded.ignored`
   ).run({ tag: t, slug: ignored ? null : slug, sub: ignored ? null : sub || null, ignored: ignored ? 1 : 0, now: Date.now() });
+  invalidateGenreCache(); // tu regla debe notarse ya, no dentro de cinco minutos
   return { ok: true };
 }
 
 export function unmapGenreTag(tag) {
+  invalidateGenreCache();
   return { removed: db.prepare('DELETE FROM genre_tag_map WHERE tag = ?').run(String(tag || '')).changes };
 }
 
@@ -861,6 +882,7 @@ export function hideGenre(slug, hidden = true) {
   if (!TOP_BY_SLUG.has(slug)) throw new Error('Género desconocido');
   if (hidden) db.prepare('INSERT OR IGNORE INTO genre_hidden (slug) VALUES (?)').run(slug);
   else db.prepare('DELETE FROM genre_hidden WHERE slug = ?').run(slug);
+  invalidateGenreCache();
   return { ok: true, slug, hidden };
 }
 

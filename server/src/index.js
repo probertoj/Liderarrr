@@ -623,6 +623,8 @@ app.get('/api/lyrics/counts', async () => lyricsCounts());
 // Explorar la colección por género, al estilo del árbol de Roon. Los géneros se normalizan en
 // vivo desde las etiquetas de tus ficheros (ver genres.js): nada que reescanear.
 app.get('/api/genres', async () => genreTree());
+// solo los nombres y cuentas, para el buscador rápido (va en todas las páginas)
+app.get('/api/genres/options', async () => ({ genres: genreOptions() }));
 // la taxonomía y las reglas que has puesto tú (para el editor de géneros)
 app.get('/api/genres/taxonomy', async () => ({ taxonomy: taxonomy(), mapped: mappedTags() }));
 // mandar una etiqueta cruda a un género, o marcarla como ruido

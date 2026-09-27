@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Component } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy, Star, User, Loader2, ExternalLink, Heart, HeartOff } from 'lucide-react';
+import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy, Star, User, Loader2, ExternalLink, Heart, HeartOff, Shapes } from 'lucide-react';
 import { api, coverUrl, artistPhotoUrl, fmtBytes } from './api.js';
 import { matchKey } from './matchkey.js';
 
@@ -1166,6 +1166,35 @@ const MbLink = ({ url }) => (
 // descargar disco). La app va de lo que tienes y, sobre todo, de lo que aún no tienes. Se
 // usa en el Dashboard y, para tenerlo siempre a mano, en Huecos, Lanzamientos, Escuchas,
 // Resumen y Retos.
+// Los géneros para el buscador: se piden UNA vez por sesión y se filtran en el navegador. Son
+// un par de cientos de nombres, así que buscarlos en local es instantáneo y no manda una
+// petición por tecla pulsada.
+let _generos = null;
+let _generosPromise = null;
+function cargarGeneros() {
+  if (_generos) return Promise.resolve(_generos);
+  if (_generosPromise) return _generosPromise;
+  _generosPromise = api
+    .genreOptions()
+    .then((r) => {
+      _generos = r.genres || [];
+      _generosPromise = null;
+      return _generos;
+    })
+    .catch(() => {
+      _generosPromise = null;
+      return [];
+    });
+  return _generosPromise;
+}
+
+// Comparación sin acentos ni mayúsculas: «electronica» tiene que encontrar «Electrónica».
+const sinAcentos = (t) =>
+  String(t || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
 export function QuickSearch() {
   const navigate = useNavigate();
   const [q, setQ] = useState('');
@@ -1174,6 +1203,11 @@ export function QuickSearch() {
   const [extLoading, setExtLoading] = useState(false);
   const [busy, setBusy] = useState(null);
   const [search, setSearch] = useState(null);
+  const [generos, setGeneros] = useState(_generos || []);
+
+  useEffect(() => {
+    cargarGeneros().then(setGeneros);
+  }, []);
 
   useEffect(() => {
     const term = q.trim();
@@ -1212,11 +1246,25 @@ export function QuickSearch() {
     }
   };
 
+  // Géneros que casan con lo escrito. Se ordenan poniendo primero los que EMPIEZAN por el
+  // texto («rock» antes que «Punk rock») y, a igualdad, los que más discos tienen.
+  const term = sinAcentos(q.trim());
+  const generosCasan = term
+    ? generos
+        .filter((g) => sinAcentos(g.label).includes(term))
+        .sort((a, b) => {
+          const ea = sinAcentos(a.label).startsWith(term) || sinAcentos(a.label.split(' · ').pop()).startsWith(term);
+          const eb = sinAcentos(b.label).startsWith(term) || sinAcentos(b.label.split(' · ').pop()).startsWith(term);
+          return ea === eb ? b.count - a.count : ea ? -1 : 1;
+        })
+        .slice(0, 6)
+    : [];
+
   const close = () => setQ('');
   const localHas = local && (local.artists.length || local.albums.length);
   const extArtistsNew = ext?.artists?.filter((a) => !a.artist_id) || [];
   const extArtistsOwned = ext?.artists?.filter((a) => a.artist_id) || [];
-  const open = q.trim() && (local || ext || extLoading);
+  const open = q.trim() && (local || ext || extLoading || generosCasan.length > 0);
 
   return (
     <div className="relative mb-6">
@@ -1240,6 +1288,31 @@ export function QuickSearch() {
         <>
           <div className="fixed inset-0 z-20" onClick={close} />
           <div className="absolute z-30 mt-1.5 w-full card p-2 shadow-xl border border-ink-700 max-h-[70vh] overflow-y-auto">
+            {generosCasan.length > 0 && (
+              <div className="mb-1">
+                <div className="text-[11px] uppercase tracking-wider text-neutral-600 px-2 py-1">Géneros</div>
+                {generosCasan.map((g) => {
+                  const [padre, sub] = g.label.split(' · ');
+                  const [slug, subName] = g.value.slice(2).split('::');
+                  return (
+                    <Link
+                      key={g.value}
+                      to={`/generos/${slug}${subName ? `?sub=${encodeURIComponent(subName)}` : ''}`}
+                      onClick={close}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-ink-800 text-sm"
+                    >
+                      <Shapes size={14} className="text-neutral-500 shrink-0" />
+                      <span className="flex-1 truncate">
+                        {sub || padre}
+                        {sub ? <span className="text-neutral-600"> · en {padre}</span> : null}
+                      </span>
+                      <span className="text-xs text-neutral-600 shrink-0">{g.count} discos</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
             {localHas ? (
               <div className="mb-1">
                 <div className="text-[11px] uppercase tracking-wider text-neutral-600 px-2 py-1">En tu colección</div>
@@ -1323,7 +1396,7 @@ export function QuickSearch() {
               </div>
             ))}
 
-            {!extLoading && ext && !ext.artists.length && !ext.albums.length && !localHas && (
+            {!extLoading && ext && !ext.artists.length && !ext.albums.length && !localHas && !generosCasan.length && (
               <div className="text-sm text-neutral-600 px-2 py-2">Nada en tu colección ni en MusicBrainz.</div>
             )}
           </div>

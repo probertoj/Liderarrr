@@ -10,6 +10,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 ## [Sin publicar]
 
 ### Añadido
+- **El buscador rápido encuentra géneros.** Escribe «shoegaze» y te lleva a tu shoegaze; escribe
+  «rock» y ves Rock con sus 4.796 discos, luego Rock alternativo, Hard rock… Con el nº de discos
+  que tienes de cada uno, e insensible a acentos («electronica» encuentra «Electrónica»). Va en
+  las seis páginas donde está el buscador.
+  - Los géneros se piden **una vez por sesión** y se filtran en el navegador: son un par de
+    cientos de nombres, así que no hace falta una petición por tecla.
+  - Y el árbol de géneros se **memoiza** unos minutos en el servidor (calcularlo son ~470 ms
+    sobre 33.000 discos). Cualquier regla tuya de género lo invalida al instante, así que un
+    cambio se nota ya, no dentro de cinco minutos.
+### Añadido
 - **«No lo quiero»: vetar una recomendación.** El hermano opuesto del ♥, en cada recomendación
   —las de un género y las de la ficha de un disco—. Si Last.fm insiste en colarte Twenty One
   Pilots como indie pop, lo vetas y no vuelve.

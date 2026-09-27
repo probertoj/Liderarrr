@@ -132,6 +132,7 @@ export const api = {
   albumLyrics: (id) => req(`/albums/${id}/lyrics`),
   fetchAlbumLyrics: (id, force) => req(`/albums/${id}/lyrics`, { method: 'POST', body: { force } }),
   lyricsCounts: () => req('/lyrics/counts'),
+  genreOptions: () => req('/genres/options'),
   genreTaxonomy: () => req('/genres/taxonomy'),
   mapGenreTag: (tag, slug, sub, ignored) => req('/genres/map', { method: 'POST', body: { tag, slug, sub, ignored } }),
   unmapGenreTag: (tag) => req('/genres/unmap', { method: 'POST', body: { tag } }),
