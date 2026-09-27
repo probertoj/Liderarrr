@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, Fragment } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy, Database, Radio } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy, Database, Radio, Mic2, Clock } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { openMbReleaseEditor } from '../mb.js';
 import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies, AddToChallengeButton, WantButton, ReleaseYear, GenreChips } from '../components.jsx';
@@ -9,6 +9,9 @@ import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEna
 // directos no oficiales) que cuenta en lo descriptivo pero no en el completismo. En toda
 // la ficha se tratan igual — ninguno se identifica ni se le escriben etiquetas.
 const isRarity = (s) => s === 'orphan' || s === 'bootleg';
+
+// mm:ss a partir de milisegundos
+const min = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
 
 export default function AlbumDetail() {
   const { id } = useParams();
@@ -130,7 +133,6 @@ export default function AlbumDetail() {
   if (!album) return <Spinner label="Cargando álbum…" />;
 
   const incomplete = album.track_file_count < album.track_count;
-  const min = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
 
   return (
     <div>
@@ -271,8 +273,6 @@ export default function AlbumDetail() {
           </span>
           {album.year && <span className="text-neutral-500"> · {album.year}</span>}
 
-          {/* de qué género es esto, y puerta para ver qué más tienes de lo mismo */}
-          <GenreChips genres={album.genres} className="mt-2" />
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-sm">
             <div>
@@ -313,15 +313,20 @@ export default function AlbumDetail() {
             </div>
           </div>
 
-          {album.genres?.length > 0 && (
+          {/* Géneros CANÓNICOS y clicables (llevan a la sección de Géneros). Si de las etiquetas
+              de este disco no se reconoce ninguna, se enseñan crudas: antes que no mostrar nada,
+              mejor que veas lo que dice tu fichero aunque el diccionario no lo entienda. */}
+          {album.canonicalGenres?.length > 0 ? (
+            <GenreChips genres={album.canonicalGenres} className="mt-4" />
+          ) : album.genres?.length > 0 ? (
             <div className="flex flex-wrap gap-1.5 mt-4">
               {album.genres.map((g) => (
-                <span key={g} className="text-xs px-2 py-0.5 rounded-full bg-ink-850 border border-ink-800">
+                <span key={g} title="Etiqueta del fichero, sin reconocer" className="text-xs px-2 py-0.5 rounded-full bg-ink-850 border border-ink-800 text-neutral-500">
                   {g}
                 </span>
               ))}
             </div>
-          )}
+          ) : null}
 
           <div className="flex flex-wrap gap-2 mt-5">
             {album.match_state !== 'orphan' && (
@@ -448,31 +453,7 @@ export default function AlbumDetail() {
 
       {album.match_state === 'matched' && <AlbumCreditsSection albumId={album.id} />}
 
-      <div className="card overflow-hidden mb-6">
-        <div className="px-4 py-2.5 border-b border-ink-800 flex items-center gap-2 text-sm text-neutral-400">
-          <Music2 size={15} /> Pistas
-        </div>
-        <table className="w-full text-sm">
-          <tbody>
-            {album.tracks.map((t) => (
-              <tr key={t.id} className="border-b border-ink-850/60 last:border-0 hover:bg-ink-850/40">
-                <td className="py-2 px-4 text-neutral-600 w-10 text-right">{t.num || '·'}</td>
-                <td className="py-2 pr-4">
-                  <div className="truncate">{t.title}</div>
-                </td>
-                <td className="py-2 pr-4 text-neutral-500 whitespace-nowrap">
-                  <span className={t.lossless ? 'text-emerald-400/80' : ''}>{t.format}</span>
-                  {t.bitrate ? ` · ${Math.round(t.bitrate / 1000)}k` : ''}
-                  {t.bit_depth ? ` · ${t.bit_depth}bit` : ''}
-                </td>
-                <td className="py-2 pr-4 text-neutral-600 text-right whitespace-nowrap">
-                  {t.duration_ms ? min(t.duration_ms) : ''}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <TrackList album={album} />
 
       <Recommendations albumId={album.id} artistName={album.artist?.name || album.album_artist} />
 
@@ -1319,6 +1300,219 @@ function Recommendations({ albumId, artistName }) {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// Lista de pistas con LETRAS (LRCLIB). La letra se guarda en la base de datos, nunca en tus
+// ficheros: es un metadato más, como el resto. Se pide bajo demanda —un disco son una docena
+// de peticiones a un servicio gratuito mantenido por voluntarios— y se cachea, también cuando
+// no hay letra, para no volver a preguntar lo mismo.
+function TrackList({ album }) {
+  const [estado, setEstado] = useState({}); // track_id → {state, synced}
+  const [abierta, setAbierta] = useState(null); // pista con la letra desplegada
+  const [letra, setLetra] = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const [lote, setLote] = useState(null); // progreso de «Buscar letras»
+  const sondeo = useRef(null);
+
+  const cargarEstado = () =>
+    api
+      .albumLyrics(album.id)
+      .then((r) => {
+        const m = {};
+        for (const t of r.tracks) m[t.track_id] = t;
+        setEstado(m);
+        return r;
+      })
+      .catch(() => {});
+
+  useEffect(() => {
+    cargarEstado();
+    return () => clearInterval(sondeo.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [album.id]);
+
+  const verLetra = async (t) => {
+    if (abierta === t.id) {
+      setAbierta(null);
+      return;
+    }
+    setAbierta(t.id);
+    setLetra(null);
+    setCargando(true);
+    try {
+      // si ya se buscó, viene de la BBDD; si no, se pide a LRCLIB en el momento
+      const ya = estado[t.id]?.state;
+      const l = ya ? await api.trackLyrics(t.id) : await api.fetchTrackLyrics(t.id);
+      setLetra(l);
+      if (!ya) cargarEstado();
+    } catch {
+      setLetra({ state: 'error' });
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const buscarTodas = async () => {
+    try {
+      await api.fetchAlbumLyrics(album.id);
+    } catch (e) {
+      alert(e.message);
+      return;
+    }
+    clearInterval(sondeo.current);
+    sondeo.current = setInterval(async () => {
+      const r = await cargarEstado();
+      if (!r) return;
+      setLote(r.status);
+      if (!r.status?.running) {
+        clearInterval(sondeo.current);
+        setTimeout(() => setLote(null), 4000);
+      }
+    }, 1200);
+  };
+
+  const conLetra = Object.values(estado).filter((e) => e.state === 'found' || e.state === 'instrumental').length;
+  const buscadas = Object.values(estado).filter((e) => e.state).length;
+
+  return (
+    <div className="card overflow-hidden mb-6">
+      <div className="px-4 py-2.5 border-b border-ink-800 flex items-center justify-between gap-2 text-sm text-neutral-400 flex-wrap">
+        <span className="inline-flex items-center gap-2">
+          <Music2 size={15} /> Pistas
+          {conLetra > 0 && (
+            <span className="text-xs text-neutral-600">
+              · {conLetra} con letra{buscadas > conLetra ? ` (${buscadas - conLetra} sin)` : ''}
+            </span>
+          )}
+        </span>
+        <span className="inline-flex items-center gap-2">
+          {lote && (
+            <span className="text-xs text-gold-300/90">
+              {lote.running ? `Buscando letras… ${lote.done}/${lote.total}` : `${lote.found} de ${lote.total} con letra`}
+            </span>
+          )}
+          <button
+            onClick={buscarTodas}
+            disabled={!!lote?.running}
+            title="Buscar en LRCLIB la letra de todas las pistas (se guardan en la base de datos, no en tus ficheros)"
+            className="text-xs px-2 py-1 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {lote?.running ? <Loader2 size={12} className="animate-spin" /> : <Mic2 size={12} />} Buscar letras
+          </button>
+        </span>
+      </div>
+      <table className="w-full text-sm">
+        <tbody>
+          {album.tracks.map((t) => {
+            const e = estado[t.id];
+            const tiene = e?.state === 'found' || e?.state === 'instrumental';
+            return (
+              <Fragment key={t.id}>
+                <tr className="border-b border-ink-850/60 last:border-0 hover:bg-ink-850/40">
+                  <td className="py-2 px-4 text-neutral-600 w-10 text-right">{t.num || '·'}</td>
+                  <td className="py-2 pr-4">
+                    <div className="truncate">{t.title}</div>
+                  </td>
+                  <td className="py-2 pr-2 w-8">
+                    <button
+                      onClick={() => verLetra(t)}
+                      title={
+                        e?.state === 'instrumental'
+                          ? 'Instrumental'
+                          : e?.state === 'notfound'
+                            ? 'LRCLIB no tiene letra de esta pista'
+                            : tiene
+                              ? 'Ver la letra'
+                              : 'Buscar la letra en LRCLIB'
+                      }
+                      className={`p-1 rounded inline-flex items-center ${
+                        tiene
+                          ? 'text-gold-400/80 hover:text-gold-300'
+                          : e?.state === 'notfound'
+                            ? 'text-neutral-700'
+                            : 'text-neutral-600 hover:text-neutral-300'
+                      }`}
+                    >
+                      <Mic2 size={13} />
+                    </button>
+                  </td>
+                  <td className="py-2 pr-4 text-neutral-500 whitespace-nowrap">
+                    <span className={t.lossless ? 'text-emerald-400/80' : ''}>{t.format}</span>
+                    {t.bitrate ? ` · ${Math.round(t.bitrate / 1000)}k` : ''}
+                    {t.bit_depth ? ` · ${t.bit_depth}bit` : ''}
+                  </td>
+                  <td className="py-2 pr-4 text-neutral-600 text-right whitespace-nowrap">
+                    {t.duration_ms ? min(t.duration_ms) : ''}
+                  </td>
+                </tr>
+                {abierta === t.id && (
+                  <tr className="border-b border-ink-850/60 last:border-0">
+                    <td colSpan={5} className="px-4 pb-4 pt-1 bg-ink-900/60">
+                      <LyricsPanel cargando={cargando} letra={letra} onReintentar={() => api.fetchTrackLyrics(t.id, true).then(setLetra)} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// El texto de la letra. Si LRCLIB la trae SINCRONIZADA (.lrc) se muestran las marcas de
+// tiempo en un lateral tenue: no reproducimos audio, pero saber en qué minuto entra cada
+// verso es justo lo que distingue una letra sincronizada de un bloque de texto.
+function LyricsPanel({ cargando, letra, onReintentar }) {
+  if (cargando) return <div className="text-xs text-neutral-500 py-2">Buscando en LRCLIB…</div>;
+  if (!letra) return null;
+  if (letra.state === 'instrumental') return <div className="text-xs text-neutral-500 py-2">Instrumental: no tiene letra.</div>;
+  if (letra.state === 'notfound')
+    return (
+      <div className="text-xs text-neutral-500 py-2">
+        LRCLIB no tiene la letra de esta pista.{' '}
+        <a href="https://lrclib.net" target="_blank" rel="noreferrer" className="text-gold-400 hover:underline">
+          Puedes subirla tú
+        </a>
+        .
+      </div>
+    );
+  if (letra.state === 'error')
+    return (
+      <div className="text-xs text-neutral-500 py-2">
+        LRCLIB estaba ocupado.{' '}
+        <button onClick={onReintentar} className="text-gold-400 hover:underline">
+          Reintentar
+        </button>
+      </div>
+    );
+
+  const lineas = (letra.synced || letra.plain || '').split(/\r?\n/);
+  const conTiempo = !!letra.synced;
+  return (
+    <div>
+      <div className="text-[11px] text-neutral-600 mb-2 flex items-center gap-2">
+        {conTiempo && (
+          <span className="inline-flex items-center gap-1 text-gold-400/70">
+            <Clock size={11} /> sincronizada
+          </span>
+        )}
+        <span>vía LRCLIB</span>
+      </div>
+      <div className="max-h-80 overflow-y-auto pr-2 leading-relaxed">
+        {lineas.map((l, i) => {
+          const m = conTiempo && l.match(/^\[(\d{2}:\d{2})[.:]\d{2}\]\s?(.*)$/);
+          return (
+            <div key={i} className="flex gap-3">
+              {conTiempo && <span className="text-[11px] text-neutral-700 tabular-nums w-10 shrink-0 pt-0.5">{m ? m[1] : ''}</span>}
+              <span className="text-neutral-300">{m ? m[2] : l}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

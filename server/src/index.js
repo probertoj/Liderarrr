@@ -23,6 +23,7 @@ import { runAutoImport, autoImportStatus, autoImportEnabled } from './autoimport
 import { runAutoGrab, autoGrabConfig, autoGrabStatus, searchAndGrabBest } from './autograb.js';
 import { addWanted, removeWanted, wantedList, wantedKeys, wantedCounts, wantedConfig, wantedStatus, runWantedWatch } from './wanted.js';
 import { genreTree, genreDetail, genreRecommendations, albumGenres, artistGenres, mapGenreTag, unmapGenreTag, mappedTags, hideGenre, taxonomy, genreOptions, idsForGenreKey } from './genres.js';
+import { lyricsOfTrack, albumLyricsState, importTrackLyrics, importAlbumLyrics, lyricsStatus, lyricsCounts } from './lyrics.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground, releaseGroupOfRelease } from './musicbrainz.js';
 import { buildReleaseSeed, findPossibleDuplicate } from './mbseed.js';
 import { acoustidTest } from './acoustid.js';
@@ -274,7 +275,7 @@ app.get('/api/albums/:id', async (req, reply) => {
   const lid = lidarrConfig();
   const owned = lid.url && lid.key ? lidarrOwnedIds() : new Set();
   a.inLidarr = a.rg_mbid ? owned.has(a.rg_mbid) : false;
-  a.genres = albumGenres(a.id); // puerta a la sección de Géneros desde la ficha
+  a.canonicalGenres = albumGenres(a.id); // puerta a la sección de Géneros (a.genres son las etiquetas crudas)
   return a;
 });
 // grupo de duplicados de un álbum (para el panel al pinchar ×N en la Discoteca)
@@ -569,6 +570,35 @@ app.get('/api/discover/recent', async (req) =>
 app.get('/api/discover/dismissed', async () => dismissedList());
 app.post('/api/discover/dismiss', async (req) => dismissGap(req.body?.rg_mbid, req.body?.title));
 app.delete('/api/discover/dismiss/:rgMbid', async (req) => undismissGap(req.params.rgMbid));
+
+// --- letras (LRCLIB) --------------------------------------------------------
+// Se guardan en la BBDD, nunca en tus ficheros. LRCLIB es gratuito y mantenido por
+// voluntarios: se pide una a una, con pausa, y se cachea todo (también los fallos).
+app.get('/api/tracks/:id/lyrics', async (req, reply) => {
+  const l = lyricsOfTrack(Number(req.params.id));
+  if (!l) return reply.code(404).send({ error: 'Sin buscar todavía' });
+  return l;
+});
+// buscar la letra de UNA pista (bloquea: es una sola petición)
+app.post('/api/tracks/:id/lyrics', async (req, reply) => {
+  try {
+    return await importTrackLyrics(Number(req.params.id), { force: !!req.body?.force });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+// estado de las letras de un álbum (para marcar las pistas que ya tienen)
+app.get('/api/albums/:id/lyrics', async (req) => ({
+  tracks: albumLyricsState(Number(req.params.id)),
+  status: lyricsStatus,
+}));
+// buscar las de todo un álbum: en segundo plano, con progreso
+app.post('/api/albums/:id/lyrics', async (req) => {
+  const id = Number(req.params.id);
+  importAlbumLyrics(id, { force: !!req.body?.force }).catch((e) => app.log.warn(e));
+  return { started: true, status: lyricsStatus };
+});
+app.get('/api/lyrics/counts', async () => lyricsCounts());
 
 // --- géneros (1.1) ----------------------------------------------------------
 // Explorar la colección por género, al estilo del árbol de Roon. Los géneros se normalizan en

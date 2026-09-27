@@ -7,6 +7,33 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [Sin publicar]
+
+### Añadido
+- **Letras, vía [LRCLIB](https://lrclib.net)** (abierto, sin clave, con letras **sincronizadas**
+  además de planas). En la ficha del disco, cada pista tiene su botón de letra; y «Buscar letras»
+  las trae todas de una vez, en segundo plano y con progreso.
+  - **Se guardan en la base de datos, nunca en tus ficheros.** La letra es un metadato más, como
+    todo lo demás aquí: tu audio no se toca.
+  - Cuando LRCLIB trae la letra **sincronizada**, se enseñan las marcas de tiempo al lado, en
+    tenue. Saber en qué minuto entra cada verso es justo lo que la distingue de un bloque de texto.
+  - **Antes sin letra que con la equivocada**: LRCLIB indexa muchas versiones del mismo tema
+    (estudio, directo, remezcla) y lo único que distingue la tuya es la duración, así que un
+    resultado que se pase de 4 s se descarta. Mismo criterio que en identificación: cero falsos
+    positivos.
+  - **Buen vecino con un servicio gratuito**: una petición cada vez, con pausa, User-Agent que
+    dice quiénes somos, y todo cacheado —también cuando NO hay letra— para no volver a preguntar
+    lo mismo. Un «servidor ocupado» (503) se reintenta y **no** se guarda como «sin letra»: sería
+    perder la letra para siempre por un fallo pasajero.
+
+### Arreglado
+- **La ficha del disco reventaba entera** al mostrar sus géneros: el campo `genres` ya existía con
+  las etiquetas crudas del fichero y se pisó con objetos. Ahora los géneros canónicos van en su
+  propio campo, y si de un disco no se reconoce ninguna etiqueta se siguen enseñando las crudas
+  —antes eso que no mostrar nada—.
+
+---
+
 ## [1.1.0] — 2026-09-27
 
 **Géneros.** Explorar la colección por género al estilo del árbol de Roon —de «Rock» a

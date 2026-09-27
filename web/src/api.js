@@ -122,6 +122,12 @@ export const api = {
     const qs = p.toString();
     return req(`/genres/${encodeURIComponent(slug)}${qs ? `?${qs}` : ''}`);
   },
+  // Letras (LRCLIB). Se guardan en la BBDD; tus ficheros no se tocan.
+  trackLyrics: (id) => req(`/tracks/${id}/lyrics`),
+  fetchTrackLyrics: (id, force) => req(`/tracks/${id}/lyrics`, { method: 'POST', body: { force } }),
+  albumLyrics: (id) => req(`/albums/${id}/lyrics`),
+  fetchAlbumLyrics: (id, force) => req(`/albums/${id}/lyrics`, { method: 'POST', body: { force } }),
+  lyricsCounts: () => req('/lyrics/counts'),
   genreTaxonomy: () => req('/genres/taxonomy'),
   mapGenreTag: (tag, slug, sub, ignored) => req('/genres/map', { method: 'POST', body: { tag, slug, sub, ignored } }),
   unmapGenreTag: (tag) => req('/genres/unmap', { method: 'POST', body: { tag } }),

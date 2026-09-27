@@ -544,6 +544,23 @@ CREATE TABLE IF NOT EXISTS genre_tag_map (
   ignored INTEGER DEFAULT 0,
   created_at INTEGER
 );
+-- Letras (1.2), traídas de LRCLIB. Van en la BASE DE DATOS, nunca en tus ficheros: la letra
+-- es un metadato más y tu audio no se toca. Se cachea TODO, también los fallos, para no
+-- volver a preguntar lo mismo a un servicio gratuito.
+-- state: found | instrumental | notfound | error. «error» (servidor ocupado) se reintenta;
+-- «notfound» no, porque es una respuesta de verdad.
+CREATE TABLE IF NOT EXISTS lyrics (
+  track_id INTEGER PRIMARY KEY,
+  state TEXT,
+  plain TEXT,
+  synced TEXT,              -- formato .lrc, con marcas de tiempo
+  instrumental INTEGER DEFAULT 0,
+  lrclib_id INTEGER,
+  source TEXT,
+  fetched_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_lyrics_state ON lyrics(state);
+
 CREATE TABLE IF NOT EXISTS genre_hidden (
   slug TEXT PRIMARY KEY
 );
