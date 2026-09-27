@@ -2,6 +2,7 @@ import { db } from './db.js';
 import * as lastfm from './lastfm.js';
 import { matchKey } from './matchkey.js';
 import { libraryRows, collapseCopies } from './queries.js';
+import { vetoedKeys } from './recommend.js';
 
 // GÉNEROS (1.1) — explorar la colección por género, al estilo del árbol de Roon.
 //
@@ -779,6 +780,23 @@ function tagDeSubgenero(sub) {
     .trim();
 }
 
+// Deja solo lo que de verdad merece salir: fuera lo que YA tienes, fuera lo que has vetado
+// («no me lo recomiendes más») y fuera los repetidos. Función pura para poder probarla sin
+// red: Last.fm no se puede ejercitar en local porque la clave va cifrada.
+export function filterRecommendations(populares, { owned = new Set(), vetoed = new Set(), limit = 40 } = {}) {
+  const items = [];
+  const vistos = new Set();
+  for (const p of populares || []) {
+    if (!p?.artist || !p?.album) continue;
+    const k = matchKey(p.artist, p.album);
+    if (owned.has(k) || vetoed.has(k) || vistos.has(k)) continue;
+    vistos.add(k);
+    items.push(p);
+    if (items.length >= limit) break;
+  }
+  return items;
+}
+
 export async function genreRecommendations(slug, { sub = null, limit = 40, page = 1 } = {}) {
   const top = TOP_BY_SLUG.get(slug);
   if (!top) return null;
@@ -807,15 +825,7 @@ export async function genreRecommendations(slug, { sub = null, limit = 40, page 
       .all()
       .map((r) => matchKey(r.album_artist, r.title))
   );
-  const items = [];
-  const vistos = new Set();
-  for (const p of populares) {
-    const k = matchKey(p.artist, p.album);
-    if (tuyos.has(k) || vistos.has(k)) continue;
-    vistos.add(k);
-    items.push(p);
-    if (items.length >= limit) break;
-  }
+  const items = filterRecommendations(populares, { owned: tuyos, vetoed: vetoedKeys(), limit });
   // hasMore mira la TANDA CRUDA, no lo que queda tras quitar lo tuyo: que una página entera
   // sea de discos que ya tienes no significa que se haya acabado el género.
   return { tag, fallbackFrom: desde, configured: true, items, considered: populares.length, page, hasMore: populares.length >= porTanda };

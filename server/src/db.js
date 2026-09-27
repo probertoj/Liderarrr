@@ -549,6 +549,18 @@ CREATE TABLE IF NOT EXISTS genre_tag_map (
 -- volver a preguntar lo mismo a un servicio gratuito.
 -- state: found | instrumental | notfound | error. «error» (servidor ocupado) se reintenta;
 -- «notfound» no, porque es una respuesta de verdad.
+-- Recomendaciones VETADAS («no me lo recomiendes más»). El veto es GLOBAL a propósito: si no
+-- quieres que te salga Twenty One Pilots, no lo quieres en las recomendaciones de un género ni
+-- en las de un disco. Se guarda por match_key (artista+álbum normalizados), la misma vara que
+-- usa el resto de la app para cruzar con tu colección. Reversible desde la propia página.
+CREATE TABLE IF NOT EXISTS dismissed_recommendations (
+  match_key TEXT PRIMARY KEY,
+  artist TEXT,
+  album TEXT,
+  origin TEXT,              -- dónde lo vetaste (género, ficha…), solo informativo
+  created_at INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS lyrics (
   track_id INTEGER PRIMARY KEY,
   state TEXT,

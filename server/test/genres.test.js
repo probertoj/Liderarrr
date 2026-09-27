@@ -6,7 +6,9 @@ import path from 'node:path';
 // genres.js y lastfm.js importan db.js, que abre una SQLite en DATA_DIR al cargarse. Apuntamos
 // DATA_DIR a un temporal ANTES del import dinámico para no tocar la base real.
 process.env.DATA_DIR = path.join(os.tmpdir(), `liderarr-test-genres-${Date.now()}`);
-const { canonicalize, TAXONOMY, mapGenreTag, unmapGenreTag, hideGenre } = await import('../src/genres.js');
+const { canonicalize, TAXONOMY, mapGenreTag, unmapGenreTag, hideGenre, filterRecommendations } = await import('../src/genres.js');
+const { vetoRecommendation, unvetoRecommendation, vetoedKeys } = await import('../src/recommend.js');
+const { matchKey } = await import('../src/matchkey.js');
 const { mapTagAlbums } = await import('../src/lastfm.js');
 
 // --- normalización de géneros ------------------------------------------------
@@ -158,4 +160,41 @@ test('tolera una respuesta vacía o rara sin reventar', () => {
   assert.deepEqual(mapTagAlbums({}), []);
   assert.deepEqual(mapTagAlbums(null), []);
   assert.deepEqual(mapTagAlbums({ albums: { album: { name: 'X', artist: { name: 'Y' } } } }).length, 1);
+});
+
+// --- vetos de recomendación («no lo quiero») ---------------------------------
+
+test('el filtro de recomendaciones quita lo que ya tienes, lo vetado y lo repetido', () => {
+  const populares = [
+    { artist: 'Twenty One Pilots', album: 'Vessel' },
+    { artist: 'Slowdive', album: 'Souvlaki' },
+    { artist: 'slowdive', album: 'Souvlaki' }, // el mismo, otra grafía
+    { artist: 'Ride', album: 'Nowhere' },
+  ];
+  const items = filterRecommendations(populares, {
+    owned: new Set([matchKey('Ride', 'Nowhere')]),
+    vetoed: new Set([matchKey('Twenty One Pilots', 'Vessel')]),
+  });
+  assert.deepEqual(items.map((i) => i.artist), ['Slowdive'], 'solo queda lo que ni tienes ni has vetado');
+});
+
+test('el veto respeta el tope y tolera basura', () => {
+  const muchos = Array.from({ length: 10 }, (_, i) => ({ artist: `A${i}`, album: `B${i}` }));
+  assert.equal(filterRecommendations(muchos, { limit: 3 }).length, 3);
+  assert.deepEqual(filterRecommendations(null), []);
+  assert.deepEqual(filterRecommendations([null, { artist: 'X' }, { album: 'Y' }]), []);
+});
+
+test('vetar es insensible a la grafía: una vez basta', () => {
+  vetoRecommendation({ artist: 'Twenty One Pilots', album: 'Vessel' });
+  vetoRecommendation({ artist: 'twenty one pilots', album: 'Vessel (Deluxe Edition)' });
+  const k = vetoedKeys();
+  assert.equal(k.size, 1, 'la misma obra escrita de dos formas es un solo veto');
+  assert.ok(k.has(matchKey('TWENTY ONE PILOTS', 'vessel')));
+  unvetoRecommendation({ artist: 'Twenty One Pilots', album: 'Vessel' });
+  assert.equal(vetoedKeys().size, 0, 'y se puede deshacer');
+});
+
+test('vetar exige artista y álbum', () => {
+  assert.throws(() => vetoRecommendation({ artist: 'Solo el artista' }), /Faltan/i);
 });

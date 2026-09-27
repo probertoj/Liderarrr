@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy, Database, Radio, Mic2, Clock } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { openMbReleaseEditor } from '../mb.js';
-import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies, AddToChallengeButton, WantButton, ReleaseYear, GenreChips } from '../components.jsx';
+import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies, AddToChallengeButton, WantButton, ReleaseYear, GenreChips, VetoButton } from '../components.jsx';
 
 // orphan y bootleg son «de primera clase»: material fuera de catálogo (rarezas y
 // directos no oficiales) que cuenta en lo descriptivo pero no en el completismo. En toda
@@ -1287,7 +1287,16 @@ function Recommendations({ albumId, artistName }) {
               <p className="text-[11px] text-neutral-600 mb-2">Top de artistas afines que aún no tienes.</p>
               <div className="space-y-1.5">
                 {data.recommendedAlbums.map((r, i) => (
-                  <RecAlbumRow key={i} r={r} />
+                  <RecAlbumRow
+                    key={i}
+                    r={r}
+                    onVetoed={() =>
+                      setData((d) => ({
+                        ...d,
+                        recommendedAlbums: d.recommendedAlbums.filter((x) => !(x.artist === r.artist && x.album === r.album)),
+                      }))
+                    }
+                  />
                 ))}
               </div>
             </div>
@@ -1571,7 +1580,7 @@ function MissingFromArtistRow({ m, artist }) {
 
 // Fila de disco recomendado (de un artista afín que no tienes): seguir al artista y/o
 // descargar el disco (grabBest nativo).
-function RecAlbumRow({ r }) {
+function RecAlbumRow({ r, onVetoed }) {
   const [grabState, setGrabState] = useState(null); // busy | done
   const [followed, setFollowed] = useState(r.tracked);
   const [fbusy, setFbusy] = useState(false);
@@ -1646,6 +1655,7 @@ function RecAlbumRow({ r }) {
             {grabState === 'busy' ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Descargar
           </button>
         )}
+        <VetoButton artist={r.artist} album={r.album} origin="ficha" onVetoed={onVetoed} />
       </div>
     </div>
   );

@@ -95,7 +95,7 @@ import { artistRelations } from './relations.js';
 import { albumEditions, upgradeCandidates, labelsOverview, labelAlbums, labelCompletism, resolveAlbumLabel } from './editions.js';
 import { albumPersonnel } from './albumcredits.js';
 import { albumAbout } from './about.js';
-import { albumRecommendations } from './recommend.js';
+import { albumRecommendations, vetoRecommendation, unvetoRecommendation, vetoedList } from './recommend.js';
 import { findLocal, findExternal } from './find.js';
 import { previewAlbumTags, writeAlbumTags } from './tagwriter.js';
 import { coverFast, resolveCoverSlow, retryMissingCovers, coverCandidates, applyCover } from './covers.js';
@@ -570,6 +570,25 @@ app.get('/api/discover/recent', async (req) =>
 app.get('/api/discover/dismissed', async () => dismissedList());
 app.post('/api/discover/dismiss', async (req) => dismissGap(req.body?.rg_mbid, req.body?.title));
 app.delete('/api/discover/dismiss/:rgMbid', async (req) => undismissGap(req.params.rgMbid));
+
+// --- vetos de recomendación -------------------------------------------------
+// «No me lo recomiendes más». Global: vale para las recomendaciones de un género y para las
+// de la ficha de un disco. No borra nada, solo deja de sugerirlo — y se puede deshacer.
+app.get('/api/recommendations/vetoed', async () => ({ items: vetoedList() }));
+app.post('/api/recommendations/veto', async (req, reply) => {
+  try {
+    return vetoRecommendation({ artist: req.body?.artist, album: req.body?.album, origin: req.body?.origin || null });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/recommendations/unveto', async (req, reply) => {
+  try {
+    return unvetoRecommendation(req.body || {});
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 
 // --- letras (LRCLIB) --------------------------------------------------------
 // Se guardan en la BBDD, nunca en tus ficheros. LRCLIB es gratuito y mantenido por

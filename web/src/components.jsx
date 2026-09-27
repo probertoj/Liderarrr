@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Component } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy, Star, User, Loader2, ExternalLink, Heart } from 'lucide-react';
+import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy, Star, User, Loader2, ExternalLink, Heart, HeartOff } from 'lucide-react';
 import { api, coverUrl, artistPhotoUrl, fmtBytes } from './api.js';
 import { matchKey } from './matchkey.js';
 
@@ -441,6 +441,39 @@ export function AddToChallengeButton({ artist, title, label = 'Reto', className,
         />
       )}
     </>
+  );
+}
+
+// «No lo quiero»: veta una recomendación para que no vuelva a salir. Hermano del ♥ «Lo quiero»
+// y con la intención opuesta. El veto es GLOBAL —si no quieres que te recomienden a alguien, no
+// lo quieres en un género ni en la ficha de un disco— y no borra nada: solo se deja de sugerir.
+// El botón avisa al padre para que quite la fila en el acto, sin recargar.
+export function VetoButton({ artist, album, origin, onVetoed, className }) {
+  const [busy, setBusy] = useState(false);
+  const vetar = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBusy(true);
+    try {
+      await api.vetoRecommendation(artist, album, origin);
+      onVetoed?.();
+    } catch (err) {
+      alert(err.message);
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      onClick={vetar}
+      disabled={busy}
+      title={`No me recomiendes más «${album}» de ${artist}`}
+      className={
+        className ||
+        'text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 text-neutral-500 hover:text-rose-300 hover:border-rose-500/40 inline-flex items-center gap-1 disabled:opacity-50'
+      }
+    >
+      {busy ? <Loader2 size={12} className="animate-spin" /> : <HeartOff size={12} />} No lo quiero
+    </button>
   );
 }
 

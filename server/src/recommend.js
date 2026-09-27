@@ -71,6 +71,7 @@ export async function albumRecommendations(albumId) {
   const ownedAlbumKeys = new Set(
     db.prepare("SELECT album_artist, title FROM albums WHERE match_state != 'dismissed'").all().map((r) => matchKey(r.album_artist, r.title))
   );
+  const vetados = vetoedKeys();
   const recommendedAlbums = [];
   if (lastfm.lastfmConfigured()) {
     const pool = [...similar].sort((x, y) => (x.owned === y.owned ? 0 : x.owned ? 1 : -1)).slice(0, 8);
@@ -78,7 +79,7 @@ export async function albumRecommendations(albumId) {
       if (recommendedAlbums.length >= 8) break;
       // eslint-disable-next-line no-await-in-loop
       const albums = await lastfm.topAlbums(s.name, 3).catch(() => []);
-      const pick = albums.find((al) => !ownedAlbumKeys.has(matchKey(s.name, al.name)));
+      const pick = albums.find((al) => !ownedAlbumKeys.has(matchKey(s.name, al.name)) && !vetados.has(matchKey(s.name, al.name)));
       if (pick) {
         recommendedAlbums.push({
           artist: s.name,
@@ -102,3 +103,33 @@ export async function albumRecommendations(albumId) {
     lastfm: lastfm.lastfmConfigured(),
   };
 }
+
+// --- vetos de recomendación ---------------------------------------------------
+// «No me lo recomiendes más». El veto es GLOBAL: vetar Twenty One Pilots en las
+// recomendaciones de indie pop también lo saca de las de cualquier disco. Si no lo quieres,
+// no lo quieres. Y es reversible: nada se borra, solo se deja de sugerir.
+
+export function vetoRecommendation({ artist, album, origin = null } = {}) {
+  if (!artist || !album) throw new Error('Faltan artista y álbum');
+  db.prepare(
+    `INSERT INTO dismissed_recommendations (match_key, artist, album, origin, created_at)
+     VALUES (@k, @artist, @album, @origin, @now)
+     ON CONFLICT(match_key) DO NOTHING`
+  ).run({ k: matchKey(artist, album), artist, album, origin, now: Date.now() });
+  return { ok: true };
+}
+
+export function unvetoRecommendation({ artist, album, match_key } = {}) {
+  const k = match_key || (artist && album ? matchKey(artist, album) : null);
+  if (!k) throw new Error('Falta el disco');
+  return { removed: db.prepare('DELETE FROM dismissed_recommendations WHERE match_key = ?').run(k).changes };
+}
+
+export function vetoedKeys() {
+  return new Set(db.prepare('SELECT match_key FROM dismissed_recommendations').all().map((r) => r.match_key));
+}
+
+export function vetoedList() {
+  return db.prepare('SELECT match_key, artist, album, origin FROM dismissed_recommendations ORDER BY created_at DESC').all();
+}
+

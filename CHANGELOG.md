@@ -10,6 +10,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 ## [Sin publicar]
 
 ### Añadido
+- **«No lo quiero»: vetar una recomendación.** El hermano opuesto del ♥, en cada recomendación
+  —las de un género y las de la ficha de un disco—. Si Last.fm insiste en colarte Twenty One
+  Pilots como indie pop, lo vetas y no vuelve.
+  - El veto es **global** a propósito: si no quieres que te recomienden algo, no lo quieres en un
+    género ni en un disco. Y va por `matchKey`, así que vetarlo una vez cubre todas sus grafías
+    («Vessel» y «Vessel (Deluxe Edition)» son lo mismo).
+  - **No borra nada** y se deshace: bajo las recomendaciones hay una lista de lo vetado, y
+    pinchando vuelve.
+### Añadido
 - **Letras, vía [LRCLIB](https://lrclib.net)** (abierto, sin clave, con letras **sincronizadas**
   además de planas). En la ficha del disco, cada pista tiene su botón de letra; y «Buscar letras»
   las trae todas de una vez, en segundo plano y con progreso.

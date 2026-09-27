@@ -11,6 +11,7 @@ import {
   SearchModal,
   WantButton,
   AddToChallengeButton,
+  VetoButton,
 } from '../components.jsx';
 
 // GÉNEROS (1.1) — explorar la colección por género, al estilo del árbol de Roon: de lo ancho
@@ -257,6 +258,7 @@ export function GenreDetail() {
   const [recs, setRecs] = useState(null);
   const [recsLoading, setRecsLoading] = useState(false);
   const [recsMas, setRecsMas] = useState(false); // «Recomendar más» en curso
+  const [vetados, setVetados] = useState(null); // los que dijiste «no lo quiero»
   const [search, setSearch] = useState(null);
 
   useEffect(() => {
@@ -269,6 +271,7 @@ export function GenreDetail() {
     setRecsLoading(true);
     try {
       setRecs(await api.genreRecommendations(slug, sub));
+      api.vetoedRecommendations().then((v) => setVetados(v.items)).catch(() => {});
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -396,7 +399,17 @@ export function GenreDetail() {
             </p>
             <div className="space-y-1.5 mt-2">
               {recs.items.map((r) => (
-                <GenreRecRow key={`${r.artist}::${r.album}`} r={r} onSearch={setSearch} />
+                <GenreRecRow
+                  key={`${r.artist}::${r.album}`}
+                  r={r}
+                  onSearch={setSearch}
+                  onVetoed={() => {
+                    api.vetoedRecommendations().then((v) => setVetados(v.items)).catch(() => {});
+                    return (
+                      setRecs((v) => ({ ...v, items: v.items.filter((x) => !(x.artist === r.artist && x.album === r.album)) }))
+                    );
+                  }}
+                />
               ))}
             </div>
             {/* Si en lo de arriba no hay nada que te apetezca, sigue bajando por el ranking */}
@@ -413,6 +426,30 @@ export function GenreDetail() {
                 {recs.items.length} recomendaciones · página {recs.page || 1}
               </span>
             </div>
+            {vetados?.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-ink-850">
+                <div className="text-[11px] text-neutral-600 mb-1.5">
+                  No quieres que te recomienden esto ({vetados.length}). Vale para todas las recomendaciones, no solo
+                  para este género. Pincha para deshacer.
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {vetados.map((v) => (
+                    <button
+                      key={v.match_key}
+                      onClick={async () => {
+                        await api.unvetoRecommendation(v.match_key);
+                        const r = await api.vetoedRecommendations();
+                        setVetados(r.items);
+                      }}
+                      title="Volver a permitir esta recomendación"
+                      className="text-xs px-2 py-0.5 rounded-full border border-ink-800 bg-ink-850 text-neutral-500 hover:text-neutral-200 hover:border-gold-500/40"
+                    >
+                      {v.artist} — {v.album} ×
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -498,7 +535,7 @@ export function GenreDetail() {
 }
 
 // Fila de un disco recomendado del género: escucharlo fuera, quererlo o bajarlo ya.
-function GenreRecRow({ r, onSearch }) {
+function GenreRecRow({ r, onSearch, onVetoed }) {
   const [state, setState] = useState(null); // busy | done
   const grab = async () => {
     setState('busy');
@@ -543,6 +580,7 @@ function GenreRecRow({ r, onSearch }) {
         </button>
         <AddToChallengeButton artist={r.artist} title={r.album} />
         <WantButton artist={r.artist} title={r.album} origin="generos" />
+        <VetoButton artist={r.artist} album={r.album} origin="generos" onVetoed={onVetoed} />
         {r.url && (
           <a
             href={r.url}

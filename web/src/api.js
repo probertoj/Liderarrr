@@ -122,6 +122,10 @@ export const api = {
     const qs = p.toString();
     return req(`/genres/${encodeURIComponent(slug)}${qs ? `?${qs}` : ''}`);
   },
+  // «No me lo recomiendes más» (veto global de una recomendación).
+  vetoedRecommendations: () => req('/recommendations/vetoed'),
+  vetoRecommendation: (artist, album, origin) => req('/recommendations/veto', { method: 'POST', body: { artist, album, origin } }),
+  unvetoRecommendation: (match_key) => req('/recommendations/unveto', { method: 'POST', body: { match_key } }),
   // Letras (LRCLIB). Se guardan en la BBDD; tus ficheros no se tocan.
   trackLyrics: (id) => req(`/tracks/${id}/lyrics`),
   fetchTrackLyrics: (id, force) => req(`/tracks/${id}/lyrics`, { method: 'POST', body: { force } }),
