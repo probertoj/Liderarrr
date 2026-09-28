@@ -1057,6 +1057,41 @@ export default function Settings() {
         </div>
       </section>
 
+      {/* 4d. Letras junto al audio */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">
+          4d · Letras junto al audio <span className="text-xs text-neutral-500">(opcional)</span>
+        </h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Las letras que trae Liderarr de <b className="font-normal text-neutral-400">LRCLIB</b> viven en su base de
+          datos. Si activas esto, además podrás escribirlas como <b className="font-normal text-neutral-400">.lrc</b>
+          {' '}junto a cada fichero (botón «Guardar .lrc» en la ficha del disco), y así las lee
+          <b className="font-normal text-neutral-400"> tu reproductor de siempre</b> — Plex, Symfonium, Navidrome,
+          foobar…
+        </p>
+        <ul className="text-xs text-neutral-500 mb-3 space-y-1">
+          <li>
+            · <b className="font-normal text-neutral-400">No toca tu audio.</b> Crea un fichero nuevo al lado, así que
+            el <b className="font-normal text-neutral-400">hardlink con la carpeta de torrents sigue intacto</b> y
+            sigues sembrando igual.
+          </li>
+          <li>· No pisa un .lrc que ya exista: si tienes tus propias letras, mandan las tuyas.</li>
+          <li>
+            · Requiere que tu carpeta de música esté montada en <b className="font-normal text-neutral-400">modo
+            escritura</b> (<code>:rw</code>). Si está en solo lectura, te lo dirá al intentarlo.
+          </li>
+          <li>· `.lrc` cuando la letra viene sincronizada; `.txt` cuando solo hay texto plano.</li>
+        </ul>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={s.lyrics_write_lrc === '1'}
+            onChange={(e) => setS((p) => ({ ...p, lyrics_write_lrc: e.target.checked ? '1' : '0' }))}
+          />
+          Permitir escribir las letras junto a mis ficheros de música
+        </label>
+      </section>
+
       {/* 5. Escritura de etiquetas */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">

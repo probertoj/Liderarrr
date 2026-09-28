@@ -261,3 +261,71 @@ export function lyricsCounts() {
     .get();
   return r;
 }
+
+// --- escribir los .lrc junto al audio ------------------------------------------
+//
+// Liderarr hace de recolector y tu reproductor de siempre (Plex, Symfonium, Navidrome,
+// foobar…) las muestra. Es lo que convierte las letras de «un texto que se lee aquí» en algo
+// que usas donde de verdad escuchas música.
+//
+// DOS PROMESAS QUE SE MANTIENEN:
+//  1. El audio NO se toca. Se escribe un fichero NUEVO al lado; el inodo del audio ni se roza,
+//     así que el HARDLINK del torrent sigue intacto y sigues sembrando igual (verificado en
+//     server/test/lyrics.test.js, que monta el escenario real y comprueba inodo y nlink).
+//  2. Es opt-in y explícito, como el escritor de etiquetas: hay que activarlo en Ajustes Y
+//     pulsar el botón. Escribir en tu carpeta de música nunca es un efecto secundario.
+//
+// `.lrc` cuando la letra viene SINCRONIZADA (es el formato que esperan los reproductores) y
+// `.txt` cuando solo hay texto plano. Nunca se pisa un fichero que ya exista: si tienes tus
+// propias letras, mandan las tuyas.
+
+export function lrcWritingEnabled() {
+  return getSetting('lyrics_write_lrc') === '1';
+}
+
+export async function writeLrcForAlbum(albumId, { force = false } = {}) {
+  if (!lrcWritingEnabled()) {
+    throw new Error('Escribir .lrc está desactivado. Actívalo en Ajustes (y monta tu música en modo escritura).');
+  }
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+
+  const pistas = db
+    .prepare(
+      `SELECT t.id, t.path, l.plain, l.synced, l.state
+         FROM tracks t JOIN lyrics l ON l.track_id = t.id
+        WHERE t.album_id = ? AND t.path IS NOT NULL AND l.state = 'found'
+        ORDER BY t.disc, t.num`
+    )
+    .all(albumId);
+
+  const res = { written: 0, skipped: 0, noLyrics: 0, errors: [] };
+  for (const p of pistas) {
+    const texto = p.synced || p.plain;
+    if (!texto) {
+      res.noLyrics++;
+      continue;
+    }
+    // .lrc si está sincronizada (lo que leen los reproductores), .txt si es texto plano
+    const destino = p.path.replace(/\.[^.\/]+$/, '') + (p.synced ? '.lrc' : '.txt');
+    try {
+      if (!force && fs.existsSync(destino)) {
+        res.skipped++; // ya hay uno: el tuyo manda
+        continue;
+      }
+      // Fichero NUEVO al lado del audio. Nunca se abre ni se modifica el audio, así que el
+      // hardlink con la carpeta de torrents no se ve afectado.
+      fs.writeFileSync(destino, texto.endsWith('\n') ? texto : `${texto}\n`, 'utf8');
+      res.written++;
+    } catch (e) {
+      const msg = String(e.message || e);
+      res.errors.push(
+        /EROFS|EACCES|EPERM/i.test(msg)
+          ? `${path.basename(destino)}: la carpeta de música es de solo lectura (móntala en :rw)`
+          : `${path.basename(destino)}: ${msg}`
+      );
+      if (res.errors.length >= 5) break; // si falla el montaje, fallará en todas
+    }
+  }
+  return res;
+}

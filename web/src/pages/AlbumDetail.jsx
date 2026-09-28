@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, Fragment } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy, Database, Radio, Mic2, Clock } from 'lucide-react';
+import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy, Database, Radio, Mic2, Clock, FileDown } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { openMbReleaseEditor } from '../mb.js';
 import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies, AddToChallengeButton, WantButton, ReleaseYear, GenreChips, VetoButton } from '../components.jsx';
@@ -1323,6 +1323,8 @@ function TrackList({ album }) {
   const [letra, setLetra] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [lote, setLote] = useState(null); // progreso de «Buscar letras»
+  const [puedeEscribir, setPuedeEscribir] = useState(false); // ajuste «escribir .lrc»
+  const [lrcMsg, setLrcMsg] = useState(null);
   const sondeo = useRef(null);
 
   const cargarEstado = () =>
@@ -1338,6 +1340,7 @@ function TrackList({ album }) {
 
   useEffect(() => {
     cargarEstado();
+    api.lyricsCounts().then((c) => setPuedeEscribir(!!c.writeLrc)).catch(() => {});
     return () => clearInterval(sondeo.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [album.id]);
@@ -1382,6 +1385,22 @@ function TrackList({ album }) {
     }, 1200);
   };
 
+  // Escribe los .lrc junto al audio para que los lea tu reproductor. Crea ficheros NUEVOS:
+  // el audio no se abre siquiera, así que el hardlink con la carpeta del torrent no se toca.
+  const guardarLrc = async () => {
+    setLrcMsg('Escribiendo…');
+    try {
+      const r = await api.writeLrc(album.id);
+      const partes = [];
+      if (r.written) partes.push(`${r.written} escritos`);
+      if (r.skipped) partes.push(`${r.skipped} ya existían`);
+      if (r.errors?.length) partes.push(r.errors[0]);
+      setLrcMsg(partes.join(' · ') || 'Nada que escribir: busca las letras primero.');
+    } catch (e) {
+      setLrcMsg(e.message);
+    }
+  };
+
   const conLetra = Object.values(estado).filter((e) => e.state === 'found' || e.state === 'instrumental').length;
   const buscadas = Object.values(estado).filter((e) => e.state).length;
 
@@ -1410,8 +1429,20 @@ function TrackList({ album }) {
           >
             {lote?.running ? <Loader2 size={12} className="animate-spin" /> : <Mic2 size={12} />} Buscar letras
           </button>
+          {/* Solo si lo has activado en Ajustes: escribir en tu carpeta de música nunca
+              aparece de gratis. Crea ficheros nuevos, no toca el audio ni el hardlink. */}
+          {puedeEscribir && conLetra > 0 && (
+            <button
+              onClick={guardarLrc}
+              title="Escribir las letras como .lrc junto a cada fichero, para que las lea tu reproductor"
+              className="text-xs px-2 py-1 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1.5"
+            >
+              <FileDown size={12} /> Guardar .lrc
+            </button>
+          )}
         </span>
       </div>
+      {lrcMsg && <div className="px-4 py-2 text-xs text-gold-300/90 border-b border-ink-850">{lrcMsg}</div>}
       <table className="w-full text-sm">
         <tbody>
           {album.tracks.map((t) => {

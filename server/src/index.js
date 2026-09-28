@@ -23,7 +23,7 @@ import { runAutoImport, autoImportStatus, autoImportEnabled } from './autoimport
 import { runAutoGrab, autoGrabConfig, autoGrabStatus, searchAndGrabBest } from './autograb.js';
 import { addWanted, removeWanted, wantedList, wantedKeys, wantedCounts, wantedConfig, wantedStatus, runWantedWatch } from './wanted.js';
 import { genreTree, genreDetail, genreRecommendations, albumGenres, artistGenres, mapGenreTag, unmapGenreTag, mappedTags, hideGenre, taxonomy, genreOptions, idsForGenreKey } from './genres.js';
-import { lyricsOfTrack, albumLyricsState, importTrackLyrics, importAlbumLyrics, lyricsStatus, lyricsCounts } from './lyrics.js';
+import { lyricsOfTrack, albumLyricsState, importTrackLyrics, importAlbumLyrics, lyricsStatus, lyricsCounts, writeLrcForAlbum, lrcWritingEnabled } from './lyrics.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground, releaseGroupOfRelease } from './musicbrainz.js';
 import { buildReleaseSeed, findPossibleDuplicate } from './mbseed.js';
 import { acoustidTest } from './acoustid.js';
@@ -617,7 +617,17 @@ app.post('/api/albums/:id/lyrics', async (req) => {
   importAlbumLyrics(id, { force: !!req.body?.force }).catch((e) => app.log.warn(e));
   return { started: true, status: lyricsStatus };
 });
-app.get('/api/lyrics/counts', async () => lyricsCounts());
+app.get('/api/lyrics/counts', async () => ({ ...lyricsCounts(), writeLrc: lrcWritingEnabled() }));
+// Escribir los .lrc JUNTO AL AUDIO, para que los lea tu reproductor. Opt-in y explícito: hay
+// que activarlo en Ajustes y pulsar el botón. Crea ficheros NUEVOS; el audio no se toca, así
+// que el hardlink del torrent sigue intacto.
+app.post('/api/albums/:id/lrc', async (req, reply) => {
+  try {
+    return await writeLrcForAlbum(Number(req.params.id), { force: !!req.body?.force });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 
 // --- géneros (1.1) ----------------------------------------------------------
 // Explorar la colección por género, al estilo del árbol de Roon. Los géneros se normalizan en

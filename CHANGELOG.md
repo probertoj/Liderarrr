@@ -40,6 +40,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
     (estudio, directo, remezcla) y lo único que distingue la tuya es la duración, así que un
     resultado que se pase de 4 s se descarta. Mismo criterio que en identificación: cero falsos
     positivos.
+  - **Y sirven donde de verdad escuchas**: con «Guardar .lrc» se escriben junto a cada fichero
+    para que los lea tu reproductor de siempre (Plex, Symfonium, Navidrome, foobar…). Liderarr
+    hace de recolector; el reproductor las muestra.
+    - **No toca tu audio y NO rompe el hardlink del torrent**: crea un fichero nuevo al lado, y
+      el inodo del audio ni se roza. Verificado montando el escenario real (descarga + hardlink
+      + escritura) y comprobando inodo y `nlink`; hay un test que lo blinda.
+    - No pisa un `.lrc` que ya exista: si tienes los tuyos, mandan los tuyos.
+    - Es **opt-in y explícito**, como el escritor de etiquetas: se activa en Ajustes (4d) y se
+      pulsa el botón. Requiere la música montada en `:rw`; si está en solo lectura, lo dice.
+    - `.lrc` cuando la letra viene sincronizada; `.txt` cuando solo hay texto plano.
   - **Buen vecino con un servicio gratuito**: una petición cada vez, con pausa, User-Agent que
     dice quiénes somos, y todo cacheado —también cuando NO hay letra— para no volver a preguntar
     lo mismo. Un «servidor ocupado» (503) se reintenta y **no** se guarda como «sin letra»: sería
