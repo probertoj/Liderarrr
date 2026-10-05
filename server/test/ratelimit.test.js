@@ -55,7 +55,7 @@ test('las reparte en el tiempo en vez de soltarlas de golpe', async () => {
     await acquire('t2', cfg, reloj);
     momentos.push(reloj.now());
   }
-  const separacionMinima = Math.ceil(cfg.windowMs / cfg.limit);
+  const separacionMinima = Math.ceil(cfg.windowMs / cfg.limit); // el real lleva margen, así que esto es el suelo
   for (let i = 1; i < momentos.length; i++) {
     assert.ok(
       momentos[i] - momentos[i - 1] >= separacionMinima,

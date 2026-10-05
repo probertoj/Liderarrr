@@ -24,6 +24,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
     dispara las alarmas. Hay separación mínima entre una y la siguiente.
   - Por defecto **6 cada 10 s**, no 10: Prowlarr también gasta cupo por su cuenta (RSS, salud) y
     ese no lo ve Liderarr. Ajustable en **Ajustes → 3f**.
+  - **Con Jackett, el agujero estaba en la descarga**: ahí Liderarr solo habla con qBittorrent
+    (local), pero le pasa una URL que qBittorrent va a pedirle a Jackett y Jackett al tracker.
+    Esa petición no la hace Liderarr, pero sí decide cuándo ocurre, así que también pide turno.
+    Los magnet no gastan cupo (van por DHT/announce, que es otra cosa).
+  - La separación lleva un **10% de margen** sobre el reparto exacto. Medido: repartiendo justo
+    se colaban **7** peticiones en una ventana de 10 s en vez de 6, porque con Jackett la descarga
+    la pide qBittorrent un instante después y eso junta llegadas. Sin margen, quien pusiera «10
+    cada 10 s» creyendo que es exacto se comería un bloqueo por unos milisegundos.
   - En **Diagnóstico** se ve el límite aplicado y cuántas peticiones llevas, para poder responder
     si un tracker pregunta.
 

@@ -1,4 +1,5 @@
 import { getSetting } from './db.js';
+import { acquire } from './ratelimit.js';
 
 // Cliente de qBittorrent (WebUI API v2). Con Jackett, que SOLO busca (Torznab), es
 // quien materializa la descarga: recibe el magnet/.torrent elegido y lo anade. Prowlarr
@@ -121,6 +122,13 @@ export async function qbTest() {
 // qBittorrent lo que manda Liderarr). Devuelve ok; qBittorrent responde "Ok." al anadir.
 export async function qbAdd({ url: dl, category } = {}) {
   if (!dl) throw new Error('Falta el enlace de descarga (magnet o .torrent)');
+  // AGUJERO SUTIL del camino de Jackett: aquí Liderarr solo habla con qBittorrent (local, sin
+  // límite), pero le pasa una URL de descarga que qBittorrent va a pedirle a Jackett, y Jackett
+  // AL TRACKER. Esa petición no la hace Liderarr, así que no la ve el freno de prowlarr/jackett
+  // — pero sí decide CUÁNDO ocurre. Así que se pide turno igual: 20 descargas encoladas de
+  // golpe serían 20 peticiones al tracker en un segundo.
+  // Los magnet no pasan por el tracker (van a DHT/announce, que es otra cosa), así que no gastan.
+  if (!/^magnet:/i.test(String(dl))) await acquire('indexer');
   const cat = category || getSetting('qbittorrent_category') || '';
   let form = `urls=${encodeURIComponent(dl)}`;
   if (cat) form += `&category=${encodeURIComponent(cat)}`;

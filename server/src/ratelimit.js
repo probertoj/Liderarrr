@@ -47,6 +47,16 @@ export function indexerRateConfig() {
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Separación mínima entre peticiones, con un 10% de MARGEN sobre el reparto exacto.
+// Medido con un Jackett de pruebas: repartiendo justo (ventana/límite) llegaban 7 peticiones
+// en una ventana de 10 s en vez de 6. La causa es que el limitador controla cuándo Liderarr
+// INICIA cada petición, pero con Jackett quien va al tracker es qBittorrent un instante
+// después, y ese desfase junta llegadas. Sin margen, quien pusiera «10 cada 10 s» creyendo que
+// es exacto se comería un bloqueo por un puñado de milisegundos.
+function minGap(cfg) {
+  return Math.ceil((cfg.windowMs / cfg.limit) * 1.1);
+}
+
 // Pide turno. Devuelve cuánto ha tenido que esperar (ms), por si interesa contarlo.
 export async function acquire(nombre = 'indexer', cfg = indexerRateConfig(), { now = () => Date.now(), sleep = dormir } = {}) {
   const c = estado(nombre);
@@ -58,7 +68,7 @@ export async function acquire(nombre = 'indexer', cfg = indexerRateConfig(), { n
     for (;;) {
       const ahora = now();
       c.hechas = c.hechas.filter((t) => ahora - t < cfg.windowMs);
-      const separacion = Math.ceil(cfg.windowMs / cfg.limit);
+      const separacion = minGap(cfg);
       const ultima = c.hechas.length ? c.hechas[c.hechas.length - 1] : -Infinity;
       const esperaPorSeparacion = Math.max(0, separacion - (ahora - ultima));
       const esperaPorVentana = c.hechas.length >= cfg.limit ? cfg.windowMs - (ahora - c.hechas[0]) : 0;
@@ -90,7 +100,7 @@ export function rateStats(nombre = 'indexer') {
   return {
     limit: cfg.limit,
     windowSeconds: cfg.windowMs / 1000,
-    minGapMs: Math.ceil(cfg.windowMs / cfg.limit),
+    minGapMs: minGap(cfg),
     inWindow: enVentana,
     // cuándo se concedió cada turno reciente: sirve para Diagnóstico y es lo único fiable
     // que puede mirar un test (el reloj de fuera avanza mientras otras peticiones esperan)

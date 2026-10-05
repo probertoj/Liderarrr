@@ -989,6 +989,12 @@ export default function Settings() {
           </Field>
         </div>
         <p className="text-xs text-neutral-600 mt-2">
+          La separación real lleva un <b className="font-normal text-neutral-500">10% de margen</b> sobre el reparto
+          exacto. No es capricho: con Jackett, quien va al tracker a por el .torrent es qBittorrent un instante después
+          de que Liderarr se lo mande, y ese desfase juntaba llegadas — repartiendo justo, se colaban 7 peticiones en
+          una ventana de 10 s en vez de 6.
+        </p>
+        <p className="text-xs text-neutral-600 mt-2">
           En «Diagnóstico» puedes ver el límite que se está aplicando y cuántas peticiones llevas: sirve para
           responder si un tracker te pregunta.
         </p>
