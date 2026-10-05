@@ -9,6 +9,20 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.2.0',
+    title: 'Buen vecino: no pasarse con nadie, y letras',
+    items: [
+      'Liderarr ya no se pasa del límite de peticiones de los trackers privados. Pasaba de verdad y cuesta un bloqueo: un barrido de «Lo quiero» con 20 discos mandaba 40 peticiones en menos de un segundo, cuatro veces el tope de RED. Ahora van repartidas, con un máximo configurable (de fábrica 6 cada 10 s) en Ajustes → 3f.',
+      'No basta con respetar el total: también se separan en el tiempo. Diez de golpe y luego diez segundos parado cumple la norma sobre el papel, pero es justo la ráfaga que hace saltar las alarmas.',
+      'El mismo rasero para todo lo demás que sale a la red: ListenBrainz (que además publica su cupo en cada respuesta y ahora se le hace caso), Last.fm, AcoustID y Deezer. Cada uno con el ritmo que pide, y todos a la vista en Diagnóstico — sirve para responder si un tracker te pregunta.',
+      'Letras, vía LRCLIB: cada pista tiene su botón en la ficha del disco, y «Buscar letras» las trae todas. Muchas vienen sincronizadas, con sus marcas de tiempo.',
+      'Y con «Guardar .lrc» se escriben junto a cada fichero para que las lea tu reproductor de siempre. No toca tu audio ni rompe el hardlink del torrent; hay que activarlo en Ajustes → 4d.',
+      'Nuevo botón «No lo quiero» en las recomendaciones: si algo no te encaja, lo vetas y no vuelve a salir en ningún sitio. Se deshace cuando quieras.',
+      'El buscador rápido encuentra géneros: escribe «shoegaze» y te lleva a tu shoegaze.',
+      'Arreglado: la ficha del disco reventaba al mostrar sus géneros.',
+    ],
+  },
+  {
     version: '1.1.0',
     title: 'Géneros: explora lo que tienes y descubre lo que te falta',
     items: [

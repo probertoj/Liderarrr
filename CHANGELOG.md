@@ -7,7 +7,54 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
-## [Sin publicar]
+## [1.2.0] — 2026-10-05
+
+**Buen vecino.** Esta versión nace de un bloqueo real en un tracker privado por pasarse de
+peticiones. El arreglo acabó siendo un repaso a todo lo que Liderarr pide a servicios ajenos.
+Y además: letras con sus `.lrc`, vetar recomendaciones y buscar géneros.
+### Añadido
+- **El buscador rápido encuentra géneros.** Escribe «shoegaze» y te lleva a tu shoegaze; escribe
+  «rock» y ves Rock con sus 4.796 discos, luego Rock alternativo, Hard rock… Con el nº de discos
+  que tienes de cada uno, e insensible a acentos («electronica» encuentra «Electrónica»). Va en
+  las seis páginas donde está el buscador.
+  - Los géneros se piden **una vez por sesión** y se filtran en el navegador: son un par de
+    cientos de nombres, así que no hace falta una petición por tecla.
+  - Y el árbol de géneros se **memoiza** unos minutos en el servidor (calcularlo son ~470 ms
+    sobre 33.000 discos). Cualquier regla tuya de género lo invalida al instante, así que un
+    cambio se nota ya, no dentro de cinco minutos.
+- **«No lo quiero»: vetar una recomendación.** El hermano opuesto del ♥, en cada recomendación
+  —las de un género y las de la ficha de un disco—. Si Last.fm insiste en colarte Twenty One
+  Pilots como indie pop, lo vetas y no vuelve.
+  - El veto es **global** a propósito: si no quieres que te recomienden algo, no lo quieres en un
+    género ni en un disco. Y va por `matchKey`, así que vetarlo una vez cubre todas sus grafías
+    («Vessel» y «Vessel (Deluxe Edition)» son lo mismo).
+  - **No borra nada** y se deshace: bajo las recomendaciones hay una lista de lo vetado, y
+    pinchando vuelve.
+- **Letras, vía [LRCLIB](https://lrclib.net)** (abierto, sin clave, con letras **sincronizadas**
+  además de planas). En la ficha del disco, cada pista tiene su botón de letra; y «Buscar letras»
+  las trae todas de una vez, en segundo plano y con progreso.
+  - **Se guardan en la base de datos, nunca en tus ficheros.** La letra es un metadato más, como
+    todo lo demás aquí: tu audio no se toca.
+  - Cuando LRCLIB trae la letra **sincronizada**, se enseñan las marcas de tiempo al lado, en
+    tenue. Saber en qué minuto entra cada verso es justo lo que la distingue de un bloque de texto.
+  - **Antes sin letra que con la equivocada**: LRCLIB indexa muchas versiones del mismo tema
+    (estudio, directo, remezcla) y lo único que distingue la tuya es la duración, así que un
+    resultado que se pase de 4 s se descarta. Mismo criterio que en identificación: cero falsos
+    positivos.
+  - **Y sirven donde de verdad escuchas**: con «Guardar .lrc» se escriben junto a cada fichero
+    para que los lea tu reproductor de siempre (Plex, Symfonium, Navidrome, foobar…). Liderarr
+    hace de recolector; el reproductor las muestra.
+    - **No toca tu audio y NO rompe el hardlink del torrent**: crea un fichero nuevo al lado, y
+      el inodo del audio ni se roza. Verificado montando el escenario real (descarga + hardlink
+      + escritura) y comprobando inodo y `nlink`; hay un test que lo blinda.
+    - No pisa un `.lrc` que ya exista: si tienes los tuyos, mandan los tuyos.
+    - Es **opt-in y explícito**, como el escritor de etiquetas: se activa en Ajustes (4d) y se
+      pulsa el botón. Requiere la música montada en `:rw`; si está en solo lectura, lo dice.
+    - `.lrc` cuando la letra viene sincronizada; `.txt` cuando solo hay texto plano.
+  - **Buen vecino con un servicio gratuito**: una petición cada vez, con pausa, User-Agent que
+    dice quiénes somos, y todo cacheado —también cuando NO hay letra— para no volver a preguntar
+    lo mismo. Un «servidor ocupado» (503) se reintenta y **no** se guarda como «sin letra»: sería
+    perder la letra para siempre por un fallo pasajero.
 
 ### Arreglado
 - **Liderarr se pasaba del límite de peticiones de los trackers privados, y eso cuesta un
@@ -47,58 +94,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
     ven en Diagnóstico con su norma. MusicBrainz se queda aparte, con su cola de 1/s de siempre.
   - En **Diagnóstico** se ve el límite aplicado y cuántas peticiones llevas, para poder responder
     si un tracker pregunta.
-
-### Añadido
-- **El buscador rápido encuentra géneros.** Escribe «shoegaze» y te lleva a tu shoegaze; escribe
-  «rock» y ves Rock con sus 4.796 discos, luego Rock alternativo, Hard rock… Con el nº de discos
-  que tienes de cada uno, e insensible a acentos («electronica» encuentra «Electrónica»). Va en
-  las seis páginas donde está el buscador.
-  - Los géneros se piden **una vez por sesión** y se filtran en el navegador: son un par de
-    cientos de nombres, así que no hace falta una petición por tecla.
-  - Y el árbol de géneros se **memoiza** unos minutos en el servidor (calcularlo son ~470 ms
-    sobre 33.000 discos). Cualquier regla tuya de género lo invalida al instante, así que un
-    cambio se nota ya, no dentro de cinco minutos.
-### Añadido
-- **«No lo quiero»: vetar una recomendación.** El hermano opuesto del ♥, en cada recomendación
-  —las de un género y las de la ficha de un disco—. Si Last.fm insiste en colarte Twenty One
-  Pilots como indie pop, lo vetas y no vuelve.
-  - El veto es **global** a propósito: si no quieres que te recomienden algo, no lo quieres en un
-    género ni en un disco. Y va por `matchKey`, así que vetarlo una vez cubre todas sus grafías
-    («Vessel» y «Vessel (Deluxe Edition)» son lo mismo).
-  - **No borra nada** y se deshace: bajo las recomendaciones hay una lista de lo vetado, y
-    pinchando vuelve.
-### Añadido
-- **Letras, vía [LRCLIB](https://lrclib.net)** (abierto, sin clave, con letras **sincronizadas**
-  además de planas). En la ficha del disco, cada pista tiene su botón de letra; y «Buscar letras»
-  las trae todas de una vez, en segundo plano y con progreso.
-  - **Se guardan en la base de datos, nunca en tus ficheros.** La letra es un metadato más, como
-    todo lo demás aquí: tu audio no se toca.
-  - Cuando LRCLIB trae la letra **sincronizada**, se enseñan las marcas de tiempo al lado, en
-    tenue. Saber en qué minuto entra cada verso es justo lo que la distingue de un bloque de texto.
-  - **Antes sin letra que con la equivocada**: LRCLIB indexa muchas versiones del mismo tema
-    (estudio, directo, remezcla) y lo único que distingue la tuya es la duración, así que un
-    resultado que se pase de 4 s se descarta. Mismo criterio que en identificación: cero falsos
-    positivos.
-  - **Y sirven donde de verdad escuchas**: con «Guardar .lrc» se escriben junto a cada fichero
-    para que los lea tu reproductor de siempre (Plex, Symfonium, Navidrome, foobar…). Liderarr
-    hace de recolector; el reproductor las muestra.
-    - **No toca tu audio y NO rompe el hardlink del torrent**: crea un fichero nuevo al lado, y
-      el inodo del audio ni se roza. Verificado montando el escenario real (descarga + hardlink
-      + escritura) y comprobando inodo y `nlink`; hay un test que lo blinda.
-    - No pisa un `.lrc` que ya exista: si tienes los tuyos, mandan los tuyos.
-    - Es **opt-in y explícito**, como el escritor de etiquetas: se activa en Ajustes (4d) y se
-      pulsa el botón. Requiere la música montada en `:rw`; si está en solo lectura, lo dice.
-    - `.lrc` cuando la letra viene sincronizada; `.txt` cuando solo hay texto plano.
-  - **Buen vecino con un servicio gratuito**: una petición cada vez, con pausa, User-Agent que
-    dice quiénes somos, y todo cacheado —también cuando NO hay letra— para no volver a preguntar
-    lo mismo. Un «servidor ocupado» (503) se reintenta y **no** se guarda como «sin letra»: sería
-    perder la letra para siempre por un fallo pasajero.
-
-### Arreglado
 - **La ficha del disco reventaba entera** al mostrar sus géneros: el campo `genres` ya existía con
   las etiquetas crudas del fichero y se pisó con objetos. Ahora los géneros canónicos van en su
   propio campo, y si de un disco no se reconoce ninguna etiqueta se siguen enseñando las crudas
   —antes eso que no mostrar nada—.
+
+---
 
 ---
 
