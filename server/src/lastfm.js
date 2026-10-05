@@ -1,5 +1,6 @@
 import { cacheRead, cacheWrite, getSetting } from './db.js';
 import { CACHE_MAX_AGE } from './cache-versions.js';
+import { acquire, servicio } from './ratelimit.js';
 
 // Last.fm: su catálogo nace de scrobbles, así que tiene una cola larguísima de
 // cosas oscuras que MusicBrainz no cataloga. Los datos son pobres (ni fechas ni
@@ -11,11 +12,17 @@ export function lastfmConfigured() {
   return !!getSetting('lastfm_key');
 }
 
+// Identificarse es de buena educación y evita que te tomen por un bot anónimo.
+const UA = `Liderarrr/${process.env.npm_package_version || '1.1.0'} ( https://github.com/probertoj/Liderarrr )`;
+
 async function lfFetch(params) {
   const key = getSetting('lastfm_key');
   if (!key) throw new Error('Last.fm no configurado');
   const qs = new URLSearchParams({ ...params, api_key: key, format: 'json' });
-  const res = await fetch(`${BASE}?${qs}`, { signal: AbortSignal.timeout(20000) });
+  // Turno: suggest.js recorre TODAS las semillas y las recomendaciones de la ficha piden el
+  // top de ocho artistas afines. Sin freno, eso sale como una ráfaga.
+  await acquire('lastfm', servicio('lastfm'));
+  const res = await fetch(`${BASE}?${qs}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`Last.fm ${res.status}`);
   const data = await res.json();
   if (data.error) throw new Error(`Last.fm: ${data.message || data.error}`);

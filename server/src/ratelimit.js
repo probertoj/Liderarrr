@@ -45,6 +45,31 @@ export function indexerRateConfig() {
   };
 }
 
+// Resto de servicios externos. Mismo mecanismo, un cubo por servicio: lo que gaste Last.fm no
+// debe frenar a Deezer. Los números salen de lo que pide cada uno, siempre por debajo:
+//   last.fm      — recomienda no pasar de ~5/s por IP
+//   listenbrainz — publica su cupo en cabeceras; importar escuchas son cientos de páginas
+//   acoustid     — pide no pasar de 3/s
+//   deezer       — sin API oficial documentada; se asume ~50 cada 5 s y se va holgado
+// MusicBrainz NO está aquí: tiene su propia cola de 1,1 s en musicbrainz.js (su norma es 1/s
+// y además con dos carriles de prioridad), y meterlo aquí sería frenarlo dos veces.
+const SERVICIOS = {
+  lastfm: { limit: 4, windowMs: 1000 },
+  listenbrainz: { limit: 3, windowMs: 1000 },
+  acoustid: { limit: 2, windowMs: 1000 },
+  deezer: { limit: 5, windowMs: 1000 },
+};
+
+// Pide turno para un servicio externo por su nombre. Para los indexers se usa acquire() con
+// la config del usuario; para el resto, estos valores fijos.
+export function servicio(nombre) {
+  return SERVICIOS[nombre] || { limit: 5, windowMs: 1000 };
+}
+
+export function limitesExternos() {
+  return Object.entries(SERVICIOS).map(([name, c]) => ({ name, limit: c.limit, windowSeconds: c.windowMs / 1000 }));
+}
+
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Separación mínima entre peticiones, con un 10% de MARGEN sobre el reparto exacto.
@@ -92,9 +117,8 @@ export async function acquire(nombre = 'indexer', cfg = indexerRateConfig(), { n
 
 // Para enseñar en Diagnóstico que esto está funcionando (y poder contestar al tracker si
 // pregunta qué límite aplicas).
-export function rateStats(nombre = 'indexer') {
+export function rateStats(nombre = 'indexer', cfg = nombre === 'indexer' ? indexerRateConfig() : servicio(nombre)) {
   const c = estado(nombre);
-  const cfg = indexerRateConfig();
   const ahora = Date.now();
   const enVentana = c.hechas.filter((t) => ahora - t < cfg.windowMs).length;
   return {

@@ -1,5 +1,5 @@
 import { db, getSetting } from './db.js';
-import { rateStats } from './ratelimit.js';
+import { rateStats, limitesExternos } from './ratelimit.js';
 import { scanStatus } from './scanner.js';
 import { identifyStatus } from './identify.js';
 import { lidarrAddStatus } from './lidarr.js';
@@ -78,6 +78,8 @@ export function diagnostics() {
     // Freno de peticiones a los indexers. Se enseña aquí para poder responder a un tracker
     // que pregunte qué límite aplicas: es literalmente lo que está aplicando la app.
     indexerRate: rateStats('indexer'),
+    // el resto de servicios externos, con su ritmo y lo que llevan gastado
+    externalRates: limitesExternos().map((x) => ({ ...rateStats(x.name), name: x.name })),
     uptimeSec: Math.round(process.uptime()),
     memory: { rss: mem.rss, heapUsed: mem.heapUsed, heapTotal: mem.heapTotal },
     dataDir: process.env.DATA_DIR || null,

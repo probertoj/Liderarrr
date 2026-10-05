@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import { matchKey, normName, cleanTitleForMatch } from './matchkey.js';
 import { deezerFindArtist } from './artistpix.js';
+import { acquire, servicio } from './ratelimit.js';
 // (Ya no se usa Spotify aquí: el barrido de novedades/singles de la colección va solo por
 //  Deezer, para no agotar la cuota de la app de Spotify —capada en modo desarrollo—.)
 
@@ -41,6 +42,7 @@ const UA = 'Liderarrr ( https://github.com/probertoj/Liderarrr )';
 // radar de descubrimiento para los estrenos de artistas similares.)
 export async function deezerArtistAlbums(artistId) {
   try {
+    await acquire('deezer', servicio('deezer'));
     const res = await fetch(`https://api.deezer.com/artist/${artistId}/albums?limit=100`, {
       headers: { 'User-Agent': UA },
       signal: AbortSignal.timeout(12000),

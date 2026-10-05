@@ -1,6 +1,9 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { db, getSetting } from './db.js';
+import { acquire, servicio } from './ratelimit.js';
+
+const UA = `Liderarrr/${process.env.npm_package_version || '1.1.0'} ( https://github.com/probertoj/Liderarrr )`;
 
 const execFileP = promisify(execFile);
 
@@ -78,9 +81,12 @@ export async function lookup(filePath) {
   });
   let data;
   try {
+    // AcoustID pide no pasar de 3 peticiones por segundo, y la identificación por huella va
+    // en bucle sobre todos los discos pendientes (y con varias pistas por disco).
+    await acquire('acoustid', servicio('acoustid'));
     const res = await fetch(API, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
       body: params,
       signal: AbortSignal.timeout(20000),
     });

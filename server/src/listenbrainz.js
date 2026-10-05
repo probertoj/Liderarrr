@@ -1,4 +1,5 @@
 import { db, getSetting, setSetting } from './db.js';
+import { acquire, servicio } from './ratelimit.js';
 
 // ListenBrainz: alternativa (o complemento) abierta a Last.fm, alineada con MusicBrainz.
 // Importa tu historial de escuchas a la tabla `listens` con source='listenbrainz'. Solo
@@ -11,9 +12,11 @@ export function lbConfigured() {
   return !!getSetting('listenbrainz_user');
 }
 
+const UA = `Liderarrr/${process.env.npm_package_version || '1.1.0'} ( https://github.com/probertoj/Liderarrr )`;
+
 function lbHeaders() {
   const token = getSetting('listenbrainz_token');
-  return token ? { Authorization: `Token ${token}` } : {};
+  return token ? { Authorization: `Token ${token}`, 'User-Agent': UA } : { 'User-Agent': UA };
 }
 
 export async function lbTest() {
@@ -49,7 +52,19 @@ export async function importListenBrainz({ full = false } = {}) {
     url.searchParams.set('count', '100');
     if (before) url.searchParams.set('max_ts', String(before));
     // eslint-disable-next-line no-await-in-loop
+    // eslint-disable-next-line no-await-in-loop
+    await acquire('listenbrainz', servicio('listenbrainz'));
+    // eslint-disable-next-line no-await-in-loop
     const res = await fetch(url, { headers: lbHeaders(), signal: AbortSignal.timeout(20000) });
+    // ListenBrainz DICE cuánto cupo te queda en cada respuesta. Hacerle caso es gratis y es la
+    // diferencia entre importar un historial largo tranquilamente o que te corten a medias.
+    const quedan = Number(res.headers.get('x-ratelimit-remaining'));
+    const resetEn = Number(res.headers.get('x-ratelimit-reset-in'));
+    if (Number.isFinite(quedan) && quedan <= 1 && Number.isFinite(resetEn) && resetEn > 0) {
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, Math.min(resetEn, 30) * 1000));
+    }
+    if (res.status === 429) throw new Error('ListenBrainz: límite de peticiones alcanzado; inténtalo en un minuto');
     if (!res.ok) throw new Error(`ListenBrainz devolvió ${res.status}`);
     // eslint-disable-next-line no-await-in-loop
     const data = await res.json();

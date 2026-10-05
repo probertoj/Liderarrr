@@ -3,6 +3,7 @@ import path from 'node:path';
 import { db, DATA_DIR, cacheRead, cacheWrite } from './db.js';
 import { matchKey } from './matchkey.js';
 import * as lastfm from './lastfm.js';
+import { acquire as turnoDe, servicio } from './ratelimit.js';
 
 // Fotos de artista, en paralelo a las carátulas (covers.js): resolución automática
 // desde Deezer (por nombre, sin API key) y edición manual (buscar candidatos o subir).
@@ -64,6 +65,7 @@ function cacheAndServe(id, buf, mime) {
 // Deezer: buscar artistas por texto. Sin API key. Devuelve candidatos con su foto.
 async function deezerSearch(term, limit = 12) {
   try {
+    await turnoDe('deezer', servicio('deezer'));
     const res = await fetch(`https://api.deezer.com/search/artist?q=${encodeURIComponent(term)}&limit=${limit}`, {
       headers: { 'User-Agent': UA },
       signal: AbortSignal.timeout(12000),
@@ -107,6 +109,9 @@ export async function deezerAlbumCover(artist, title) {
   if (cached !== null) return cached.url || null;
   let out = { url: null };
   try {
+    // El mosaico del Resumen pide hasta 24 carátulas A LA VEZ: sin turno, eso es una ráfaga
+    // de 24 peticiones simultáneas a Deezer por abrir una página.
+    await turnoDe('deezer', servicio('deezer'));
     const res = await fetch(
       `https://api.deezer.com/search/album?q=${encodeURIComponent(`${artist} ${title}`)}&limit=1`,
       { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(10000) }

@@ -32,6 +32,19 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
     se colaban **7** peticiones en una ventana de 10 s en vez de 6, porque con Jackett la descarga
     la pide qBittorrent un instante después y eso junta llegadas. Sin margen, quien pusiera «10
     cada 10 s» creyendo que es exacto se comería un bloqueo por unos milisegundos.
+- **Y de paso, auditoría de TODO lo que sale a la red**, con el mismo rasero. Lo que faltaba:
+  - **ListenBrainz**: importar un historial largo son hasta **300 páginas seguidas** sin pausa ni
+    identificarse. Ahora va a ritmo, con User-Agent, y **hace caso a las cabeceras de cupo que el
+    propio ListenBrainz devuelve** (`X-RateLimit-Remaining` / `Reset-In`), que estaban ahí sin que
+    nadie las mirara.
+  - **Last.fm**: sin User-Agent y sin ritmo, con bucles que recorren todas tus semillas de
+    similares y el top de ocho artistas por cada ficha. Ahora ambas cosas.
+  - **AcoustID**: sin User-Agent, y se llama dentro del bucle de identificación. Pide no pasar de
+    3/s; va a 2/s.
+  - **Deezer**: el mosaico del Resumen pedía hasta **24 carátulas a la vez** por abrir una página.
+    Ahora pasan por turno.
+  - Cada servicio tiene **su propio cubo**: gastar cupo de Last.fm no frena a Deezer. Y todos se
+    ven en Diagnóstico con su norma. MusicBrainz se queda aparte, con su cola de 1/s de siempre.
   - En **Diagnóstico** se ve el límite aplicado y cuántas peticiones llevas, para poder responder
     si un tracker pregunta.
 

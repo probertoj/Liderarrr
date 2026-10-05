@@ -227,6 +227,22 @@ export default function Diagnostics() {
               <div>{d.indexerRate.totalRequests} peticiones</div>
             </div>
           </div>
+          {d.externalRates?.length > 0 && (
+            <>
+              <div className="text-xs text-neutral-500 mt-4 mb-1">
+                Y el ritmo con el resto de servicios de fuera, por el mismo motivo: son gratuitos y conviene no
+                abusar. MusicBrainz va aparte, con su propia cola de 1 petición por segundo.
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {d.externalRates.map((r) => (
+                  <span key={r.name} className="text-xs px-2 py-0.5 rounded-full border border-ink-800 bg-ink-850 text-neutral-400">
+                    {r.name} <span className="text-neutral-600">{r.limit}/{r.windowSeconds}s</span>
+                    {r.totalRequests ? <span className="text-neutral-600"> · {r.totalRequests}</span> : null}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 

@@ -5,7 +5,7 @@ import path from 'node:path';
 
 // ratelimit.js importa db.js (lee los ajustes), que abre una SQLite en DATA_DIR al cargarse.
 process.env.DATA_DIR = path.join(os.tmpdir(), `liderarr-test-rate-${Date.now()}`);
-const { acquire, resetRate, indexerRateConfig, rateStats } = await import('../src/ratelimit.js');
+const { acquire, resetRate, indexerRateConfig, rateStats, servicio, limitesExternos } = await import('../src/ratelimit.js');
 
 // Esto nació de un bloqueo real en RED por pasarse de peticiones, así que conviene tenerlo
 // clavado. Los tests usan un RELOJ SIMULADO: comprueban la política, no la paciencia.
@@ -99,4 +99,34 @@ test('por defecto deja aire bajo el tope típico de un tracker privado', () => {
   const c = indexerRateConfig();
   assert.ok(c.limit <= 10 && c.windowMs >= 10000, 'el valor de fábrica no puede rozar el límite de RED');
   assert.ok(c.limit > 0);
+});
+
+// --- un cubo por servicio ------------------------------------------------------
+
+test('cada servicio tiene su propio ritmo, no el de los indexers', () => {
+  // Fallo real: rateStats daba por hecho la config de los indexers para CUALQUIER cubo, así
+  // que en Diagnóstico todos los servicios salían con «6 cada 10 s» en vez de con su norma.
+  const lastfm = rateStats('lastfm');
+  const indexer = rateStats('indexer');
+  assert.notEqual(lastfm.windowSeconds, indexer.windowSeconds, 'last.fm no se mide en la ventana de los indexers');
+  assert.equal(lastfm.limit, servicio('lastfm').limit);
+  assert.equal(rateStats('acoustid').limit, servicio('acoustid').limit);
+});
+
+test('ningún servicio externo se pasa de lo que pide su proveedor', () => {
+  const topes = { lastfm: 5, acoustid: 3, listenbrainz: 5, deezer: 10 }; // lo que documenta cada uno, por segundo
+  for (const s of limitesExternos()) {
+    const porSegundo = s.limit / s.windowSeconds;
+    assert.ok(porSegundo <= topes[s.name], `${s.name} va a ${porSegundo}/s y su tope es ${topes[s.name]}/s`);
+  }
+});
+
+test('los cubos no se estorban entre sí', async () => {
+  resetRate('lastfm');
+  resetRate('deezer');
+  const reloj = relojFalso();
+  await acquire('lastfm', servicio('lastfm'), reloj);
+  // justo después, otro servicio distinto no debe esperar por culpa del primero
+  const esperado = await acquire('deezer', servicio('deezer'), reloj);
+  assert.equal(esperado, 0, 'gastar cupo de Last.fm no puede frenar a Deezer');
 });
