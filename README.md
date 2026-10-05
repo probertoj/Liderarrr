@@ -1,6 +1,6 @@
 # 🎵 Liderarrr
 
-> **v1.0** · Panel de **completismo** para tu colección de música digital. Escanea tus
+> **v1.2** · Panel de **completismo** para tu colección de música digital. Escanea tus
 > ficheros, los identifica contra MusicBrainz / AcoustID / Discogs / Last.fm, y te enseña qué
 > tienes, qué te falta y qué es una rareza — y te ayuda a **conseguirlo y ordenarlo**, con o
 > sin Lidarr.
@@ -16,9 +16,17 @@ ninguna base de datos: maquetas, bootlegs e inéditos son ciudadanos de primera 
 borra ni reescribe tu audio** sin que se lo pidas.
 
 Desde la 0.7 es **independiente de Lidarr**: busca, descarga e importa por su cuenta. Lidarr
-sigue soportado, pero es **opcional**. La **1.0** cierra el círculo con dos piezas: saber qué
-tienes en **streaming y no en disco** (y al revés), y **«Lo quiero»**, una lista de deseos que
-se descarga sola en cuanto el disco aparece en tus trackers.
+sigue soportado, pero es **opcional**. La **1.0** cerró el círculo: saber qué tienes en
+**streaming y no en disco** (y al revés), y **«Lo quiero»**, una lista de deseos que se descarga
+sola en cuanto el disco aparece en tus trackers. La **1.1** añadió explorar por **géneros**, y
+la **1.2** el **cuidado con los servicios ajenos** (ver abajo) y las **letras**.
+
+> ### ⚠️ Si usas trackers privados, lee esto
+> Liderarr **limita las peticiones que acaban en tu tracker** (Ajustes → 3f, de fábrica 6 cada
+> 10 s). No es un detalle: los trackers privados bloquean cuentas por pasarse —RED permite «no
+> más de 10 peticiones cada 10 segundos»— y antes de la 1.2 un barrido automático podía mandar
+> 40 en menos de un segundo. En **Diagnóstico** ves el límite que se aplica, por si tu tracker
+> te pregunta qué herramientas usas.
 
 ---
 
@@ -32,12 +40,14 @@ se descarga sola en cuanto el disco aparece en tus trackers.
 6. [Conseguir lo que te falta (descargas)](#-conseguir-lo-que-te-falta)
 7. [«Lo quiero»: la lista de deseos que se descarga sola](#-lo-quiero-la-lista-de-deseos-que-se-descarga-sola)
 8. [Tu disco frente a tu streaming](#-tu-disco-frente-a-tu-streaming)
-9. [Importar descargas a la biblioteca](#-importar-descargas-a-la-biblioteca)
-10. [Avisos y copias de seguridad](#-avisos-y-copias-de-seguridad)
-11. [En el móvil](#-en-el-móvil)
-12. [Privacidad y seguridad](#-privacidad-y-seguridad)
-13. [Desarrollo local](#-desarrollo-local)
-14. [Créditos](#-créditos)
+9. [Letras](#-letras)
+10. [Importar descargas a la biblioteca](#-importar-descargas-a-la-biblioteca)
+11. [No molestar: límites de peticiones](#-no-molestar-límites-de-peticiones)
+12. [Avisos y copias de seguridad](#-avisos-y-copias-de-seguridad)
+13. [En el móvil](#-en-el-móvil)
+14. [Privacidad y seguridad](#-privacidad-y-seguridad)
+15. [Desarrollo local](#-desarrollo-local)
+16. [Créditos](#-créditos)
 
 ---
 
@@ -201,8 +211,9 @@ Dentro de la app tienes esto mismo en **«¿Cómo funciona todo esto?»**.
 | **4. Descargas + importación** | Buscas y descargas por Prowlarr/Jackett (sin el veto de Lidarr). Al terminar un torrent, el **auto-import** lo enlaza (hardlink) a tu biblioteca, sin copiar ni dejar de sembrar. |
 | **5. «Lo quiero»** | El ♥ de cualquier disco que aún no tengas lo pone **en vigilancia**: Liderarr lo busca solo en tus indexers hasta que aparece, adelantándose a su estreno. |
 | **6. Radar y novedades** | Estrenos de **toda tu colección** (los sigas o no) vía Deezer, separados en discos y canciones; radar de curadores; y **«Descubre»**, novedades por afinidad de artistas parecidos y de tus sellos. Todo marcando lo que ya tienes. |
-| **7. Escuchas y retos** | Conecta Last.fm o ListenBrainz para cruzar lo que TIENES con lo que has ESCUCHADO, monta retos con anillos de progreso y saca tu **Resumen** tipo *Wrapped*. |
-| **8. Streaming** | Conecta tu cuenta de Spotify y cruza tus **álbumes guardados** con tu colección local, en los dos sentidos. |
+| **7. Géneros** | Explora la colección por género, de lo ancho («Rock») a lo concreto («Shoegaze»), y al lado los discos buenos de ese género que **aún no tienes**. |
+| **8. Escuchas y retos** | Conecta Last.fm o ListenBrainz para cruzar lo que TIENES con lo que has ESCUCHADO, monta retos con anillos de progreso y saca tu **Resumen** tipo *Wrapped*. |
+| **9. Streaming** | Conecta tu cuenta de Spotify y cruza tus **álbumes guardados** con tu colección local, en los dos sentidos. |
 
 **¿Cuándo pasa cada cosa?**
 
@@ -229,14 +240,15 @@ El menú está agrupado con guiños musicales; aquí va cada sección con lo que
 
 | Sección | Qué encuentras |
 |---|---|
-| **Dashboard** | Totales (álbumes, artistas, pistas, tamaño en disco, duración), % sin pérdida y gráficas por década, formato y género. Incluye un **buscador rápido**: escribe y ves al instante lo que tienes; si no lo tienes, busca en MusicBrainz y te deja **seguir** al artista, **descargar** el álbum o marcarlo con **♥ Lo quiero**. |
+| **Dashboard** | Totales (álbumes, artistas, pistas, tamaño en disco, duración), % sin pérdida y gráficas por década, formato y género. Incluye un **buscador rápido**: escribe y ves al instante lo que tienes; si no lo tienes, busca en MusicBrainz y te deja **seguir** al artista, **descargar** el álbum o marcarlo con **♥ Lo quiero**. También encuentra **géneros**: escribe «shoegaze» y vas a tu shoegaze. |
 | **Discoteca** | Toda la colección en parrilla de carátulas, con filtros por género, década, formato, calidad, estado y **«con duplicados»**, y orden configurable. Las **ediciones** distintas se agrupan bien; los discos con varias copias muestran un badge **×N** que abre el panel de copias, y las **cajas multidisco** cuentan como un álbum. Clic derecho (o el botón al pasar el ratón) para **añadir a un reto**. |
-| **Ficha de álbum** | Carátula, pistas, calidad y un panel tipo *Roon*: **créditos** y roles, **reseña** (Last.fm) y **valoración** (Discogs), **recomendaciones**, y otras **versiones/ediciones** (MusicBrainz + Discogs). Puedes renombrar el título, corregir el artista, añadir carátula, gestionar copias y cajas, y **crear su ficha en MusicBrainz** si no existe. Enlaces directos a MusicBrainz, Discogs, Record Club y Spotify. |
+| **Ficha de álbum** | Carátula, pistas, calidad y un panel tipo *Roon*: **créditos** y roles, **reseña** (Last.fm) y **valoración** (Discogs), **recomendaciones** —con **«No lo quiero»** para vetar lo que no te encaje—, y otras **versiones/ediciones** (MusicBrainz + Discogs). Cada pista tiene su **letra** (LRCLIB), sincronizada cuando existe. Puedes renombrar el título, corregir el artista, añadir carátula, gestionar copias y cajas, y **crear su ficha en MusicBrainz** si no existe. Enlaces directos a MusicBrainz, Discogs, Record Club y Spotify. |
 | **Artistas** | Ranking por nº de álbumes/pistas, con foto (Deezer). Filtros combinables **«Seguidos»** + **«Faltan discos»** y orden **«Más discos por completar»**. Los artistas locales (sin MBID) conviven con los de MusicBrainz. |
 | **Ficha de artista** | Discografía por tipo (álbum, EP, single, directo…), con lo que tienes marcado **en vivo**, ámbito de completismo configurable, **«Descargar todos»** los que faltan y ♥ por disco. |
 | **Álbumes incompletos** | Álbumes a los que les falta alguna pista (las que hay en disco vs. las que deberían), ordenados por cuántas faltan. El agujero que no se ve hasta que le das al play. |
 | **Calidad y disco** | Formatos, sin pérdida vs. con pérdida, sin ReplayGain, sin carátula, formatos mezclados, **duplicados** (clicables) y los más pesados. |
 | **Candidatos a upgrade** | Álbumes que podrías mejorar de calidad (p. ej. de MP3 a FLAC), con descarga nativa a un clic. |
+| **Géneros** | Tu colección por género, al estilo del árbol de Roon: de «Rock» a «Shoegaze», con subgéneros, filtro por década, tus artistas y tus discos. Al lado, **lo mejor del género que aún no tienes** (Last.fm), con ♥, Descargar y **«No lo quiero»**, más un **«Recomendar más»** cuando ninguna te convenza. El género sale de las etiquetas de tus ficheros —que vienen en mil grafías— y se normaliza; lo que no se reconoce **no se fuerza**: queda a la vista y lo colocas tú. También puedes esconder géneros que no te interesen. |
 | **Sellos** | Sigue sellos discográficos y ve su catálogo cruzado con lo que tienes; el sello aparece también en la ficha del álbum. |
 
 ### 🌍 I Hear a New World — descubrir y conseguir
@@ -292,8 +304,8 @@ El menú está agrupado con guiños musicales; aquí va cada sección con lo que
 |---|---|
 | **Novedades de la app** | El changelog en cristiano, versión a versión, marcando en cuál estás. |
 | **¿Cómo funciona todo esto?** | El recorrido de la app y cuándo pasa cada cosa. |
-| **Ajustes** | Tu música · identificación · Lidarr, Prowlarr/Jackett, qBittorrent e importación · prioridad de trackers · auto-descarga · **vigilancia de «Lo quiero»** · **biblioteca de Spotify** · notificaciones · escritura de etiquetas (opt-in) · **copia de seguridad** · tema claro/oscuro. |
-| **Diagnóstico** | Estado de las conexiones y de los procesos de fondo, para cazar problemas. |
+| **Ajustes** | Tu música · identificación · Lidarr, Prowlarr/Jackett, qBittorrent e importación · prioridad de trackers · **límite de peticiones a los indexers** · auto-descarga · **vigilancia de «Lo quiero»** · **biblioteca de Spotify** · notificaciones · escritura de etiquetas y **letras `.lrc` junto al audio** (ambas opt-in) · **copia de seguridad** · tema claro/oscuro. |
+| **Diagnóstico** | Estado de las conexiones y de los procesos de fondo, para cazar problemas, y el **gasto de peticiones** por servicio frente al límite que se aplica. |
 
 ---
 
@@ -383,6 +395,26 @@ apruebas en Spotify y pegas el `code` que te devuelve. Si sirves Liderarr por HT
 
 ---
 
+## 🎤 Letras
+
+Cada pista de la ficha de un disco tiene su botón de letra, y **«Buscar letras»** las trae todas
+de una vez. Vienen de [LRCLIB](https://lrclib.net) —abierto, sin clave— y muchas están
+**sincronizadas**: entonces se ven las marcas de tiempo al lado.
+
+Se guardan en la base de datos, **nunca dentro de tus ficheros**. Pero con **«Guardar .lrc»**
+(hay que activarlo en Ajustes → 4d) se escribe un `Canción.lrc` junto a cada fichero para que
+**lo lea tu reproductor de siempre**: Plex, Symfonium, Navidrome, foobar… Liderarr hace de
+recolector y tú las escuchas donde quieras.
+
+- **No toca tu audio y no rompe el hardlink del torrent.** Escribe un fichero nuevo al lado; el
+  inodo del audio ni se roza, así que sigues sembrando igual. Hay un test que lo vigila.
+- **No pisa un `.lrc` que ya exista**: si tienes los tuyos, mandan los tuyos.
+- Requiere la música montada en **modo escritura** (`:rw`). Si está en solo lectura, te lo dice.
+- **Antes sin letra que con la equivocada**: LRCLIB indexa muchas versiones del mismo tema y lo
+  único que distingue la tuya es la duración, así que un resultado que se pase de 4 s se descarta.
+
+---
+
 ## 📥 Importar descargas a la biblioteca
 
 Liderarrr **enlaza (hardlink)** lo que bajas a tu biblioteca organizada `{artista}/{álbum (año)}`,
@@ -402,6 +434,42 @@ origen** (sigues sembrando) y solo enlaza (0 espacio extra si comparten volumen)
   coge el auto-import (reversible).
 - **Remapeo de rutas:** si tu cliente reporta una ruta distinta a la que Liderarr tiene montada,
   una regla `rutaCliente => rutaLocal` en Ajustes lo traduce.
+
+---
+
+## 🚦 No molestar: límites de peticiones
+
+Liderarr vive de servicios ajenos —tu tracker vía Prowlarr/Jackett, MusicBrainz, Last.fm,
+ListenBrainz, AcoustID, Deezer, LRCLIB—, casi todos **gratuitos**. Pasarse con ellos tiene
+consecuencias de verdad: en un tracker privado, un bloqueo.
+
+Por eso **la app se frena sola**, y el freno está donde pasan todas las peticiones (los
+clientes HTTP), no en cada bucle: así ninguna función nueva puede saltárselo por descuido.
+
+| Servicio | Lo que se aplica |
+|---|---|
+| **Tu tracker** (vía Prowlarr/Jackett) | **Configurable** en Ajustes → 3f. De fábrica **6 cada 10 s** |
+| MusicBrainz | 1 por segundo (su norma), con dos carriles: lo que pides tú no espera detrás del trabajo de fondo |
+| Last.fm | 4 por segundo |
+| ListenBrainz | 3 por segundo, **y hace caso al cupo que él mismo informa** en cada respuesta |
+| AcoustID | 2 por segundo (su norma es 3) |
+| Deezer | 5 por segundo |
+| LRCLIB | Una cada vez, con pausa, y todo cacheado |
+
+Dos detalles que importan más de lo que parece:
+
+- **No basta con respetar el total: también se separan en el tiempo.** Diez peticiones de golpe
+  y luego diez segundos parado cumple «10 cada 10 s» sobre el papel, pero es justo la ráfaga que
+  hace saltar las alarmas de un tracker.
+- **El valor de fábrica deja aire a propósito** (6, no 10). Prowlarr gasta cupo por su cuenta
+  con sus sincronizaciones RSS y comprobaciones de salud, y ese cupo Liderarr no lo ve.
+
+En **Diagnóstico** tienes el límite que se está aplicando y cuántas peticiones llevas. Sirve para
+responder cuando un tracker pregunta *«¿usas herramientas automáticas y respetan nuestros
+límites?»* — porque la respuesta es sí, y ahí está el número.
+
+> Esto cubre lo que manda Liderarr. Revisa también, en Prowlarr, los campos **Query Limit** y
+> **Grab Limit** del indexer, que cubren lo que Prowlarr haga por su cuenta.
 
 ---
 
@@ -433,6 +501,10 @@ teléfono.
   Existe una opción **opt-in** para escribir *solo los MBID* en álbumes ya identificados, con
   previsualización y confirmación, y nunca sobre rarezas (requiere activarla **y** montar la
   música en `:rw`).
+- La otra opción **opt-in** que escribe en la carpeta de música son los **`.lrc` de letras**, y
+  escriben **ficheros nuevos**: ni tocan tu audio ni rompen el hardlink del torrent.
+- Liderarrr **se autolimita** con los servicios de los que tira, tu tracker incluido. No es solo
+  buena educación: evita bloqueos. Ver [No molestar](#-no-molestar-límites-de-peticiones).
 - Credenciales cifradas en disco con `LIDERARRR_SECRET` (AES-256-GCM). Incluye el token de
   Spotify, que además solo se pide con los permisos mínimos.
 - Autenticación básica opcional con `LIDERARRR_AUTH="usuario:contraseña"`.
