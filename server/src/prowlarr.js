@@ -1,5 +1,6 @@
 import { getSetting } from './db.js';
 import { cleanSearchQuery } from './searchquery.js';
+import { acquire } from './ratelimit.js';
 
 // Prowlarr agrega TODOS tus indexers (RED, OPS, lo de Jackett) y expone una API de
 // búsqueda y de "grab" (agarrar) que empuja la release a su cliente de descarga.
@@ -13,9 +14,14 @@ export function prowlarrConfig() {
   return { url, key };
 }
 
-async function prowlarrFetch(path, { method = 'GET', body } = {}) {
+async function prowlarrFetch(path, { method = 'GET', body, limited = true } = {}) {
   const { url, key } = prowlarrConfig();
   if (!url || !key) throw new Error('Prowlarr no configurado (URL o API key vacíos)');
+  // Freno de peticiones AQUÍ, no en quien llama: cada búsqueda y cada «grab» acaba siendo una
+  // petición al tracker, y los trackers privados tienen un tope (RED: 10 cada 10 s). Poniéndolo
+  // en el cuello de botella, ninguna función nueva puede saltárselo por descuido. Las consultas
+  // a Prowlarr que NO salen al tracker (estado, lista de clientes) van sin freno.
+  if (limited) await acquire('indexer');
   const t0 = Date.now();
   let res;
   try {
@@ -63,12 +69,12 @@ async function prowlarrFetch(path, { method = 'GET', body } = {}) {
 // Clientes de descarga configurados EN Prowlarr (Settings → Download Clients). Es a
 // donde Prowlarr empuja lo que agarra: si no hay ninguno, un «grab» no descarga nada.
 export async function prowlarrDownloadClients() {
-  const list = await prowlarrFetch('/downloadclient');
+  const list = await prowlarrFetch('/downloadclient', { limited: false });
   return Array.isArray(list) ? list : [];
 }
 
 export async function prowlarrTest() {
-  const status = await prowlarrFetch('/system/status');
+  const status = await prowlarrFetch('/system/status', { limited: false });
   // CLAVE sin Lidarr: Liderarr NO habla con qBittorrent en el flujo Prowlarr; le pide a
   // Prowlarr que agarre, y Prowlarr empuja a SU cliente de descarga. En un montaje *Arr
   // clásico ese cliente vive en Lidarr, no en Prowlarr, así que al «liberar de Lidarr» es

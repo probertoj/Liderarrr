@@ -9,6 +9,24 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ## [Sin publicar]
 
+### Arreglado
+- **Liderarr se pasaba del límite de peticiones de los trackers privados, y eso cuesta un
+  bloqueo.** Pasó de verdad: RED permite «no más de 10 peticiones cada 10 segundos» y los bucles
+  de la app disparaban muchísimas más. Medido contra un indexer de pruebas que las cuenta:
+  el barrido de «Lo quiero» con 20 discos mandaba **40 peticiones en 0,9 segundos** — cuatro veces
+  el tope, de una tacada. Los mismos 20 discos ahora salen en 58 s, con un **máximo de 6 en
+  cualquier ventana de 10 s**.
+  - El freno va en el **cuello de botella** (los clientes de Prowlarr y Jackett), no en cada
+    bucle: así ninguna función nueva puede saltárselo por descuido. Afecta a búsquedas y a
+    «grabs», que es lo que llega al tracker; las consultas de estado no gastan cupo.
+  - **No basta con respetar el total: también las separa en el tiempo.** Diez de golpe y luego
+    diez segundos parado cumple «10 cada 10 s» sobre el papel, pero es justo la ráfaga que
+    dispara las alarmas. Hay separación mínima entre una y la siguiente.
+  - Por defecto **6 cada 10 s**, no 10: Prowlarr también gasta cupo por su cuenta (RSS, salud) y
+    ese no lo ve Liderarr. Ajustable en **Ajustes → 3f**.
+  - En **Diagnóstico** se ve el límite aplicado y cuántas peticiones llevas, para poder responder
+    si un tracker pregunta.
+
 ### Añadido
 - **El buscador rápido encuentra géneros.** Escribe «shoegaze» y te lleva a tu shoegaze; escribe
   «rock» y ves Rock con sus 4.796 discos, luego Rock alternativo, Hard rock… Con el nº de discos

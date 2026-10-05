@@ -1,5 +1,6 @@
 import { getSetting } from './db.js';
 import { cleanSearchQuery } from './searchquery.js';
+import { acquire } from './ratelimit.js';
 
 // Jackett es la ALTERNATIVA a Prowlarr para la busqueda manual (Prowlarr resulta mas
 // inestable). Diferencia clave: Jackett expone Torznab y SOLO BUSCA; no empuja al
@@ -19,9 +20,12 @@ function torznabUrl(url, key, params) {
   return `${url}/api/v2.0/indexers/all/results/torznab/api?apikey=${enc(key)}&${qs}`;
 }
 
-async function torznabFetch(params) {
+async function torznabFetch(params, { limited = true } = {}) {
   const { url, key } = jackettConfig();
   if (!url || !key) throw new Error('Jackett no configurado (URL o API key vacios)');
+  // Mismo freno que en Prowlarr: cada búsqueda acaba en una petición al tracker, y los
+  // privados tienen tope (RED: 10 cada 10 s). Va aquí para que ningún bucle lo esquive.
+  if (limited) await acquire('indexer');
   const t0 = Date.now();
   let res;
   try {
@@ -108,7 +112,7 @@ function parseTorznab(xml) {
 
 export async function jackettTest() {
   // t=caps no requiere query y valida url+apikey de una
-  const xml = await torznabFetch({ t: 'caps' });
+  const xml = await torznabFetch({ t: 'caps' }, { limited: false }); // caps no consulta al tracker
   if (!/<caps/i.test(xml)) throw new Error('Respuesta inesperada de Jackett (sin <caps>)');
   return { ok: true, name: 'Jackett' };
 }

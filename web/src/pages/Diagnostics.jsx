@@ -194,6 +194,42 @@ export default function Diagnostics() {
         </div>
       </div>
 
+      {/* Freno de peticiones a los indexers: esto es lo que se le enseña a un tracker que
+          pregunte qué límite aplicas. */}
+      {d.indexerRate && (
+        <div className="card p-4 mb-4">
+          <h2 className="text-sm text-neutral-400 mb-1">Límite de peticiones a los indexers</h2>
+          <p className="text-xs text-neutral-600 mb-3">
+            Toda búsqueda y toda descarga que Liderarr pide a Prowlarr o Jackett acaba siendo una petición a tu
+            tracker. Los privados tienen un tope (RED: 10 cada 10 s) y pasarse es motivo de bloqueo, así que la app
+            las reparte ella misma. Se ajusta en Ajustes.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+            <div>
+              <div className="text-neutral-500 text-xs">Tope aplicado</div>
+              <div className="text-emerald-400">
+                {d.indexerRate.limit} cada {d.indexerRate.windowSeconds}s
+              </div>
+            </div>
+            <div>
+              <div className="text-neutral-500 text-xs">Separación mínima</div>
+              <div>{(d.indexerRate.minGapMs / 1000).toFixed(1)}s</div>
+            </div>
+            <div>
+              <div className="text-neutral-500 text-xs">En la ventana actual</div>
+              <div>
+                {d.indexerRate.inWindow} / {d.indexerRate.limit}
+                {d.indexerRate.waiting > 0 ? ` · ${d.indexerRate.waiting} esperando` : ''}
+              </div>
+            </div>
+            <div>
+              <div className="text-neutral-500 text-xs">Desde que arrancó</div>
+              <div>{d.indexerRate.totalRequests} peticiones</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* eventos */}
       <div className="card p-4">
         <h2 className="text-sm text-neutral-400 mb-2">Eventos recientes ({d.events.length})</h2>

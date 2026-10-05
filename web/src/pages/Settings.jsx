@@ -959,6 +959,41 @@ export default function Settings() {
         </div>
       </section>
 
+      {/* 3f. Límite de peticiones a los indexers */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">
+          3f · Límite de peticiones a los indexers{' '}
+          <span className="text-xs text-amber-400/90 border border-amber-500/40 bg-amber-500/10 rounded px-1.5 py-0.5">
+            evita bloqueos
+          </span>
+        </h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Cada búsqueda y cada descarga que Liderarr pide a Prowlarr o Jackett acaba siendo{' '}
+          <b className="font-normal text-neutral-400">una petición a tu tracker</b>. Los privados ponen un tope —RED:
+          «no más de 10 peticiones cada 10 segundos»— y pasarse es motivo de bloqueo. Liderarr las reparte él mismo:
+          respeta el tope <em>y</em> las separa en el tiempo, porque una ráfaga de diez y luego diez segundos parado
+          cumple la norma sobre el papel pero es justo lo que hace saltar las alarmas.
+        </p>
+        <p className="text-xs text-neutral-500 mb-3">
+          El valor de fábrica (6 cada 10 s) deja aire a propósito:{' '}
+          <b className="font-normal text-neutral-400">Prowlarr también gasta cupo por su cuenta</b> con sus
+          sincronizaciones RSS y comprobaciones de salud, y ese cupo no lo ve Liderarr. Súbelo solo si sabes que te
+          sobra margen.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Peticiones" hint="Máximo por ventana. Para RED, no pases de 10 (y mejor por debajo).">
+            <input type="number" value={s.indexer_rate_requests || '6'} onChange={set('indexer_rate_requests')} className={input} />
+          </Field>
+          <Field label="Ventana (segundos)" hint="El periodo sobre el que se cuentan. RED usa 10 s.">
+            <input type="number" value={s.indexer_rate_seconds || '10'} onChange={set('indexer_rate_seconds')} className={input} />
+          </Field>
+        </div>
+        <p className="text-xs text-neutral-600 mt-2">
+          En «Diagnóstico» puedes ver el límite que se está aplicando y cuántas peticiones llevas: sirve para
+          responder si un tracker te pregunta.
+        </p>
+      </section>
+
       {/* 4b. Auto-descargar nativo (sin Lidarr) */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">
