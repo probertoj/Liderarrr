@@ -7,7 +7,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
-## [Sin publicar]
+## [1.3.0] - 2026-10-25
+
+**Red de seguridad.** Esta versión nace de un susto real: el volumen del NAS se quedó sin
+sitio, SQLite partió la base de datos a mitad de una escritura nocturna y la copia más
+reciente era una exportación manual de dos meses antes. Se recuperó entera, pero el aviso
+estaba claro: copiar la base no puede depender de que te acuerdes.
 
 ### Añadido
 - **Copias de seguridad automáticas de la base.** Todos los días, a la hora que digas (de

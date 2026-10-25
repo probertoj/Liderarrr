@@ -1,6 +1,6 @@
 # 🎵 Liderarrr
 
-> **v1.2** · Panel de **completismo** para tu colección de música digital. Escanea tus
+> **v1.3** · Panel de **completismo** para tu colección de música digital. Escanea tus
 > ficheros, los identifica contra MusicBrainz / AcoustID / Discogs / Last.fm, y te enseña qué
 > tienes, qué te falta y qué es una rareza — y te ayuda a **conseguirlo y ordenarlo**, con o
 > sin Lidarr.
@@ -19,7 +19,9 @@ Desde la 0.7 es **independiente de Lidarr**: busca, descarga e importa por su cu
 sigue soportado, pero es **opcional**. La **1.0** cerró el círculo: saber qué tienes en
 **streaming y no en disco** (y al revés), y **«Lo quiero»**, una lista de deseos que se descarga
 sola en cuanto el disco aparece en tus trackers. La **1.1** añadió explorar por **géneros**, y
-la **1.2** el **cuidado con los servicios ajenos** (ver abajo) y las **letras**.
+la **1.2** el **cuidado con los servicios ajenos** (ver abajo) y las **letras**. La **1.3**
+pone la red de seguridad: **copias automáticas** de la base y aviso antes de que el disco se
+quede sin sitio.
 
 > ### ⚠️ Si usas trackers privados, lee esto
 > Liderarr **limita las peticiones que acaban en tu tracker** (Ajustes → 3f, de fábrica 6 cada
@@ -304,7 +306,7 @@ El menú está agrupado con guiños musicales; aquí va cada sección con lo que
 |---|---|
 | **Novedades de la app** | El changelog en cristiano, versión a versión, marcando en cuál estás. |
 | **¿Cómo funciona todo esto?** | El recorrido de la app y cuándo pasa cada cosa. |
-| **Ajustes** | Tu música · identificación · Lidarr, Prowlarr/Jackett, qBittorrent e importación · prioridad de trackers · **límite de peticiones a los indexers** · auto-descarga · **vigilancia de «Lo quiero»** · **biblioteca de Spotify** · notificaciones · escritura de etiquetas y **letras `.lrc` junto al audio** (ambas opt-in) · **copia de seguridad** · tema claro/oscuro. |
+| **Ajustes** | Tu música · identificación · Lidarr, Prowlarr/Jackett, qBittorrent e importación · prioridad de trackers · **límite de peticiones a los indexers** · auto-descarga · **vigilancia de «Lo quiero»** · **biblioteca de Spotify** · notificaciones · escritura de etiquetas y **letras `.lrc` junto al audio** (ambas opt-in) · **copias de seguridad automáticas** · tema claro/oscuro. |
 | **Diagnóstico** | Estado de las conexiones y de los procesos de fondo, para cazar problemas, y el **gasto de peticiones** por servicio frente al límite que se aplica. |
 
 ---
@@ -478,9 +480,21 @@ límites?»* — porque la respuesta es sí, y ahí está el número.
 - **Notificaciones por webhook** (Discord, Slack, ntfy): Liderarr te avisa cuando **importa
   descargas** —diciendo **qué** discos entraron, no solo cuántos—, cuando hay **novedades** de tus
   artistas y cuando pilla algo de **«Lo quiero»**. En Ajustes → *Notificaciones*.
-- **Copia de seguridad:** descarga tu base de datos completa desde Ajustes, y **restáurala**
-  subiendo el `.db` cuando lo necesites. Al restaurar se valida el fichero, se guarda un respaldo
-  automático de la base actual y la app se reinicia sola.
+- **Copias de seguridad automáticas:** todos los días, a la hora que digas, Liderarrr guarda una
+  copia de su base de datos en `/data/backups` y mantiene las últimas que quieras (de fábrica, 7).
+  En Ajustes las ves todas, haces una a mano, la descargas o **vuelves a cualquiera** de un clic.
+  - Se hace con `VACUUM INTO`, que no es copiar el fichero: saca una instantánea **coherente de la
+    base en uso** sin parar la app y la reconstruye desde las tablas. Una copia que termina bien es
+    **sana por definición**, en vez de ser el calco de una base que ya estaba dañada. De paso la
+    compacta: una base de 521 MB cabe en 248 MB de copia.
+  - Aun así, **llévate alguna fuera del NAS**: una copia en el mismo disco no te salva de que ese
+    disco falle.
+- **Aviso de poco espacio:** si quedan menos de los GB que marques donde vive la base, te avisa en
+  Ajustes, en Diagnóstico y por notificación. Quedarse sin sitio es lo que corrompe una base SQLite
+  a mitad de una escritura, y de ahí sale toda esta sección.
+- **Restaurar:** elige una de las copias, o sube el `.db` que descargaste. Se valida el fichero, se
+  guarda un respaldo de la base actual y la app se reinicia sola para hacer el cambio con la base
+  cerrada, que es el único momento en que es seguro.
 
 ---
 

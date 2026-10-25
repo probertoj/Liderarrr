@@ -9,6 +9,17 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.3.0',
+    title: 'Red de seguridad: copias solas y aviso antes de que el disco se llene',
+    items: [
+      'Liderarrr se hace una copia de la base de datos todos los días, sola. Esto viene de un susto de verdad: el volumen del NAS se quedó sin sitio, SQLite partió la base a mitad de una escritura nocturna y la copia más reciente era una exportación manual de dos meses antes. Se recuperó entera, pero el aviso estaba claro.',
+      'La copia va a /data/backups, a la hora que digas (de fábrica las 4 de la mañana) y guardando las últimas que quieras (de fábrica 7). En Ajustes → 6 tienes la lista: copiar ahora, descargar, borrar o volver a una copia de un clic.',
+      'No es un simple duplicado del fichero: se usa VACUUM INTO, que saca una instantánea coherente de la base EN USO sin parar la app y la reconstruye desde las tablas. Una copia que termina bien es sana por definición, en vez de ser el calco de una base ya rota. De paso la compacta: 521 MB de base caben en 248 MB de copia.',
+      'Y la otra mitad del problema: si quedan menos GB de los que marques donde vive la base (de fábrica 20), te avisa en Ajustes, en Diagnóstico y por notificación. Quedarse sin espacio es justo lo que corrompe una base a mitad de escritura.',
+      'Arreglado: una base de datos corrupta ya no deja el contenedor reiniciándose en bucle para siempre. Ahora el arranque lo detecta, explica qué ha pasado, apunta al disco lleno como causa probable, te da los dos caminos para recuperarla y se queda quieto en vez de machacar el disco.',
+    ],
+  },
+  {
     version: '1.2.0',
     title: 'Buen vecino: no pasarse con nadie, y letras',
     items: [
