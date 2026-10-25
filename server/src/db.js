@@ -54,6 +54,75 @@ if (fs.existsSync(IMPORT_PATH)) {
   }
 }
 
+// Una base corrupta (lo habitual: el volumen se queda sin sitio a mitad de un WAL, o
+// un apagón sucio) revienta en la PRIMERA consulta del arranque, más abajo. Y con el
+// contenedor puesto a reiniciarse eso es un bucle: miles de vueltas tirando del disco
+// —1701 en un caso real—, el log lleno del mismo stack de SQLite y en ningún sitio qué
+// hacer. Auditar la base al abrirla costaría un arranque entero (12 s con 500 MB), así
+// que no se audita: se caza el error justo cuando salta, que es gratis. Un fallo en la
+// evaluación de un módulo ESM llega aquí igual que cualquier otro. Se registra ANTES
+// de abrir la base porque un fichero que ya no es ni una base de datos revienta en el
+// propio new Database().
+//
+// El fichero del usuario NO se toca: decidir entre repararlo o restaurar una copia es
+// cosa suya, y hacerlo por su cuenta sería jugar con la única copia que le queda.
+let servidorEnMarcha = false;
+let yaAvisadoDeLaCorrupcion = false;
+
+/** Lo llama index.js cuando el servidor ya escucha: a partir de ahí no estamos arrancando. */
+export function marcarServidorEnMarcha() {
+  servidorEnMarcha = true;
+}
+
+function huelaACorrupcion(e) {
+  const texto = `${e && e.code} ${(e && e.message) || e}`;
+  return /SQLITE_CORRUPT|SQLITE_NOTADB|malformed|not a database|file is not a database/i.test(texto);
+}
+
+process.on('uncaughtException', (e) => {
+  if (!huelaACorrupcion(e)) {
+    // Lo que no es corrupción no es asunto de esta guarda. En marcha ya decide index.js
+    // (prefiere seguir vivo); arrancando, se muere como siempre y que lo reintente quien
+    // gobierne el contenedor.
+    if (servidorEnMarcha) return;
+    console.error('[fatal] el arranque no pudo completarse:', e);
+    process.exit(1);
+  }
+  if (!yaAvisadoDeLaCorrupcion) {
+    yaAvisadoDeLaCorrupcion = true;
+    console.error(
+      [
+        '',
+        '  ================================================================',
+        '   LA BASE DE DATOS ESTÁ CORRUPTA.',
+        '  ================================================================',
+        '',
+        `  SQLite dice: ${(e && e.message) || e}`,
+        `  Fichero:     ${DB_PATH}`,
+        '',
+        '  La causa casi siempre es la misma: el volumen se quedó SIN ESPACIO mientras',
+        '  SQLite escribía, o el equipo se apagó a lo bruto. Mira el espacio libre',
+        '  (df -h) ANTES de recuperar, o se romperá otra vez.',
+        '',
+        '  Para recuperarla, trabajando SIEMPRE sobre una copia:',
+        '    1) cp liderarrr.db liderarrr.db.copia',
+        '    2) sqlite3 liderarrr.db.copia "PRAGMA integrity_check"',
+        '       - si solo se queja de índices:  sqlite3 liderarrr.db.copia "REINDEX"',
+        '       - si hay páginas de datos mal:  sqlite3 roto.db ".recover" | sqlite3 nueva.db',
+        '',
+        '  O restaura una copia de seguridad sin pelearte con nada: deja el .db bueno',
+        `  como ${DB_PATH}.import y reinicia; el cambio se hace solo al arrancar.`,
+        '',
+      ].join('\n')
+    );
+  }
+  if (!servidorEnMarcha) {
+    console.error('  El proceso se queda AQUÍ parado, sin reiniciarse, para no machacar el');
+    console.error('  disco y para que puedas leer esto con calma.');
+    setInterval(() => {}, 60_000); // un asa viva: así Node no se sale por su cuenta
+  }
+});
+
 export const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');

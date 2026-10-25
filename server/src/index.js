@@ -6,7 +6,16 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
-import { db, DATA_DIR, DB_PATH, getAllSettings, getSetting, setSetting, stageDatabaseImport } from './db.js';
+import {
+  db,
+  DATA_DIR,
+  DB_PATH,
+  getAllSettings,
+  getSetting,
+  setSetting,
+  stageDatabaseImport,
+  marcarServidorEnMarcha,
+} from './db.js';
 import { runScan, scanStatus } from './scanner.js';
 import { regroupDiscs, combineAlbums, uncombineAlbum, combineCandidates, boxInfo, identifyBox } from './discgroup.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch, matchByMbUrl } from './identify.js';
@@ -1497,6 +1506,7 @@ const PORT = Number(process.env.PORT) || 3861;
 app
   .listen({ port: PORT, host: '0.0.0.0' })
   .then(() => {
+    marcarServidorEnMarcha(); // ya no estamos arrancando: un fallo de la base no debe parar esto
     console.log(`[Liderarrr] escuchando en http://0.0.0.0:${PORT}`);
     scheduleNightly();
     scheduleAutoImport();
