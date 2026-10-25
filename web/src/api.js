@@ -24,6 +24,12 @@ export const api = {
   version: () => req('/version'),
   updateCheck: () => req('/update-check'),
   diag: () => req('/diag'),
+
+  // copias de seguridad de la base
+  backups: () => req('/backups'),
+  backupRun: () => req('/backups/run', { method: 'POST' }),
+  backupDelete: (name) => req(`/backups/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  backupRestore: (name) => req(`/backups/${encodeURIComponent(name)}/restore`, { method: 'POST' }),
   settings: () => req('/settings'),
   saveSettings: (body) => req('/settings', { method: 'PUT', body }),
   test: (svc) => req(`/settings/test/${svc}`, { method: 'POST' }),

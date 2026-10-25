@@ -7,6 +7,32 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [Sin publicar]
+
+### Añadido
+- **Copias de seguridad automáticas de la base.** Todos los días, a la hora que digas (de
+  fábrica las 4 de la mañana), guarda una copia en `/data/backups` y mantiene las últimas N
+  (de fábrica 7). Desde Ajustes → 6 puedes hacer una a mano, descargarla, borrarla o **volver
+  a ella** con un clic.
+  - Se hace con `VACUUM INTO`, que no es un `cp`: saca una instantánea **coherente de la base
+    en uso** —con su WAL— sin parar la app, y la reconstruye desde las tablas. Así una copia
+    que termina bien es sana por definición, en vez de ser un calco de una base ya dañada.
+  - De paso la compacta: 521 MB de base caben en 248 MB de copia, así que guardar siete no
+    cuesta siete veces.
+  - Se escribe con nombre provisional y se renombra al final: una copia que falla a medias
+    nunca destruye la que ya tenías.
+- **Aviso de poco espacio en disco.** Si quedan menos de los GB que marques (de fábrica 20)
+  donde vive la base, lo dice en Ajustes, en Diagnóstico y por notificación —una vez al día—.
+  Quedarse sin sitio es lo que corrompe una SQLite a mitad de escritura.
+
+### Arreglado
+- **Una base de datos corrupta ya no deja el contenedor reiniciándose en bucle.** Pasó de
+  verdad: 1701 reinicios, el log lleno del mismo error de SQLite y ninguna pista de qué hacer.
+  Ahora el arranque lo detecta, explica qué ha pasado, apunta al disco lleno como causa
+  probable, da los dos caminos de recuperación y se queda quieto en vez de machacar el disco.
+
+---
+
 ## [1.2.0] — 2026-10-05
 
 **Buen vecino.** Esta versión nace de un bloqueo real en un tracker privado por pasarse de

@@ -33,6 +33,19 @@ import { runAutoGrab, autoGrabConfig, autoGrabStatus, searchAndGrabBest } from '
 import { addWanted, removeWanted, wantedList, wantedKeys, wantedCounts, wantedConfig, wantedStatus, runWantedWatch } from './wanted.js';
 import { genreTree, genreDetail, genreRecommendations, albumGenres, artistGenres, mapGenreTag, unmapGenreTag, mappedTags, hideGenre, taxonomy, genreOptions, idsForGenreKey } from './genres.js';
 import { lyricsOfTrack, albumLyricsState, importTrackLyrics, importAlbumLyrics, lyricsStatus, lyricsCounts, writeLrcForAlbum, lrcWritingEnabled } from './lyrics.js';
+import {
+  backupConfig,
+  backupStatus,
+  backupPath,
+  listBackups,
+  runBackup,
+  deleteBackup,
+  stageRestore,
+  estadoEspacio,
+  dbBytes,
+  tocaCopia,
+  vigilarEspacio,
+} from './backups.js';
 import { mbTest, searchReleaseGroup, searchReleaseGroups, searchArtists, searchLabels, runBackground, releaseGroupOfRelease } from './musicbrainz.js';
 import { buildReleaseSeed, findPossibleDuplicate } from './mbseed.js';
 import { acoustidTest } from './acoustid.js';
@@ -171,7 +184,9 @@ app.addHook('onResponse', async (req, reply) => {
 // --- meta -------------------------------------------------------------------
 app.get('/api/version', async () => ({ name: 'Liderarrr', version: pkg.version }));
 app.get('/api/update-check', async () => updateCheck());
-app.get('/api/diag', async () => diagnostics());
+// El espacio del volumen se anade aqui y no dentro de diagnostics() para no cruzar los
+// modulos: diag.js ya lo usa backups.js, y al reves seria un circulo.
+app.get('/api/diag', async () => ({ ...diagnostics(), space: estadoEspacio() }));
 
 // --- ajustes ----------------------------------------------------------------
 const SECRET_KEYS = new Set(['lidarr_key', 'prowlarr_key', 'jackett_key', 'qbittorrent_pass', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token', 'spotify_client_secret', 'notify_url', 'listenbrainz_token']);
@@ -1427,6 +1442,56 @@ app.post('/api/restore/database', async (req, reply) => {
   return reply;
 });
 
+// --- copias automáticas -----------------------------------------------------
+app.get('/api/backups', async () => ({
+  config: backupConfig(),
+  items: listBackups(),
+  status: backupStatus,
+  space: estadoEspacio(),
+  dbBytes: dbBytes(),
+}));
+
+app.post('/api/backups/run', async (req, reply) => {
+  try {
+    return await runBackup('manual');
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+
+app.get('/api/backups/:name/download', async (req, reply) => {
+  let ruta;
+  try {
+    ruta = backupPath(req.params.name); // valida el nombre: nada de salirse de la carpeta
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+  reply.header('Content-Disposition', `attachment; filename="${req.params.name}"`);
+  reply.header('Content-Type', 'application/octet-stream');
+  return reply.send(fs.createReadStream(ruta));
+});
+
+app.delete('/api/backups/:name', async (req, reply) => {
+  try {
+    return deleteBackup(req.params.name);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+
+// Restaurar desde una copia: se valida y se deja pendiente; el cambio lo hace db.js al
+// arrancar. Se responde ANTES de salir para que el navegador reciba el ok.
+app.post('/api/backups/:name/restore', async (req, reply) => {
+  try {
+    stageRestore(req.params.name);
+  } catch (err) {
+    return reply.code(400).send({ error: `No se pudo preparar la restauración: ${String(err.message || err)}` });
+  }
+  reply.send({ ok: true, restarting: true });
+  setTimeout(() => process.exit(0), 300);
+  return reply;
+});
+
 // --- SPA estática -----------------------------------------------------------
 const webDist = path.resolve(__dirname, '../../web/dist');
 if (fs.existsSync(webDist)) {
@@ -1435,6 +1500,16 @@ if (fs.existsSync(webDist)) {
     if (req.raw.url?.startsWith('/api/')) return reply.code(404).send({ error: 'No encontrado' });
     return reply.sendFile('index.html');
   });
+}
+
+// Copia diaria de la base y vigilancia del espacio libre. Las dos mitades del mismo
+// problema: tener copias, y enterarte de que el disco se llena ANTES de que rompa nada.
+function scheduleBackup() {
+  setInterval(() => {
+    vigilarEspacio().catch(() => {});
+    if (backupStatus.running || !tocaCopia()) return;
+    runBackup('automática').catch((e) => console.warn('[copias] la copia diaria falló:', String(e.message || e)));
+  }, 60 * 1000);
 }
 
 // --- cron nocturno (03:00) --------------------------------------------------
@@ -1511,6 +1586,7 @@ app
     scheduleNightly();
     scheduleAutoImport();
     scheduleWantedWatch();
+    scheduleBackup();
     // backfill de multidiscos: reagrupa cajas sobre lo ya escaneado, sin exigir un
     // reescaneo completo. Diferido para no retrasar el primer request. Solo lectura.
     setImmediate(() => {

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Settings as SettingsIcon, Check, X, Loader2, Download, Upload, FolderSearch, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Settings as SettingsIcon, Check, X, Loader2, Download, Upload, FolderSearch, RefreshCw, AlertTriangle, HardDrive, RotateCcw, Trash2 } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, Button } from '../components.jsx';
 
@@ -322,6 +322,141 @@ function TestButton({ service, label, beforeTest }) {
 
 // Restaurar/importar la base de datos desde una copia. Acción destructiva (reemplaza toda
 // la base) pero con respaldo automático; sube el .db y reinicia la app para aplicar el swap.
+// Copias automáticas: lo que hay guardado, cuánto sitio queda y los botones para hacer una
+// ahora, descargarla o volver a ella. La lista importa tanto como el automatismo: una copia
+// que no sabes si existe no tranquiliza a nadie.
+function BackupList() {
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const load = () => api.backups().then(setData).catch(() => {});
+  useEffect(() => {
+    load();
+  }, []);
+
+  const copiaAhora = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.backupRun();
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy(false);
+  };
+
+  const borrar = async (name) => {
+    if (!confirm(`¿Borrar la copia «${name}»?`)) return;
+    try {
+      await api.backupDelete(name);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
+
+  const restaurar = async (name) => {
+    if (
+      !confirm(
+        `Vas a REEMPLAZAR toda la base de datos por la copia «${name}».\n\n` +
+          'Se guardará un respaldo de la actual y la app se reiniciará. ¿Continuar?'
+      )
+    )
+      return;
+    try {
+      await api.backupRestore(name);
+      setErr(null);
+      setTimeout(() => window.location.reload(), 4500);
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
+
+  if (!data) return null;
+  const mb = (b) => (b / 1024 ** 2).toFixed(0).toLocaleString('es') + ' MB';
+  const gb = (b) => (b / 1024 ** 3).toFixed(1);
+  const cuando = (ms) => new Date(ms).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' });
+
+  return (
+    <div className="mt-4 pt-4 border-t border-ink-800">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <span className="text-sm text-neutral-300">
+          Copias guardadas <span className="text-neutral-600">({data.items.length})</span>
+        </span>
+        <Button onClick={copiaAhora} disabled={busy}>
+          <span className="inline-flex items-center gap-1.5">
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <HardDrive size={14} />}
+            {busy ? 'Copiando…' : 'Copiar ahora'}
+          </span>
+        </Button>
+      </div>
+
+      {data.space && (
+        <p className={`text-xs mb-2 ${data.space.bajo ? 'text-amber-400' : 'text-neutral-600'}`}>
+          {data.space.bajo && <AlertTriangle size={12} className="inline mr-1 -mt-0.5" />}
+          Quedan <b className="font-normal">{gb(data.space.free)} GB</b> libres donde vive la base (ocupa{' '}
+          {mb(data.dbBytes)}).
+          {data.space.bajo && ' Sin espacio, SQLite puede romper la base a mitad de una escritura.'}
+        </p>
+      )}
+
+      {err && <p className="text-xs text-red-400 mb-2">{err}</p>}
+      {data.status?.lastError && !err && (
+        <p className="text-xs text-red-400 mb-2">
+          La última copia automática falló: {data.status.lastError.error}
+        </p>
+      )}
+
+      {data.items.length === 0 ? (
+        <p className="text-xs text-neutral-600">
+          Todavía no hay ninguna. La primera se hará sola esta madrugada, o dale a «Copiar ahora».
+        </p>
+      ) : (
+        <ul className="text-sm divide-y divide-ink-800 border border-ink-800 rounded-lg overflow-hidden">
+          {data.items.map((b, i) => (
+            <li key={b.name} className="flex items-center justify-between gap-2 px-3 py-2 bg-ink-850/50">
+              <span className="min-w-0">
+                <span className="block truncate">
+                  {cuando(b.mtime)}
+                  {i === 0 && <span className="ml-2 text-xs text-gold-400">la más reciente</span>}
+                </span>
+                <span className="block text-xs text-neutral-600 truncate">
+                  {b.name} · {mb(b.bytes)}
+                </span>
+              </span>
+              <span className="flex items-center gap-1 shrink-0">
+                <a
+                  href={`/api/backups/${encodeURIComponent(b.name)}/download`}
+                  title="Descargar"
+                  className="p-1.5 rounded-lg border border-ink-700 hover:bg-ink-800"
+                >
+                  <Download size={14} />
+                </a>
+                <button
+                  onClick={() => restaurar(b.name)}
+                  title="Volver a esta copia"
+                  className="p-1.5 rounded-lg border border-ink-700 hover:bg-ink-800"
+                >
+                  <RotateCcw size={14} />
+                </button>
+                <button
+                  onClick={() => borrar(b.name)}
+                  title="Borrar"
+                  className="p-1.5 rounded-lg border border-ink-700 hover:bg-ink-800 text-neutral-500 hover:text-red-400"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function RestoreDatabase() {
   const inputRef = useRef(null);
   const [file, setFile] = useState(null);
@@ -1177,13 +1312,55 @@ export default function Settings() {
       {/* 6. Copia de seguridad */}
       <section className="card p-5">
         <h2 className="font-display text-lg mb-1">6 · Copia de seguridad</h2>
-        <p className="text-xs text-neutral-500 mb-3">Descarga la base de datos entera (SQLite). Todo vive en local.</p>
-        <a
-          href="/api/backup/database"
-          className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800"
+        <p className="text-xs text-neutral-500 mb-3">
+          Todo lo que has catalogado —las correcciones a mano, los géneros que colocaste tú, tus escuchas,
+          «Lo quiero»— vive en un único fichero SQLite. Esto lo copia solo, sin parar la app.
+        </p>
+
+        <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={s.backup_enabled !== '0'}
+            onChange={(e) => setS((p) => ({ ...p, backup_enabled: e.target.checked ? '1' : '0' }))}
+          />
+          Copia automática diaria
+        </label>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="A qué hora" hint="0–23. De madrugada estorba menos.">
+            <input type="number" min="0" max="23" value={s.backup_hour ?? '4'} onChange={set('backup_hour')} className={input} />
+          </Field>
+          <Field label="Cuántas guardar" hint="Las más viejas se van solas.">
+            <input type="number" min="1" max="30" value={s.backup_keep ?? '7'} onChange={set('backup_keep')} className={input} />
+          </Field>
+        </div>
+        <Field
+          label="Avisarme si quedan menos de (GB)"
+          hint="Quedarse sin espacio es lo que corrompe una base SQLite a mitad de escritura. 0 para no avisar."
         >
-          <Download size={14} /> Descargar base de datos
-        </a>
+          <input
+            type="number"
+            min="0"
+            value={s.backup_min_free_gb ?? '20'}
+            onChange={set('backup_min_free_gb')}
+            className={input}
+          />
+        </Field>
+
+        <BackupList />
+
+        <div className="mt-4 pt-4 border-t border-ink-800">
+          <p className="text-xs text-neutral-500 mb-2">
+            <b className="font-normal text-neutral-300">Llevártela fuera del NAS</b>: una copia en el mismo disco
+            no te salva de que ese disco falle.
+          </p>
+          <a
+            href="/api/backup/database"
+            className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800"
+          >
+            <Download size={14} /> Descargar base de datos
+          </a>
+        </div>
         <RestoreDatabase />
       </section>
 
