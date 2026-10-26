@@ -9,6 +9,17 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.3.1',
+    title: 'Los ocultos de un Mac dejan de contar como música',
+    items: [
+      'Liderarr ya no lee los ficheros ocultos que siembra un Mac. Si tocas la biblioteca desde macOS, al lado de cada canción aparece otro fichero con la misma extensión (la «otra mitad» del fichero, que empieza por ._) y se colaban como pistas: un disco de 10 canciones se veía con 20, la mitad sin título ni número, y encima parecía que le faltaban temas.',
+      'Fuera también .DS_Store, .Trashes, .Spotlight-V100, el @eaDir de Synology y la papelera de Windows, tanto al escanear la biblioteca como al importar descargas.',
+      'Y se arregla de paso la carátula rota de algunas carpetas: se podía estar cogiendo como carátula un ._cover.jpg, que no es una imagen.',
+      'Los títulos que empiezan por puntos siguen intactos: «...And Justice for All» se escanea igual que siempre.',
+      'La limpieza es retroactiva: al actualizar, esas pistas fantasma se van de la base una sola vez y los discos afectados recalculan sus cifras en el siguiente escaneo. Tus ficheros no se tocan: solo se borran filas de la base.',
+    ],
+  },
+  {
     version: '1.3.0',
     title: 'Red de seguridad: copias solas y aviso antes de que el disco se llene',
     items: [

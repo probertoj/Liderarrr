@@ -6,6 +6,7 @@ import { normalizeForDup } from './queries.js';
 import { reconcileImported } from './downloads.js';
 import { qbCompletedTorrents } from './qbittorrent.js';
 import { pathMappings, remapPath, norm } from './pathmap.js';
+import { isJunkEntry } from './libkey.js';
 
 // Importador estilo TRaSH: lo que bajas por Prowlarr a la carpeta de torrents lo
 // HARDLINKEA a la biblioteca organizada media/music/<Artista>/<Álbum (Año)>. Mismo
@@ -83,6 +84,7 @@ function walkKeep(root, rel = '') {
     return out;
   }
   for (const e of entries) {
+    if (isJunkEntry(e.name)) continue; // ocultos de Mac: no se enlazan a la biblioteca
     const r = rel ? path.join(rel, e.name) : e.name;
     if (e.isDirectory()) out.push(...walkKeep(root, r));
     else if (e.isFile() && KEEP_EXT.has(path.extname(e.name).toLowerCase())) out.push(r);
@@ -190,7 +192,9 @@ export async function pendingImports() {
   if (!source || !dest) return { configured: false, enabled, items: [] };
   let dirents;
   try {
-    dirents = fs.readdirSync(source, { withFileTypes: true }).filter((e) => e.isDirectory());
+    dirents = fs
+      .readdirSync(source, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && !isJunkEntry(e.name));
   } catch (e) {
     return { configured: true, enabled, error: `No se puede leer ${source}: ${e.message}`, items: [] };
   }
@@ -284,7 +288,9 @@ export async function listAlbumSubfolders(sourceDir) {
   if (!base.startsWith(path.resolve(source))) throw new Error('La carpeta está fuera de la carpeta de descargas.');
   let entries;
   try {
-    entries = fs.readdirSync(base, { withFileTypes: true }).filter((e) => e.isDirectory());
+    entries = fs
+      .readdirSync(base, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && !isJunkEntry(e.name));
   } catch (e) {
     throw new Error(`No se puede leer la carpeta: ${e.message}`);
   }

@@ -16,7 +16,7 @@ import {
   stageDatabaseImport,
   marcarServidorEnMarcha,
 } from './db.js';
-import { runScan, scanStatus } from './scanner.js';
+import { runScan, scanStatus, purgeJunkFromDb } from './scanner.js';
 import { regroupDiscs, combineAlbums, uncombineAlbum, combineCandidates, boxInfo, identifyBox } from './discgroup.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch, matchByMbUrl } from './identify.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
@@ -1599,6 +1599,20 @@ app
         resumeAddQueue(); // reanuda una tanda de envío a Lidarr que quedara a medias
       } catch (e) {
         console.warn('[lidarr] no se pudo reanudar la cola:', String(e.message || e));
+      }
+      // limpieza ÚNICA de los ocultos que se escanearon antes de que existiera el filtro
+      // (pistas `._loquesea.flac` de Mac). Solo filas: no toca el disco.
+      try {
+        if (getSetting('junk_purged') !== '1') {
+          const r = purgeJunkFromDb();
+          setSetting('junk_purged', '1');
+          if (r.tracks || r.albums || r.covers)
+            console.log(
+              `[scan] ocultos limpiados: ${r.tracks} pistas · ${r.albums} álbumes · ${r.covers} carátulas`
+            );
+        }
+      } catch (e) {
+        console.warn('[scan] limpieza de ocultos falló (se reintentará):', String(e.message || e));
       }
     });
   })

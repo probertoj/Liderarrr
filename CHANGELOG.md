@@ -7,6 +7,29 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.3.1] - 2026-10-26
+
+**Los ocultos de un Mac dejan de contar como música.** Viene del aviso de un usuario: si tocas
+la biblioteca desde un Mac, al lado de cada canción aparece un `._loquesea.flac` —la «otra
+mitad» del fichero, con la MISMA extensión que el original— y el escáner se los tragaba como si
+fueran pistas.
+
+### Arreglado
+- **El escaneo ignora los ocultos y la basura del sistema de ficheros**: los `._…` de Mac
+  (AppleDouble), `.DS_Store`, `.Trashes`, `.Spotlight-V100`, el `@eaDir` de Synology,
+  `$RECYCLE.BIN`… Un disco de 10 canciones se veía con 20 —la mitad sin título ni número— y
+  encima parecía que le faltaban temas. Lo mismo al importar descargas y al buscar la carátula de
+  la carpeta: un `._cover.jpg` no es una imagen, así que la carátula salía rota.
+  - Los títulos que empiezan por puntos siguen siendo títulos: «...And Justice for All» se escanea
+    igual que siempre. Y una biblioteca que viva en una carpeta oculta (`/volumen/.musica`)
+    también, porque solo se juzga lo que hay DENTRO de la biblioteca, nunca su raíz.
+- **Y limpia lo que ya estaba escaneado**, al arrancar y una sola vez: esas pistas fantasma se van
+  de la base, los discos afectados quedan pendientes de reescaneo para que recalculen sus cifras,
+  y los «álbumes» que no eran más que basura (lo que hubiera caído dentro de `.Trashes`) se
+  borran de la base. **No toca tus ficheros**: solo filas.
+
+---
+
 ## [1.3.0] - 2026-10-25
 
 **Red de seguridad.** Esta versión nace de un susto real: el volumen del NAS se quedó sin

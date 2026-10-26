@@ -7,6 +7,7 @@ import { matchRequest, setDownloadStatus, reconcileAgainstLibrary, pruneDownload
 import { runScan } from './scanner.js';
 import { runIdentify } from './identify.js';
 import { norm, within, pathMappings, remapPath } from './pathmap.js';
+import { isJunkEntry } from './libkey.js';
 import { sendNotification } from './notify.js';
 
 // AUTO-IMPORT: cierra el bucle de descargas sin Lidarr. Sondea qBittorrent, y por cada
@@ -170,6 +171,7 @@ export async function runAutoImport() {
       autoImportStatus.errors.push(`No se puede leer ${source}: ${String(e.message || e)}`);
     }
     const scanList = scanEntries
+      .filter((e) => !isJunkEntry(e.name)) // ocultos de Mac: no son descargas
       .map((e) => {
         const full = path.join(source, e.name);
         let mtime = 0;

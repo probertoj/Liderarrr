@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseFile } from 'music-metadata';
 import { db, DATA_DIR } from './db.js';
+import { isJunkEntry } from './libkey.js';
 
 // Resolución de carátulas, en orden de preferencia:
 //   1. fichero de imagen con nombre reconocido en la carpeta (del escaneo)
@@ -58,6 +59,7 @@ function biggestImage(dir) {
     return null;
   }
   for (const f of entries) {
+    if (isJunkEntry(f)) continue; // un `._cover.jpg` pesa poco, pero no es una imagen
     if (!IMG_EXT.has(path.extname(f).toLowerCase())) continue;
     try {
       const s = fs.statSync(path.join(dir, f));

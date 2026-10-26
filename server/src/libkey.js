@@ -35,3 +35,30 @@ export function isJunkLabel(name) {
     .replace(/[.\s[\]()_/-]/g, '');
   return !n || JUNK_LABELS.has(n);
 }
+
+// Basura del sistema de ficheros: NO es música, pero lo parece. Un Mac que toque la
+// biblioteca (por red o por USB) siembra cada carpeta de `._loquesea.flac` —AppleDouble, la
+// «otra mitad» del fichero, con la MISMA extensión que el original— y de `.DS_Store`,
+// `.Trashes` o `.Spotlight-V100`; Synology deja `@eaDir` con sus miniaturas y Windows
+// `$RECYCLE.BIN`. Si se escanea, un disco de 10 pistas sale con 20 —la mitad sin etiquetas ni
+// número— y la carátula puede acabar siendo un `._cover.jpg`, que no es una imagen.
+//
+// Basta el punto inicial para casi todo, con UNA excepción: los nombres que empiezan por DOS
+// puntos o más son títulos de verdad, no ocultos («...And Justice for All»). La lista cubre
+// la basura que no lleva punto.
+//
+// OJO: se juzgan los nombres de DENTRO de la biblioteca, nunca la raíz — una biblioteca en
+// /volumen/.musica es legítima y tiene que escanearse igual.
+const JUNK_NAMES = new Set(['__macosx', '@eadir', '$recycle.bin', 'system volume information', 'lost+found']);
+
+export function isJunkEntry(name) {
+  const n = String(name || '');
+  return (n.startsWith('.') && !n.startsWith('..')) || JUNK_NAMES.has(n.toLowerCase());
+}
+
+// Trozos de una ruta, con la barra que sea (la base guarda las rutas del NAS con / y las de
+// Windows con \).
+export const pathSegments = (p) =>
+  String(p || '')
+    .split(/[/\\]+/)
+    .filter(Boolean);

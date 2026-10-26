@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseFile } from 'music-metadata';
 import { db, getSetting, setSetting } from './db.js';
-import { albumKey, splitRoots, isJunkLabel } from './libkey.js';
+import { albumKey, splitRoots, isJunkLabel, isJunkEntry, pathSegments } from './libkey.js';
 import { regroupDiscs } from './discgroup.js';
 
 // Raíces de la biblioteca para CALCULAR la identidad de cada álbum (clave relativa
@@ -64,6 +64,9 @@ async function scanTree(dir, onFolder) {
   const files = [];
   const subdirs = [];
   for (const e of entries) {
+    // Ocultos y basura del sistema fuera, carpetas y ficheros: un `._x.flac` tiene la
+    // extensión de una pista pero no es audio (ver isJunkEntry en libkey.js).
+    if (isJunkEntry(e.name)) continue;
     const full = path.join(dir, e.name);
     if (e.isDirectory()) subdirs.push(full);
     else if (e.isFile() && isAudio(e.name)) files.push(full);
@@ -75,6 +78,7 @@ async function scanTree(dir, onFolder) {
 function findCover(dir, files) {
   try {
     for (const f of fs.readdirSync(dir)) {
+      if (isJunkEntry(f)) continue; // un `._cover.jpg` no es una imagen
       const ext = path.extname(f).toLowerCase();
       if (!['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) continue;
       const base = path.basename(f, ext).toLowerCase();
@@ -403,4 +407,95 @@ export async function runScan(opts = {}) {
     );
   }
   return scanStatus;
+}
+
+// LIMPIEZA DE LO YA ESCANEADO, una sola vez. El filtro de arriba evita que la basura entre,
+// pero una biblioteca que ya pasó por un Mac tiene miles de pistas `._loquesea.flac` guardadas:
+// inflan el recuento de pistas, salen en la ficha del disco y hacen que un álbum completo
+// parezca que le faltan la mitad de los temas. Esto borra esas FILAS —nunca ficheros: tocar el
+// disco solo lo hace albumdelete.js, a mano y con confirmación— y deja el álbum pendiente de
+// reescaneo (scanned_at = NULL, que el salto incremental respeta) para que la próxima pasada
+// recalcule sus cifras desde las etiquetas. Lo que no era más que basura (un álbum dentro de
+// `.Trashes`, o uno cuyas pistas eran todas AppleDouble) se va de la base.
+export function purgeJunkFromDb() {
+  const out = { tracks: 0, albums: 0, covers: 0 };
+  const roots = splitRoots(getSetting('music_dirs')).map((r) => r.replace(/\\/g, '/'));
+  // La raíz la elige el usuario, así que una carpeta solo se juzga por la parte de su ruta
+  // RELATIVA a la biblioteca; lo que cae fuera de ella no se toca.
+  const junkFolder = (p) => {
+    const np = String(p || '').replace(/\\/g, '/').replace(/\/+$/, '');
+    for (const r of roots) {
+      if (np === r) return false;
+      if (np.startsWith(`${r}/`)) return pathSegments(np.slice(r.length + 1)).some(isJunkEntry);
+    }
+    return false;
+  };
+  // Candidatos por SQL para no traerse la tabla entera: en LIKE el `_` es un comodín, así que
+  // '%/._%' casa con cualquier nombre oculto detrás de una barra. El filtro fino va en JS.
+  const CAND = (col) =>
+    `${col} LIKE '%/._%' OR ${col} LIKE '%\\._%' OR ${col} LIKE '%MACOSX%' OR ${col} LIKE '%eaDir%'`;
+
+  const delTrack = db.prepare('DELETE FROM tracks WHERE id = ?');
+  const leftOf = db.prepare('SELECT COUNT(*) AS n FROM tracks WHERE album_id = ?');
+  const albumOf = db.prepare('SELECT id, track_count, track_file_count FROM albums WHERE id = ?');
+  const recount = db.prepare(`
+    UPDATE albums SET
+      track_file_count = (SELECT COUNT(*) FROM tracks WHERE album_id = albums.id),
+      size_bytes = (SELECT COALESCE(SUM(size_bytes), 0) FROM tracks WHERE album_id = albums.id),
+      duration_ms = (SELECT COALESCE(SUM(duration_ms), 0) FROM tracks WHERE album_id = albums.id),
+      scanned_at = NULL
+    WHERE id = ?`);
+  const fixCount = db.prepare('UPDATE albums SET track_count = track_file_count WHERE id = ?');
+  const dropCover = db.prepare('UPDATE albums SET cover = NULL WHERE id = ?');
+  const dropAlbum = [
+    db.prepare('DELETE FROM tracks WHERE album_id = ?'),
+    db.prepare('DELETE FROM album_tags WHERE album_id = ?'),
+    db.prepare('DELETE FROM album_labels WHERE album_id = ?'),
+    db.prepare('DELETE FROM album_artists WHERE album_id = ?'),
+    db.prepare('DELETE FROM albums WHERE id = ?'),
+  ];
+
+  db.transaction(() => {
+    // 1. álbumes que son basura enteros: cuelgan de una carpeta oculta
+    for (const a of db.prepare(`SELECT id, path FROM albums WHERE ${CAND('path')}`).all()) {
+      if (!junkFolder(a.path)) continue;
+      for (const st of dropAlbum) st.run(a.id);
+      out.albums++;
+    }
+    // 2. pistas basura dentro de álbumes buenos. El nombre del fichero se juzga tal cual: un
+    //    `._x.flac` es basura venga de donde venga.
+    const touched = new Set();
+    for (const t of db.prepare(`SELECT id, album_id, path FROM tracks WHERE ${CAND('path')}`).all()) {
+      const base = pathSegments(t.path).pop() || '';
+      if (!isJunkEntry(base) && !junkFolder(t.path)) continue;
+      delTrack.run(t.id);
+      if (t.album_id) touched.add(t.album_id);
+      out.tracks++;
+    }
+    // 3. recuentos de los álbumes tocados; el que se queda sin pistas era basura entero
+    for (const id of touched) {
+      const a = albumOf.get(id);
+      if (!a) continue;
+      if (!leftOf.get(id).n) {
+        for (const st of dropAlbum) st.run(id);
+        out.albums++;
+        continue;
+      }
+      // si el «debería tener» venía de los ficheros y no de las etiquetas (que decían más),
+      // hay que bajarlo: lo había subido la basura.
+      const deLosFicheros = a.track_count === a.track_file_count;
+      recount.run(id);
+      if (deLosFicheros) fixCount.run(id);
+    }
+    // 4. carátulas que apuntaban a un `._cover.jpg`: se olvidan y se busca la de verdad
+    const conCaratula = db
+      .prepare(`SELECT id, cover FROM albums WHERE cover IS NOT NULL AND (${CAND('cover')})`)
+      .all();
+    for (const a of conCaratula) {
+      if (!isJunkEntry(pathSegments(a.cover).pop() || '')) continue;
+      dropCover.run(a.id);
+      out.covers++;
+    }
+  })();
+  return out;
 }
