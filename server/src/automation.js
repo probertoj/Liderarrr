@@ -1,5 +1,6 @@
 import { db, getSetting, setSetting } from './db.js';
 import { lidarrAdd, lidarrOwnedIds } from './lidarr.js';
+import { ownedMatcher } from './discover.js';
 
 const DAY = 24 * 3600 * 1000;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -24,17 +25,21 @@ export async function runAutoLidarr({ months = 6, lookbackDays = 30, dryRun = fa
     const floor = new Date(Date.now() - lookbackDays * DAY).toISOString().slice(0, 10);
     const horizon = new Date(Date.now() + months * 30 * DAY).toISOString().slice(0, 10);
     const owned = lidarrOwnedIds();
+    // Propiedad EN VIVO contra la biblioteca, igual que autograb.js y el calendario. El flag
+    // guardado release_groups.is_owned solo se refresca al re-enriquecer la discografía, así
+    // que un disco recién importado seguía contando como hueco y se volvía a pedir.
+    const isOwned = ownedMatcher();
 
-    // álbumes de estudio de artistas seguidos (faceta artist), no tuyos, con
-    // fecha dentro de [floor, horizon]. Incluye estrenos futuros y recientes.
+    // álbumes de estudio de artistas seguidos (faceta artist) con fecha dentro de
+    // [floor, horizon]. Incluye estrenos futuros y recientes. Lo que ya tienes se
+    // descarta abajo, en vivo.
     const candidates = db
       .prepare(
         `SELECT rg.rg_mbid, rg.title, rg.first_release, rg.artist_mbid, ar.name AS artist
          FROM release_groups rg
          JOIN tracked_artists t ON t.artist_id = rg.artist_id AND t.facet = 'artist'
          JOIN artists ar ON ar.id = rg.artist_id
-         WHERE rg.is_owned = 0
-           AND rg.primary_type = 'Album'
+         WHERE rg.primary_type = 'Album'
            AND (rg.secondary_types IS NULL OR rg.secondary_types = '[]')
            AND rg.first_release IS NOT NULL
            AND rg.first_release >= ? AND rg.first_release <= ?
@@ -42,7 +47,7 @@ export async function runAutoLidarr({ months = 6, lookbackDays = 30, dryRun = fa
          ORDER BY rg.first_release`
       )
       .all(floor, horizon)
-      .filter((c) => !owned.has(c.rg_mbid));
+      .filter((c) => !owned.has(c.rg_mbid) && !isOwned(c.rg_mbid, c.artist, c.title));
 
     autoLidarrStatus.considered = candidates.length;
     for (const c of candidates) {

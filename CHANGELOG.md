@@ -7,6 +7,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.3.2] - 2026-10-26
+
+**El envío automático a Lidarr deja de pedir lo que ya tienes.** Solo afecta a quien use la
+integración opcional con Lidarr; la descarga nativa ya lo hacía bien desde la 1.0.
+
+### Arreglado
+- **La automatización diaria de Lidarr cruza tu biblioteca en el momento**, en vez de fiarse de
+  una marca guardada en la discografía (`release_groups.is_owned`) que solo se refresca al volver
+  a enriquecerla. Un disco recién importado seguía contando como hueco y se volvía a encargar; y
+  al revés, si la marca se había quedado puesta, un hueco de verdad no se pedía nunca.
+  - Ahora casa por MBID **y** por artista + título, así que también reconoce lo que tienes sin
+    identificar. Es exactamente el mismo criterio que usan ya la descarga nativa y el calendario.
+
+---
+
 ## [1.3.1] - 2026-10-26
 
 **Los ocultos de un Mac dejan de contar como música.** Viene del aviso de un usuario: si tocas

@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.3.2',
+    title: 'El envío automático a Lidarr deja de pedir lo que ya tienes',
+    items: [
+      'Si usas la integración opcional con Lidarr, el envío automático ya no vuelve a encargar discos que acabas de importar. Se fiaba de una marca guardada en la discografía que solo se refresca al volver a enriquecerla; ahora mira tu biblioteca en el momento.',
+      'Y al contrario: si esa marca se había quedado puesta, un hueco de verdad no se pedía nunca. Ya no pasa.',
+      'Reconoce lo que tienes aunque esté sin identificar, casando por artista y título además de por MBID. Es el mismo criterio que ya usaban la descarga nativa y el calendario.',
+    ],
+  },
+  {
     version: '1.3.1',
     title: 'Los ocultos de un Mac dejan de contar como música',
     items: [
