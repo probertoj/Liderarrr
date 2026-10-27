@@ -7,6 +7,27 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.4.0] - 2026-10-27
+
+**La hora del refresco nocturno la pones tú.** Estaba clavada a las 03:00 en el código: si a esa
+hora tu NAS hacía otra cosa (copias, Plex, transcodificar), no había manera de moverla.
+
+### Añadido
+- **Ajustes → Refresco nocturno → «A qué hora»** (0–23, de fábrica las 3). La pasada completa
+  —escanear, identificar, discografías y completismo, escuchas, radares y novedades— se lanza a la
+  hora que elijas. Se aplica sin reiniciar: el cambio se nota en la siguiente comprobación.
+
+### Arreglado
+- **La pasada nocturna ya no se pierde por medio minuto.** Antes exigía la hora Y el minuto en
+  punto, así que un contenedor que arrancaba a las 03:00:30 se quedaba sin refresco hasta el día
+  siguiente. Ahora basta con acertar la hora, corre una sola vez al día, y si por lo que sea no se
+  dio (la app estaba parada, o acabas de cambiar la hora) se lanza igual pasadas 36 horas.
+- La guía «¿Cómo funciona todo esto?» decía «03:00» a pelo y llamaba al botón de la barra lateral
+  «Actualizar todo», cuando en pantalla pone «Identificar y sincronizar». Ahora dice tu hora y le
+  llama por su nombre.
+
+---
+
 ## [1.3.3] - 2026-10-27
 
 **Enlazar un artista con MusicBrainz ya no se atasca cuando hay dos fichas del mismo grupo.**

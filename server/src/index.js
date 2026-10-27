@@ -19,7 +19,7 @@ import {
 import { runScan, scanStatus, purgeJunkFromDb } from './scanner.js';
 import { regroupDiscs, combineAlbums, uncombineAlbum, combineCandidates, boxInfo, identifyBox } from './discgroup.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch, matchByMbUrl } from './identify.js';
-import { runFullRefresh, refreshStatus } from './refresh.js';
+import { runFullRefresh, refreshStatus, tocaRefresco } from './refresh.js';
 import { lidarrTest, lidarrProfiles, lidarrSync, lidarrAdd, lidarrOwnedIds, lidarrReleases, lidarrGrab, enqueueLidarrAdd, lidarrAddStatus, resumeAddQueue, lidarrConfig } from './lidarr.js';
 import { prowlarrTest, prowlarrSearch, prowlarrGrab } from './prowlarr.js';
 import { jackettTest, jackettSearch } from './jackett.js';
@@ -1512,14 +1512,12 @@ function scheduleBackup() {
   }, 60 * 1000);
 }
 
-// --- cron nocturno (03:00) --------------------------------------------------
+// --- cron nocturno (hora configurable en Ajustes, de fábrica 03:00) ---------
 function scheduleNightly() {
   const check = () => {
-    const now = new Date();
-    if (now.getHours() === 3 && now.getMinutes() === 0 && !refreshStatus.running) {
-      console.log('[Liderarrr] Refresco nocturno');
-      runFullRefresh('nightly').catch((e) => console.error('nightly', e));
-    }
+    if (refreshStatus.running || !tocaRefresco()) return;
+    console.log('[Liderarrr] Refresco nocturno');
+    runFullRefresh('nightly').catch((e) => console.error('nightly', e));
   };
   setInterval(check, 60 * 1000);
 }

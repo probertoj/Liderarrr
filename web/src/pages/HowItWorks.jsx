@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { HardDrive, Sparkles, Compass, DownloadCloud, Radio, Headphones, Clock, Moon, Library, Heart } from 'lucide-react';
+import { api } from '../api.js';
 import { PageTitle } from '../components.jsx';
 
 // «¿Cómo funciona todo esto?»: explica en cristiano el recorrido de la app y, sobre todo,
@@ -23,6 +25,18 @@ function Step({ n, Icon, title, children }) {
 }
 
 export default function HowItWorks() {
+  // La hora del refresco se configura en Ajustes, así que se lee: antes aquí ponía «03:00»
+  // a pelo y mentía en cuanto alguien la cambiaba.
+  const [hora, setHora] = useState(3);
+  useEffect(() => {
+    api
+      .settings()
+      .then((s) => {
+        const n = Number(s?.nightly_hour);
+        if (Number.isFinite(n) && n >= 0 && n <= 23) setHora(Math.round(n));
+      })
+      .catch(() => {});
+  }, []);
   return (
     <div>
       <PageTitle title="¿Cómo funciona todo esto?" sub="El recorrido de Liderarr, en cristiano" />
@@ -112,14 +126,17 @@ export default function HowItWorks() {
             <Moon size={16} />
           </div>
           <div>
-            <div className="text-sm text-neutral-200 mb-0.5">Cada noche a las 03:00 · refresco completo</div>
+            <div className="text-sm text-neutral-200 mb-0.5">
+              Cada noche a las {String(hora).padStart(2, '0')}:00 · refresco completo
+            </div>
             <div className="text-xs text-neutral-500 leading-relaxed">
               La pasada de fondo, en orden: auto-importar → escanear → identificar todo lo pendiente → importar
               escuchas de Last.fm → (si usas Lidarr) sincronizar su snapshot → recalcular discografías y
               completismo → actualizar sellos seguidos → refrescar el radar y los discos/canciones nuevos de tu
               colección (vía Deezer) → radar de descubrimiento → sincronizar tu biblioteca de Spotify → buscar los discos de «Lo quiero» → auto-descargar
-              estrenos. Es lo mismo que hace el botón <strong className="text-neutral-400">«Actualizar todo»</strong>{' '}
-              cuando lo pulsas a mano.
+              estrenos. Es lo mismo que hace el botón{' '}
+              <strong className="text-neutral-400">«Identificar y sincronizar»</strong> cuando lo pulsas a mano. La hora
+              se cambia en Ajustes → Refresco nocturno.
             </div>
           </div>
         </div>
@@ -127,7 +144,7 @@ export default function HowItWorks() {
 
       <p className="text-xs text-neutral-600 mt-6 max-w-2xl">
         ¿Prisa por ver algo recién descargado? El auto-import ya lo coloca e identifica en minutos. Para forzar la
-        pasada completa cuando quieras, usa «Actualizar todo» (arriba a la izquierda).
+        pasada completa cuando quieras, usa «Identificar y sincronizar» (arriba a la izquierda).
       </p>
     </div>
   );

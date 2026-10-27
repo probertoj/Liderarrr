@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.4.0',
+    title: 'La hora del refresco nocturno la pones tú',
+    items: [
+      'La hora del refresco nocturno ya se elige en Ajustes → Refresco nocturno (0–23, de fábrica las 3 de la madrugada). Estaba clavada a las 03:00 en el código: si a esa hora tu NAS andaba con las copias o transcodificando, no había forma de moverla. El cambio se aplica sin reiniciar.',
+      'Esa pasada es la que escanea el disco, identifica lo pendiente, recalcula discografías y completismo, trae tus escuchas y refresca radares y novedades; la misma que el botón «Identificar y sincronizar».',
+      'Y ya no se pierde por medio minuto: antes hacía falta que coincidieran la hora Y el minuto en punto, así que un contenedor arrancado a las 03:00:30 se quedaba sin refresco hasta el día siguiente. Ahora basta la hora, corre una vez al día, y si no se dio (app parada, o acabas de cambiar la hora) se lanza pasadas 36 horas.',
+    ],
+  },
+  {
     version: '1.3.3',
     title: 'Enlazar un artista con MusicBrainz ya no choca con su propia ficha duplicada',
     items: [

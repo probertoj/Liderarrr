@@ -717,6 +717,29 @@ export default function Settings() {
 
       <SpotifyLibrarySection onSave={save} />
 
+      {/* Refresco nocturno */}
+      <section className="card p-5 mb-4">
+        <h2 className="font-display text-lg mb-1">Refresco nocturno</h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Una vez al día Liderarrr se pone al día solo: escanea el disco, identifica lo pendiente, recalcula
+          discografías y completismo, trae tus escuchas y refresca radares y novedades. Es la misma pasada que el
+          botón <b className="font-normal text-neutral-300">«Identificar y sincronizar»</b> de la barra lateral.
+        </p>
+        <Field
+          label="A qué hora"
+          hint="0–23. De madrugada estorba menos: es cuando más trabaja y más pide a MusicBrainz. Se aplica sin reiniciar."
+        >
+          <input
+            type="number"
+            min="0"
+            max="23"
+            value={s.nightly_hour ?? '3'}
+            onChange={set('nightly_hour')}
+            className={`${input} w-24`}
+          />
+        </Field>
+      </section>
+
       {/* Notificaciones */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">Notificaciones <span className="text-xs text-neutral-500">(opcional)</span></h2>

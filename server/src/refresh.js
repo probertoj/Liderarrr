@@ -1,4 +1,4 @@
-import { getSetting } from './db.js';
+import { getSetting, setSetting } from './db.js';
 import { runScan, scanStatus } from './scanner.js';
 import { runIdentify, identifyStatus } from './identify.js';
 import { lidarrSync } from './lidarr.js';
@@ -37,6 +37,32 @@ export const refreshStatus = {
 };
 
 const has = (...keys) => keys.every((k) => !!getSetting(k));
+
+// Hora del refresco nocturno, configurable en Ajustes (0–23; de fábrica las 3 de la
+// madrugada, cuando nadie está escuchando música). Se relee en cada comprobación, así que
+// cambiarla en Ajustes aplica sin reiniciar.
+export function nightlyConfig() {
+  const crudo = getSetting('nightly_hour');
+  const n = Number(crudo);
+  // Cuidado: la medianoche es la hora 0, y `Number(null) || 3` la convertiría en las 3.
+  // Hay que mirar si el ajuste está PUESTO, no si su valor es cero.
+  const hour = crudo == null || crudo === '' || !Number.isFinite(n) ? 3 : Math.min(23, Math.max(0, Math.round(n)));
+  return { hour, lastRun: Number(getSetting('nightly_last_run')) || null };
+}
+
+// ¿Toca la pasada nocturna? Antes esto exigía la hora Y el minuto en punto, así que un
+// contenedor arrancado a las 03:00:30 se saltaba la pasada entera hasta el día siguiente.
+// Ahora basta con acertar la HORA —una vez al día, por el guard de 20 h— y, si por lo que
+// sea no se dio (app parada a esa hora, o la hora recién cambiada), a las 36 h se lanza
+// igual. En una instalación nueva no hay pasada previa: espera a su hora en vez de ponerse
+// a machacar MusicBrainz mientras el usuario aún está configurando.
+export function tocaRefresco(ahora = new Date()) {
+  const cfg = nightlyConfig();
+  if (!cfg.lastRun) return ahora.getHours() === cfg.hour;
+  const horas = (ahora.getTime() - cfg.lastRun) / 3600000;
+  if (horas < 20) return false;
+  return ahora.getHours() === cfg.hour || horas >= 36;
+}
 
 function buildSteps() {
   return [
@@ -212,6 +238,9 @@ function buildSteps() {
 
 export async function runFullRefresh(trigger = 'manual') {
   if (refreshStatus.running) return refreshStatus;
+  // Se apunta AL EMPEZAR, no al acabar: si la pasada muere a medias, que no se reintente
+  // cada minuto el resto de la noche.
+  if (trigger === 'nightly') setSetting('nightly_last_run', String(Date.now()));
   const steps = buildSteps();
   Object.assign(refreshStatus, {
     running: true,
