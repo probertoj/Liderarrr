@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.3.3',
+    title: 'Enlazar un artista con MusicBrainz ya no choca con su propia ficha duplicada',
+    items: [
+      'Enlazar un artista con MusicBrainz ya no se atasca con un «UNIQUE constraint failed: artists.mbid» en rojo. Pasaba cuando ya existía otra ficha del mismo grupo con ese MBID —otra grafía del nombre, o la ficha que se creó sola al identificar—, y el MBID solo puede estar en una.',
+      'Ahora las dos fichas se funden en una: los discos, los créditos, el seguimiento, la discografía y las novedades pasan a la ficha que tienes delante, la duplicada desaparece y te decimos qué se ha fundido. No se toca ningún fichero tuyo, solo la base de datos.',
+      'Y el disco que llega de la otra ficha se cuenta ya como tuyo: antes podía seguir saliendo en «te faltan» porque sus etiquetas usan la otra grafía del artista («Go-Betweens» frente a «The Go-Betweens»). El completismo ya mira las dos.',
+    ],
+  },
+  {
     version: '1.3.2',
     title: 'El envío automático a Lidarr deja de pedir lo que ya tienes',
     items: [

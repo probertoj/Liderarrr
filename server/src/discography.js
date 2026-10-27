@@ -190,7 +190,15 @@ export function artistCompleteness(artistId) {
     )
     .all({ id: artistId });
   const ownedRg = new Set(ownedRows.filter((o) => o.rg_mbid).map((o) => o.rg_mbid));
-  const ownedKey = new Set(ownedRows.map((o) => matchKey(o.album_artist || artistName, o.title)));
+  // Se indexa el título CON LAS DOS grafías del artista: la de la etiqueta (album_artist) y el
+  // nombre canónico de la ficha. Si no, un disco cuyas etiquetas dicen «Go-Betweens» en una ficha
+  // llamada «The Go-Betweens» salía como que te falta aunque estuviera ahí mismo en la colección
+  // (se ve sobre todo al fundir dos fichas). Es lo que ya hace ownedMatcher() en discover.js.
+  const ownedKey = new Set();
+  for (const o of ownedRows) {
+    ownedKey.add(matchKey(o.album_artist || artistName, o.title));
+    ownedKey.add(matchKey(artistName, o.title));
+  }
   const isOwned = (r) => (r.rg_mbid && ownedRg.has(r.rg_mbid)) || ownedKey.has(matchKey(artistName, r.title));
 
   // "Por estrenar" se decide por FECHA en vivo, no por el flag is_upcoming guardado.

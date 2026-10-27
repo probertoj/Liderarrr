@@ -625,13 +625,50 @@ export function setArtistScope(id, scope) {
 // automática solo escribe el MBID cuando está a NULL, así que no lo pisa un reescaneo.
 // Tras esto conviene recalcular la discografía (la ruta lo hace). No toca ficheros.
 const MBID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Dos fichas para el MISMO artista (dos grafías del nombre, o la que creó por su cuenta la
+// identificación) son la misma gente. El MBID es único por índice, así que enlazar a mano
+// reventaba con «UNIQUE constraint failed: artists.mbid» y ahí se quedaba todo. Se FUNDEN en
+// la ficha que el usuario tiene delante: discos, créditos, seguimiento, discografía y
+// novedades pasan a ella y la duplicada desaparece. Solo filas: no toca ni un fichero.
+//
+// Las tablas de clave compuesta (album_artists, tracked_artists, release_groups,
+// external_releases) van con UPDATE OR IGNORE + DELETE, por si las dos fichas tenían ya la
+// misma entrada: mover la fila chocaría con la que ya está, y lo que toca es quedarse una.
+function mergeArtistInto(fromId, intoId) {
+  const albums = db.prepare('UPDATE albums SET artist_id = ? WHERE artist_id = ?').run(intoId, fromId).changes;
+  for (const t of ['album_artists', 'tracked_artists', 'release_groups', 'external_releases']) {
+    db.prepare(`UPDATE OR IGNORE ${t} SET artist_id = ? WHERE artist_id = ?`).run(intoId, fromId);
+    db.prepare(`DELETE FROM ${t} WHERE artist_id = ?`).run(fromId);
+  }
+  // lo que la ficha que se queda no tenga, se lo lleva de la que se va (la foto, sobre todo)
+  db.prepare(
+    `UPDATE artists SET
+       sort_name = COALESCE(sort_name, (SELECT sort_name FROM artists WHERE id = @from)),
+       type = COALESCE(type, (SELECT type FROM artists WHERE id = @from)),
+       country = COALESCE(country, (SELECT country FROM artists WHERE id = @from)),
+       began = COALESCE(began, (SELECT began FROM artists WHERE id = @from)),
+       ended = COALESCE(ended, (SELECT ended FROM artists WHERE id = @from)),
+       disambiguation = COALESCE(NULLIF(disambiguation, ''), (SELECT disambiguation FROM artists WHERE id = @from)),
+       thumb = COALESCE(thumb, (SELECT thumb FROM artists WHERE id = @from))
+     WHERE id = @into`
+  ).run({ from: fromId, into: intoId });
+  db.prepare('DELETE FROM artist_stats WHERE artist_id = ?').run(fromId); // se recalcula al enriquecer
+  db.prepare('DELETE FROM artists WHERE id = ?').run(fromId);
+  return { albums };
+}
+
 export function setArtistMbid(id, mbid) {
   const clean = String(mbid || '').trim().toLowerCase();
   if (!MBID_RE.test(clean)) throw new Error('MBID no válido (debe ser un UUID de MusicBrainz)');
   const artist = db.prepare('SELECT id FROM artists WHERE id = ?').get(id);
   if (!artist) throw new Error('Artista no encontrado');
-  db.prepare('UPDATE artists SET mbid = ? WHERE id = ?').run(clean, id);
-  return { ok: true, mbid: clean };
+  const dup = db.prepare('SELECT id, name FROM artists WHERE mbid = ? AND id != ?').get(clean, id);
+  let merged = null;
+  db.transaction(() => {
+    if (dup) merged = { name: dup.name, ...mergeArtistInto(dup.id, id) };
+    db.prepare('UPDATE artists SET mbid = ? WHERE id = ?').run(clean, id);
+  })();
+  return { ok: true, mbid: clean, merged };
 }
 
 // Álbumes incompletos: la feature estrella. Faltan pistas frente a lo que

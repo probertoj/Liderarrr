@@ -7,6 +7,26 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.3.3] - 2026-10-27
+
+**Enlazar un artista con MusicBrainz ya no se atasca cuando hay dos fichas del mismo grupo.**
+Del informe de un usuario: al enlazar «The Go-Betweens» salía en rojo `UNIQUE constraint failed:
+artists.mbid` y ahí se quedaba todo.
+
+### Arreglado
+- **Dos fichas del mismo artista se funden en una.** El MBID solo puede estar en una ficha, así
+  que si la que elegías ya lo tenía (otra grafía del nombre, o la ficha que creó por su cuenta la
+  identificación), la operación moría con un error de base de datos. Ahora los discos, los
+  créditos, el seguimiento, la discografía y las novedades de la ficha duplicada pasan a la que
+  tienes delante, la duplicada desaparece y se te dice qué se ha fundido. **No toca tus ficheros**:
+  solo filas de la base.
+- **Y el disco que llega se cuenta como tuyo.** El completismo casaba el título con el nombre de
+  la ficha, pero los discos traen en sus etiquetas la OTRA grafía: un disco que acababa de entrar
+  («Go-Betweens») seguía apareciendo en «te faltan» con la ficha llamada «The Go-Betweens».
+  Ahora se mira con las dos grafías, que es lo que ya hacían el calendario y los huecos.
+
+---
+
 ## [1.3.2] - 2026-10-26
 
 **El envío automático a Lidarr deja de pedir lo que ya tienes.** Solo afecta a quien use la

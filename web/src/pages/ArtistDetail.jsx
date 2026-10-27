@@ -470,6 +470,7 @@ function MbidLinkerModal({ artist, onClose, onLinked }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
   const [saving, setSaving] = useState(null);
+  const [merged, setMerged] = useState(null); // otra ficha del mismo artista, absorbida al enlazar
   const [raw, setRaw] = useState('');
 
   const run = async () => {
@@ -495,7 +496,14 @@ function MbidLinkerModal({ artist, onClose, onLinked }) {
     setSaving(mbid);
     setErr(null);
     try {
-      await api.setArtistMbid(artist.id, mbid);
+      const res = await api.setArtistMbid(artist.id, mbid);
+      // si había otra ficha con ese MBID se han fundido: dilo antes de cerrar, que es un
+      // cambio en la colección (una ficha menos) y no se ve solo con recargar.
+      if (res?.merged) {
+        setMerged(res.merged);
+        setSaving(null);
+        return;
+      }
       await onLinked();
     } catch (e) {
       setErr(e.message);
@@ -533,6 +541,15 @@ function MbidLinkerModal({ artist, onClose, onLinked }) {
         </div>
 
         {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
+        {merged && (
+          <div className="mt-3 text-sm text-emerald-400 flex items-center gap-3">
+            <span>
+              Enlazado. Había otra ficha de este artista («{merged.name}») y se ha fundido en esta
+              {merged.albums ? `, con ${merged.albums === 1 ? 'su disco' : `sus ${merged.albums} discos`}` : ''}.
+            </span>
+            <Button onClick={() => onLinked()}>Cerrar</Button>
+          </div>
+        )}
         {results && results.length === 0 && !loading && (
           <p className="text-sm text-neutral-600 mt-3">Sin resultados. Cambia el texto o pega el MBID abajo.</p>
         )}
