@@ -4,6 +4,7 @@ import { normName } from './matchkey.js';
 import { searchArtists } from './musicbrainz.js';
 import { followByMbid } from './tracked.js';
 import { deezerFindArtist } from './artistpix.js';
+import { isVariousArtists } from './various.js';
 
 // «Quizá quieras seguir a…»: sugerencias de artistas para SEGUIR que aún no tienes ni
 // sigues, a partir de artist.getSimilar de Last.fm sobre tus «semillas» (los que sigues;
@@ -45,7 +46,9 @@ export async function refreshArtistSuggestions({ maxSeeds = 40, perSeed = 15, to
       )
       .all(maxSeeds);
   }
-  seeds = seeds.slice(0, maxSeeds);
+  // el cajón de recopilatorios no dice nada de tus gustos: pedir «parecidos a Various
+  // Artists» solo traería ruido
+  seeds = seeds.filter((s) => !isVariousArtists(s)).slice(0, maxSeeds);
   if (!seeds.length) return { count: 0 };
 
   // lo que ya conoces (tuyo o seguido): todo lo que hay en la tabla artists

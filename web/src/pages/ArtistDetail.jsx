@@ -151,19 +151,21 @@ export default function ArtistDetail() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant={following ? 'gold' : 'default'} onClick={toggleFollow} disabled={busy}>
-            <span className="inline-flex items-center gap-1.5">
-              <Star size={14} className={following ? 'fill-current' : ''} />
-              {following ? 'Siguiendo' : 'Seguir'}
-            </span>
-          </Button>
+          {!artist.is_various && (
+            <Button variant={following ? 'gold' : 'default'} onClick={toggleFollow} disabled={busy}>
+              <span className="inline-flex items-center gap-1.5">
+                <Star size={14} className={following ? 'fill-current' : ''} />
+                {following ? 'Siguiendo' : 'Seguir'}
+              </span>
+            </Button>
+          )}
           {noMbid ? (
             <Button variant="gold" onClick={() => setMbidModal(true)} disabled={busy}>
               <span className="inline-flex items-center gap-1.5">
                 <Link2 size={14} /> Enlazar con MusicBrainz
               </span>
             </Button>
-          ) : (
+          ) : artist.is_various ? null : (
             <Button onClick={refreshDisco} disabled={busy}>
               <span className="inline-flex items-center gap-1.5">
                 <RefreshCw size={14} className={busy ? 'animate-spin' : ''} /> Discografía
@@ -212,8 +214,21 @@ export default function ArtistDetail() {
         />
       )}
 
+      {/* el cajón de los recopilatorios: ni completismo ni ámbito, que no significan nada */}
+      {artist.is_various && (
+        <div className="card p-4 my-5 max-w-lg">
+          <p className="text-sm text-neutral-300">Esto no es un artista: es el cajón de los recopilatorios.</p>
+          <p className="text-xs text-neutral-500 mt-1">
+            MusicBrainz acredita a «Various Artists» decenas de miles de discos que no son de nadie en
+            particular, así que aquí no hay discografía que completar ni estrenos que esperar: estos
+            recopilatorios no cuentan para el completismo ni salen en el calendario. Tus discos siguen
+            donde estaban.
+          </p>
+        </div>
+      )}
+
       {/* completismo */}
-      {!noMbid && (
+      {!noMbid && !artist.is_various && (
         <div className="card p-4 my-5 max-w-lg">
           {comp.pct == null ? (
             <p className="text-sm text-neutral-500">
@@ -232,7 +247,7 @@ export default function ArtistDetail() {
       )}
 
       {/* ámbito de completismo (persistente por artista): solo álbumes vs todo */}
-      {!noMbid && (
+      {!noMbid && !artist.is_various && (
         <div className="flex items-center gap-2 flex-wrap mb-4 text-sm">
           <span className="text-neutral-500">Completismo:</span>
           <button

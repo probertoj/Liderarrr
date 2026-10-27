@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import * as mb from './musicbrainz.js';
 import { enrichArtistDiscography } from './discography.js';
+import { isVariousArtists } from './various.js';
 
 // Artistas que sigues, con faceta (artist | producer | label). Alimentan los
 // huecos, el calendario de próximos y el auto-Lidarr. Equivalente a los favoritos
@@ -13,8 +14,12 @@ const followStmt = db.prepare(
 const unfollowStmt = db.prepare('DELETE FROM tracked_artists WHERE artist_id = ? AND facet = ?');
 
 export function followArtist(artistId, facet = 'artist') {
-  const exists = db.prepare('SELECT 1 FROM artists WHERE id = ?').get(artistId);
+  const exists = db.prepare('SELECT id, name, mbid FROM artists WHERE id = ?').get(artistId);
   if (!exists) throw new Error('Artista no encontrado');
+  // Seguir el cajón de recopilatorios no significa nada: no tiene discografía que
+  // completar ni estrenos propios que esperar. Ver various.js.
+  if (isVariousArtists(exists))
+    throw new Error('«Various Artists» es el cajón de los recopilatorios, no un artista: no se puede seguir');
   followStmt.run(artistId, facet, Date.now());
   return { ok: true };
 }

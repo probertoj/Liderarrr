@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import { recentListenedAlbums } from './listening.js';
+import { isVariousArtists } from './various.js';
 import { albumCredits, writeAlbumCredits } from './credits.js';
 
 // Todas las consultas que alimentan las secciones. Regla de oro del diseño:
@@ -559,6 +560,8 @@ export function artistDetail(id) {
 
   artist.albums = albums;
   artist.duplicateGroups = duplicateGroups;
+  // el cajón de recopilatorios: la ficha lo dice en vez de enseñar un completismo imposible
+  artist.is_various = isVariousArtists(artist);
   return artist;
 }
 

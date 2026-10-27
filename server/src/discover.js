@@ -2,6 +2,7 @@ import { db } from './db.js';
 import { matchKey } from './matchkey.js';
 import { lidarrConfig } from './lidarr.js';
 import { activeRequestRgs } from './downloads.js';
+import { excludeVariousSql } from './various.js';
 
 // «en Lidarr» solo vale si Lidarr sigue conectado (si no, su tabla queda vieja tras
 // «liberar de Lidarr»). El estado nativo «pedido» sale del registro de descargas.
@@ -44,6 +45,7 @@ export function gaps({ onlyTracked = true } = {}) {
   const trackedJoin = onlyTracked
     ? 'JOIN tracked_artists t ON t.artist_id = rg.artist_id'
     : '';
+  const sinVarios = excludeVariousSql();
   const rows = db
     .prepare(
       `SELECT rg.rg_mbid, rg.title, rg.first_release, rg.artist_id, rg.artist_mbid,
@@ -56,6 +58,7 @@ export function gaps({ onlyTracked = true } = {}) {
          AND rg.primary_type = 'Album'
          AND (rg.secondary_types IS NULL OR rg.secondary_types = '[]')
          AND rg.rg_mbid NOT IN (SELECT rg_mbid FROM dismissed_albums)
+         ${sinVarios}
        ORDER BY ar.name COLLATE NOCASE, rg.first_release`
     )
     .all();
@@ -89,6 +92,7 @@ export function gaps({ onlyTracked = true } = {}) {
 // ordenados por fecha. MusicBrainz sí tiene fechas futuras.
 export function upcoming({ onlyTracked = true } = {}) {
   const trackedJoin = onlyTracked ? 'JOIN tracked_artists t ON t.artist_id = rg.artist_id' : '';
+  const sinVarios = excludeVariousSql();
   const rows = db
     .prepare(
       `SELECT rg.rg_mbid, rg.title, rg.first_release, rg.primary_type, rg.artist_id, rg.artist_mbid,
@@ -103,6 +107,7 @@ export function upcoming({ onlyTracked = true } = {}) {
        ${trackedJoin}
        WHERE rg.is_upcoming = 1
          AND rg.rg_mbid NOT IN (SELECT rg_mbid FROM dismissed_albums)
+         ${sinVarios}
        ORDER BY rg.first_release`
     )
     .all();
@@ -119,6 +124,7 @@ export function recentlyReleased({ since = null, onlyTracked = false } = {}) {
   const cutoff = since || `${new Date().getFullYear()}-01-01`;
   const today = new Date().toISOString().slice(0, 10);
   const trackedJoin = onlyTracked ? 'JOIN tracked_artists t ON t.artist_id = rg.artist_id' : '';
+  const sinVarios = excludeVariousSql();
   const rows = db
     .prepare(
       `SELECT rg.rg_mbid, rg.title, rg.first_release, rg.primary_type, rg.artist_id, rg.artist_mbid,
@@ -135,6 +141,7 @@ export function recentlyReleased({ since = null, onlyTracked = false } = {}) {
          AND (rg.secondary_types IS NULL OR rg.secondary_types = '[]')
          AND rg.first_release >= @cutoff AND rg.first_release <= @today
          AND rg.rg_mbid NOT IN (SELECT rg_mbid FROM dismissed_albums)
+         ${sinVarios}
        ORDER BY rg.first_release DESC, ar.name COLLATE NOCASE`
     )
     .all({ cutoff, today });

@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import * as mb from './musicbrainz.js';
 import { matchKey } from './matchkey.js';
+import { isVariousArtists, variousArtistIds } from './various.js';
 
 // "La caza": cruza la discografía que MusicBrainz conoce de un artista con lo que
 // TIENES en el disco, y calcula el completismo. Un artista sin MBID no se puede
@@ -41,6 +42,10 @@ ON CONFLICT(artist_id) DO UPDATE SET studio_total=excluded.studio_total,
 export async function enrichArtistDiscography(artistId) {
   const artist = db.prepare('SELECT id, name, mbid FROM artists WHERE id = ?').get(artistId);
   if (!artist?.mbid) return null;
+  // El cajón de recopilatorios no tiene discografía que completar: son decenas de miles de
+  // release groups ajenos, y pedirlos es castigar a MusicBrainz para llenar de ruido el
+  // calendario. Ver various.js.
+  if (isVariousArtists(artist)) return null;
 
   const rgs = await mb.artistReleaseGroups(artist.mbid);
 
@@ -133,7 +138,12 @@ export async function enrichAllDiscographies({ onlyTracked = false, maxAgeDays =
        LEFT JOIN artist_stats s ON s.artist_id = ar.id
        WHERE ar.mbid IS NOT NULL AND (s.fetched_at IS NULL OR s.fetched_at < ?)
        ORDER BY (SELECT COUNT(*) FROM albums a WHERE a.artist_id = ar.id) DESC`;
-  const ids = db.prepare(sql).all(cutoff).map((r) => r.id);
+  const va = variousArtistIds();
+  const ids = db
+    .prepare(sql)
+    .all(cutoff)
+    .map((r) => r.id)
+    .filter((id) => !va.has(id)); // el cajón de recopilatorios no se enriquece
 
   Object.assign(discographyStatus, {
     running: true,
@@ -172,7 +182,21 @@ export async function enrichAllDiscographies({ onlyTracked = false, maxAgeDays =
 // Completismo de un artista para su ficha: barra + lista de lo que falta y lo que
 // está por estrenar, con filtro de tipos.
 export function artistCompleteness(artistId) {
-  const artistName = db.prepare('SELECT name FROM artists WHERE id = ?').get(artistId)?.name || '';
+  const ficha = db.prepare('SELECT id, name, mbid FROM artists WHERE id = ?').get(artistId);
+  const artistName = ficha?.name || '';
+  // Completismo del cajón de recopilatorios: ninguno. Enseñar «0 de 27.139» era una broma
+  // pesada, y encima sacaba esos discos en «te faltan».
+  if (isVariousArtists(ficha))
+    return {
+      stats: { studio_total: 0, studio_owned: 0, missing: 0, upcoming: 0 },
+      pct: null,
+      missing: [],
+      missingEps: [],
+      missingSingles: [],
+      upcoming: [],
+      all: [],
+      is_various: true,
+    };
   const rgs = db
     .prepare('SELECT * FROM release_groups WHERE artist_id = ? ORDER BY first_release, title')
     .all(artistId)

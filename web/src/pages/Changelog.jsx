@@ -9,6 +9,16 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.4.1',
+    title: '«Various Artists» deja de llenarte el calendario',
+    items: [
+      '«Various Artists» ya no se comporta como si fuera un artista. MusicBrainz le acredita decenas de miles de recopilatorios que no son de nadie en particular, y Liderarrr se los bajaba todos: el calendario se llenaba de discos ajenos y su ficha anunciaba cosas como «0 de 27.139 · faltan 27.134».',
+      'Ahora esos recopilatorios no salen en el calendario, no cuentan como huecos y no aparecen en novedades; su ficha explica que es el cajón de los recopilatorios, sin barra de completismo ni botón de seguir. Tus discos siguen donde estaban: no se toca ni un fichero.',
+      'Pasaba aunque no siguieras a «Various Artists», porque la discografía se refrescaba para todo artista identificado; por eso dejar de seguirlo no servía de nada. Lo que ya estaba guardado se limpia solo al arrancar.',
+      'Reconoce también las otras grafías de las etiquetas («VA», «V/A», «AA.VV.», «Varios Artistas», «Recopilatorio»), aunque esa ficha aún no esté identificada, sin tocar a artistas de verdad con nombres parecidos.',
+    ],
+  },
+  {
     version: '1.4.0',
     title: 'La hora del refresco nocturno la pones tú',
     items: [

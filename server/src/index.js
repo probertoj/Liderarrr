@@ -17,6 +17,7 @@ import {
   marcarServidorEnMarcha,
 } from './db.js';
 import { runScan, scanStatus, purgeJunkFromDb } from './scanner.js';
+import { purgeVariousArtists } from './various.js';
 import { regroupDiscs, combineAlbums, uncombineAlbum, combineCandidates, boxInfo, identifyBox } from './discgroup.js';
 import { runIdentify, identifyOne, identifyStatus, setMatchState, restoreAlbum, manualMatch, matchByMbUrl } from './identify.js';
 import { runFullRefresh, refreshStatus, tocaRefresco } from './refresh.js';
@@ -447,7 +448,13 @@ app.post('/api/artists/:id/refresh-discography', async (req, reply) => {
 // --- seguidos (favoritos) ---------------------------------------------------
 app.get('/api/tracked', async () => trackedList());
 app.get('/api/tracked/suggestions', async () => suggestedArtists());
-app.post('/api/tracked/:id', async (req) => followArtist(Number(req.params.id), req.body?.facet || 'artist'));
+app.post('/api/tracked/:id', async (req, reply) => {
+  try {
+    return followArtist(Number(req.params.id), req.body?.facet || 'artist');
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 app.delete('/api/tracked/:id', async (req) => unfollowArtist(Number(req.params.id), req.query?.facet || 'artist'));
 app.post('/api/tracked/by-mbid', async (req, reply) => {
   try {
@@ -1611,6 +1618,21 @@ app
         }
       } catch (e) {
         console.warn('[scan] limpieza de ocultos falló (se reintentará):', String(e.message || e));
+      }
+      // limpieza ÚNICA de la discografía que se bajó del cajón de recopilatorios antes de
+      // que existiera la regla (decenas de miles de release groups ajenos). Ni tus discos
+      // ni su ficha se tocan.
+      try {
+        if (getSetting('va_purged') !== '1') {
+          const r = purgeVariousArtists();
+          setSetting('va_purged', '1');
+          if (r.rgs || r.tracked || r.ext)
+            console.log(
+              `[varios] recopilatorios fuera del completismo: ${r.rgs} lanzamientos · ${r.tracked} seguimientos · ${r.ext} novedades`
+            );
+        }
+      } catch (e) {
+        console.warn('[varios] limpieza falló (se reintentará):', String(e.message || e));
       }
     });
   })

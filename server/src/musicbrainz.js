@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { cacheRead, cacheWrite } from './db.js';
 import { CACHE_MAX_AGE } from './cache-versions.js';
+import { VA_MBID, VA_ARTIST_RE } from './various.js';
 
 // MusicBrainz exige: (1) máximo 1 petición por segundo y (2) un User-Agent que
 // te identifique. Incumplir cualquiera de las dos te gana un bloqueo. Aquí se
@@ -113,9 +114,9 @@ const EDITION_TAIL_RE = /\s+(remaster\w*|remasteriz\w*|deluxe|expanded|expandida
 // Prefijo de listas/rippers: "2021 - ", "1. ", "01 - ".
 const LEADING_RE = /^(\d{4}\s*[-–—]\s*|\d{1,3}[.\-)]\s+)/;
 
-// "Various Artists" en MusicBrainz + los comodines que usan las etiquetas para recopilatorios.
-const VA_MBID = '89ad4ac3-39f7-470e-963a-56509c546377';
-const VA_ARTIST_RE = /^\s*(various\s*artists?|various|varios(\s+artistas)?|artistas?\s+varios|v\.?\s*a\.?|v\/a|aa\.?\s*vv\.?|compilation|recopilatorio)\s*$/i;
+// VA_MBID y VA_ARTIST_RE («Various Artists» y los comodines que usan las etiquetas para
+// lo mismo) viven en various.js, que es quien decide qué es el cajón de recopilatorios en
+// toda la app; aquí solo sirven para acotar la búsqueda.
 
 // Limpia el título para buscarlo en MusicBrainz. Dos ruidos de etiquetado rompen
 // la búsqueda: (1) el nombre del artista repetido al principio ("Neil Young Archives

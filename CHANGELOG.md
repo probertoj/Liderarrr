@@ -7,6 +7,30 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.4.1] - 2026-10-27
+
+**«Various Artists» deja de comportarse como si fuera un artista.** Del informe de un usuario: su
+calendario se llenaba de recopilatorios ajenos y su ficha anunciaba «0 de 27.139 · faltan 27.134».
+
+### Arreglado
+- **Los recopilatorios no salen en el calendario ni en los huecos.** MusicBrainz acredita a
+  «Various Artists» decenas de miles de discos que no son de nadie en particular. Liderarrr lo
+  trataba como a un artista más: le bajaba la discografía entera (272 páginas de MusicBrainz para
+  27.139 lanzamientos) y colaba sus estrenos entre los tuyos. Ya no: ni calendario, ni «te faltan»,
+  ni novedades.
+- **Su ficha lo dice en vez de enseñar un 0 %.** Nada de barra de completismo, de ámbito ni de
+  botón «Seguir»: no hay discografía que completar. Tus recopilatorios siguen ahí, en su sitio.
+- **Pasaba sin que hubieras seguido a nadie**, porque la discografía se refrescaba para todo
+  artista identificado y el calendario del mes muestra a todos. Por eso dejar de seguirlo no
+  arreglaba nada.
+- Lo que ya estaba guardado se limpia solo al arrancar: se van sus lanzamientos, su resumen y el
+  seguimiento si lo tenía. **No se toca ni un fichero tuyo, ni su ficha, ni tus discos.**
+- Vale para las otras grafías que usan las etiquetas —«VA», «V/A», «AA.VV.», «Varios Artistas»,
+  «Recopilatorio»—, aunque esa ficha aún no esté identificada. Un artista de verdad cuyo nombre
+  empiece parecido (Various Production, Vanilla Fudge) no se ve afectado.
+
+---
+
 ## [1.4.0] - 2026-10-27
 
 **La hora del refresco nocturno la pones tú.** Estaba clavada a las 03:00 en el código: si a esa
