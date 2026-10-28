@@ -73,7 +73,52 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Construir y publicar
+      # Primero se construye SOLO en local. Nada se publica hasta que la imagen demuestre
+      # que arranca, porque un fallo aquí llega al NAS de la gente con el siguiente pull.
+      - name: Construir (local, para probarla)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: liderarrr:humo
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Caso de siempre: sin PUID el contenedor sigue siendo root. Está aquí porque es lo
+      # que tiene todo el mundo instalado, y lo que NO debe cambiar nunca sin querer.
+      - name: Humo — arranca como root
+        shell: bash
+        run: |
+          set -eo pipefail
+          mkdir -p /tmp/humo-root
+          docker run -d --name humo-root -p 3861:3861 -v /tmp/humo-root:/data liderarrr:humo
+          for i in $(seq 1 45); do curl -fsS localhost:3861/api/version >/dev/null && break; sleep 2; done
+          docker logs humo-root
+          curl -fsS localhost:3861/api/version
+          uid=$(docker exec humo-root stat -c %u /proc/1)
+          [ "$uid" = "0" ] || { echo "::error::sin PUID debería seguir siendo root, y corre como uid=$uid"; exit 1; }
+          docker rm -f humo-root
+
+      # Y el salto de privilegios: que la app acabe corriendo como ese usuario y que la base
+      # de datos nazca siendo suya. Es lo único que no se puede comprobar sin un contenedor.
+      - name: Humo — con PUID/PGID corre sin privilegios
+        shell: bash
+        run: |
+          set -eo pipefail
+          mkdir -p /tmp/humo-puid
+          docker run -d --name humo-puid -p 3862:3861 -e PUID=1000 -e PGID=1000 \
+            -v /tmp/humo-puid:/data liderarrr:humo
+          for i in $(seq 1 45); do curl -fsS localhost:3862/api/version >/dev/null && break; sleep 2; done
+          docker logs humo-puid
+          curl -fsS localhost:3862/api/version
+          uid=$(docker exec humo-puid stat -c %u /proc/1)
+          [ "$uid" = "1000" ] || { echo "::error::la app corre como uid=$uid, no como 1000"; exit 1; }
+          docker logs humo-puid 2>&1 | grep -q "Sin privilegios" || { echo "::error::no dijo que soltaba privilegios"; exit 1; }
+          dueno=$(stat -c %u /tmp/humo-puid/liderarrr.db)
+          [ "$dueno" = "1000" ] || { echo "::error::la base la creó el uid $dueno"; exit 1; }
+          docker rm -f humo-puid
+
+      - name: Publicar
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -81,4 +126,3 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
