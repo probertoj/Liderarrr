@@ -7,6 +7,27 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.4.2] - 2026-10-28
+
+**Cuando algo falla, la app dice qué ha fallado.** Hasta ahora el aviso en pantalla era, muchas
+veces, «Internal Server Error»: el nombre del error HTTP, que no explica nada y no dejaba rastro
+en ningún sitio.
+
+### Arreglado
+- **Los avisos cuentan el motivo de verdad.** El servidor ya traía mensajes claros («Falta la
+  carpeta raíz de Lidarr», «No se pudo contactar con Prowlarr», «El destino está en otro sistema
+  de ficheros»), pero en 72 de las 205 rutas se perdían por el camino: la interfaz leía el nombre
+  genérico del estado HTTP en vez del motivo. Ahora hay un único sitio por el que pasan todos los
+  fallos y de ahí sale el texto que ves.
+- **Y quedan apuntados en Diagnóstico**, con su traza si fue un fallo del servidor. Antes había que
+  ir a `docker logs` —si es que llegabas a enterarte de que había pasado algo—.
+- **Subir un fichero demasiado grande o un cuerpo ilegible** lo dice en español, no en el inglés de
+  Fastify («Payload Too Large», «Bad Request»).
+- **Si el servidor no contesta** (el contenedor reiniciándose, casi siempre) el aviso lo dice así,
+  en vez del «Failed to fetch» del navegador.
+
+---
+
 ## [1.4.1] - 2026-10-27
 
 **«Various Artists» deja de comportarse como si fuera un artista.** Del informe de un usuario: su

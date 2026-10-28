@@ -125,6 +125,7 @@ import { coverFast, resolveCoverSlow, retryMissingCovers, coverCandidates, apply
 import { artistPhotoFast, resolveArtistPhotoSlow, artistPhotoCandidates, applyArtistPhoto } from './artistpix.js';
 import { diagnostics, pushEvent } from './diag.js';
 import { updateCheck } from './update.js';
+import { installErrorHandler } from './httperrors.js';
 import * as q from './queries.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -181,6 +182,9 @@ app.addHook('onResponse', async (req, reply) => {
     pushEvent('slow', `${req.method} ${url} — ${Math.round(rt)}ms`);
   }
 });
+
+// Cualquier excepción que escape de una ruta termina aquí, traducida a algo legible.
+installErrorHandler(app);
 
 // --- meta -------------------------------------------------------------------
 app.get('/api/version', async () => ({ name: 'Liderarrr', version: pkg.version }));

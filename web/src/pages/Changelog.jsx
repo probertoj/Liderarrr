@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.4.2',
+    title: 'Cuando algo falla, la app dice qué ha fallado',
+    items: [
+      'Los avisos de error ya no dicen «Internal Server Error». El servidor siempre tuvo mensajes claros («Falta la carpeta raíz de Lidarr», «No se pudo contactar con Prowlarr»), pero en 72 de sus 205 rutas se perdían por el camino y en pantalla salía el nombre genérico del fallo, que no sirve para nada.',
+      'Además, esos fallos quedan apuntados en Diagnóstico —con su traza si fue cosa del servidor—, así que ya no hace falta ir a `docker logs` para enterarte de qué pasó.',
+      'Subir un fichero demasiado grande, o mandar algo que no se puede leer, se explica en español en vez de en el inglés de Fastify. Y si el servidor no contesta porque el contenedor se está reiniciando, el aviso lo dice con esas palabras.',
+    ],
+  },
+  {
     version: '1.4.1',
     title: '«Various Artists» deja de llenarte el calendario',
     items: [

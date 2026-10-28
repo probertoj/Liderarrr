@@ -1,16 +1,25 @@
 // Cliente HTTP mínimo contra la API. Todo cuelga de /api (Vite hace proxy en dev,
 // y en producción el propio servidor sirve la SPA, así que es el mismo origen).
 async function req(path, { method = 'GET', body } = {}) {
-  const res = await fetch(`/api${path}`, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(`/api${path}`, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    // fetch solo falla así cuando no hay nadie al otro lado: «Failed to fetch» no se lo
+    // merece nadie, y casi siempre es el contenedor reiniciándose.
+    throw new Error('No se pudo contactar con el servidor. ¿Se está reiniciando?');
+  }
   if (!res.ok) {
     let msg = `Error ${res.status}`;
     try {
       const j = await res.json();
-      msg = j.error || msg;
+      // `error` es lo nuestro; `message` es donde Fastify pone el motivo real cuando el
+      // fallo ni llega a nuestras manos (un cuerpo que no se puede ni leer, por ejemplo).
+      msg = j.error || j.message || msg;
     } catch {
       /* noop */
     }
