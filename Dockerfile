@@ -1,9 +1,11 @@
 # --- build del frontend -----------------------------------------------------
 FROM node:22-slim AS web
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 COPY web/package.json web/
-RUN npm install --workspace web --include-workspace-root
+# ci y no install: instala EXACTAMENTE lo que dice el lock, sin resolver rangos por su
+# cuenta. Es lo que hace que la imagen lleve las versiones que se probaron aquí.
+RUN npm ci --workspace web --include-workspace-root
 COPY web/ web/
 RUN npm run build --workspace web
 
@@ -15,9 +17,9 @@ WORKDIR /app
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 COPY server/package.json server/
-RUN npm install --workspace server --include-workspace-root --omit=dev
+RUN npm ci --workspace server --include-workspace-root --omit=dev
 
 # --- imagen final -----------------------------------------------------------
 FROM node:22-slim
@@ -25,11 +27,13 @@ WORKDIR /app
 
 # fpcalc (Chromaprint) es imprescindible para AcoustID: saca la huella acústica
 # del audio real. Sin él, la identificación cae en la búsqueda por texto.
+# gosu es para lo otro: el contenedor arranca como root y, si le das PUID/PGID, el
+# entrypoint baja a ese usuario antes de ejecutar la app.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends libchromaprint-tools ca-certificates \
+  && apt-get install -y --no-install-recommends libchromaprint-tools ca-certificates gosu \
   && rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 COPY server/package.json server/
 COPY --from=deps /app/node_modules ./node_modules
 COPY server/ server/

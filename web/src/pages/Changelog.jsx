@@ -9,6 +9,16 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.4.4',
+    title: 'El contenedor ya no tiene por qué ser root',
+    items: [
+      'Nuevas variables PUID y PGID, las mismas que usan las demás *arr: si las pones en el compose, el contenedor arranca como root, se prepara y baja a ese usuario antes de ejecutar la app. A partir de ahí corre sin privilegios y ni siquiera puede tocar su propio código.',
+      'Solo cambia de dueño lo que es suyo (la base de datos, img/ y backups/), nunca la carpeta que montas en /data: en la estructura recomendada esa carpeta es la raíz de tu música y tus descargas. Y antes de soltar el timón comprueba que ese usuario puede escribir ahí; si no puede, se queda como root y te lo dice en el log con el chown exacto que lo arregla.',
+      'Si no pones PUID/PGID no cambia nada: sigue arrancando como siempre. Una instalación que ya existe tiene los ficheros de /data creados por root, y cambiarle el usuario a la brava la dejaría sin poder abrir su propia base.',
+      'Además, la imagen se construye con npm ci en vez de npm install: instala exactamente lo que dice el lock, así que lleva las versiones parcheadas que se probaron y no otras.',
+    ],
+  },
+  {
     version: '1.4.3',
     title: 'Al día con los parches de seguridad',
     items: [

@@ -25,6 +25,12 @@ services:
       #   - /ruta/a/tu/musica:/data/media/music:ro
     environment:
       - TZ=Europe/Madrid
+      # Para que la app NO corra como root: los números de TU usuario (los que te da
+      # «id» en el NAS). La carpeta que montas arriba tiene que ser suya. Si con esos
+      # números no pudiera escribir en /data, el contenedor sigue como root y te lo
+      # dice en el log en vez de arrancar sin base de datos.
+      # - PUID=1000
+      # - PGID=1000
       # Cifra las credenciales en disco (recomendado):
       # - LIDERARRR_SECRET=una-frase-larga-y-secreta
       # Autenticación básica si esto no está solo en tu red de casa:

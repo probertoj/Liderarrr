@@ -7,6 +7,37 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.4.4] - 2026-10-28
+
+**El contenedor ya no tiene por qué correr como root, y la imagen lleva exactamente lo que se
+probó.**
+
+### Añadido
+- **`PUID` y `PGID`**, los mismos nombres que usan las demás *arr. Si los pones en el compose,
+  el contenedor arranca como root, se prepara, y **baja a ese usuario antes de ejecutar la app**:
+  a partir de ahí no tiene privilegios y ni siquiera puede tocar su propio código.
+- Solo cambia de dueño **lo que es suyo** —`liderarrr.db` (y su `-wal`/`-shm`), `img/` y
+  `backups/`—, nunca la carpeta que montas en `/data`: en la estructura recomendada esa carpeta
+  es la raíz de tu música y tus descargas, y un `chown -R` ahí sería largo, ajeno y difícil de
+  deshacer.
+- Y antes de soltar el timón comprueba que ese usuario **puede escribir en `/data` y en la base**.
+  Si no puede, se queda como root y lo dice en el log con el `chown` exacto que lo arregla:
+  mejor eso que arrancar sin poder guardar nada, o morir y dejar el contenedor reiniciándose en
+  bucle.
+
+### Cambiado
+- **`npm ci` en vez de `npm install`** en las dos etapas de construcción de la imagen. `install`
+  puede resolver los rangos `^` por su cuenta; `ci` instala **exactamente** lo que dice
+  `package-lock.json`. Con los parches de ayer recién metidos en el lock, esa diferencia es
+  justo la que hace que la imagen lleve las versiones que se probaron. Comprobado antes de
+  subirlo que `npm ci` funciona con esta estructura de workspaces.
+- Sin `PUID`/`PGID` **no cambia nada**: el contenedor sigue arrancando como root igual que
+  siempre, con un aviso de una línea en el log explicando cómo dejar de hacerlo. Una instalación
+  que ya existe tiene sus ficheros de `/data` creados por root, y cambiarle el usuario por las
+  bravas la dejaría sin poder abrir su propia base.
+
+---
+
 ## [1.4.3] - 2026-10-28
 
 **Al día con los parches de seguridad.** De 16 avisos de `npm audit` (3 críticos, 10 altos) a 2,

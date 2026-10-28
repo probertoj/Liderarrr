@@ -74,6 +74,10 @@ services:
       - TZ=Europe/Madrid
       # Recomendado: cifra las credenciales en disco (elige una frase larga y no la cambies).
       # - LIDERARRR_SECRET=una-frase-larga-y-secreta
+      # Recomendado: que no corra como root. Pon los números de TU usuario («id» en el NAS);
+      # la carpeta montada en /data debe ser suya.
+      # - PUID=1000
+      # - PGID=1000
 ```
 
 ```bash
@@ -522,6 +526,10 @@ teléfono.
 - Credenciales cifradas en disco con `LIDERARRR_SECRET` (AES-256-GCM). Incluye el token de
   Spotify, que además solo se pide con los permisos mínimos.
 - Autenticación básica opcional con `LIDERARRR_AUTH="usuario:contraseña"`.
+- **El contenedor puede correr sin privilegios**: con `PUID`/`PGID` suelta root antes de
+  arrancar la app y pasa a ser ese usuario. Solo cambia de dueño lo suyo (la base, `img/` y
+  `backups/`), nunca tu carpeta de música entera. Y si con ese usuario no pudiera escribir en
+  `/data`, se queda como root y te lo dice: antes eso que dejarte sin ajustes.
 
 ---
 
