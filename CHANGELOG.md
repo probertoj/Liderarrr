@@ -7,6 +7,34 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.6.0] - 2026-10-28
+
+**La Discoteca deja de enseñarte solo los primeros 500.** Con una biblioteca de 27.000 discos,
+eso era el 1,8 % de tu colección: la cabecera decía el total de verdad, pero del resto no había
+forma de llegar.
+
+### Añadido
+- **Más discos al llegar abajo**, de 500 en 500, y un botón «Ver más» que dice cuántos quedan
+  para quien prefiera pedirlos a mano. La cabecera pasa a decir «1000 de 27.102 álbumes», que es
+  lo que de verdad estás viendo.
+
+### Arreglado
+- **Una página traía media biblioteca.** `limit` y `offset` llegan de la URL como texto, y al
+  recortar la lista se sumaban como texto: «500» + 500 daba «500500», así que pedir la segunda
+  página devolvía desde el disco 500 hasta el final —26.602 discos de una tacada—. Nunca se notó
+  porque nadie pedía la segunda página. Ahora hay tests que lo fijan, con los parámetros en
+  texto como llegan de verdad.
+- **Ordenar por título o por artista era 17 veces más lento de lo necesario**: 3,5 segundos con
+  27.000 discos, porque cada comparación construía un comparador de idioma nuevo. Reutilizándolo
+  son 0,2 segundos. Se nota en toda la app, no solo en la Discoteca.
+- **El orden «aleatorio» ya no repite discos** al traer más: antes barajaba otra vez en cada
+  petición, así que la segunda tanda podía volver a traerte lo que ya habías visto. Ahora el
+  barajado es estable mientras dure la visita.
+- Si cambias el filtro mientras una búsqueda anterior sigue en camino, la respuesta tardía ya no
+  pisa a la buena. Con la biblioteca grande una consulta tarda unas décimas, y se notaba.
+
+---
+
 ## [1.5.0] - 2026-10-28
 
 **Se acabaron los cuadros del navegador.** Los 103 avisos y confirmaciones de la app pasan a

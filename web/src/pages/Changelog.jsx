@@ -9,6 +9,16 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.6.0',
+    title: 'La Discoteca ya no se queda en 500 discos',
+    items: [
+      'La Discoteca enseñaba los primeros 500 álbumes y no había forma de llegar al resto: con 27.000 discos, eso era el 1,8 % de la colección. Ahora, al llegar abajo, trae más de 500 en 500; hay un botón «Ver más» que dice cuántos quedan, y la cabecera cuenta lo que estás viendo de verdad («1000 de 27.102 álbumes»).',
+      'Por el camino salió el motivo de que nunca se hubiera notado: pedir la segunda página devolvía media biblioteca de golpe. Los parámetros llegan de la URL como texto y al recortar la lista se sumaban como texto, así que el corte se iba hasta el final. Queda fijado con tests.',
+      'Y ordenar por título o por artista pasa de 3,5 segundos a 0,2 con la biblioteca grande: cada comparación estaba construyendo un comparador de idioma nuevo. Se nota en toda la app.',
+      'El orden «aleatorio» tampoco repite discos al traer más: antes barajaba otra vez en cada petición y la segunda tanda podía devolverte lo ya visto.',
+    ],
+  },
+  {
     version: '1.5.0',
     title: 'Se acabaron los cuadros del navegador',
     items: [

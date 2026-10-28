@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Disc, Layers, X, Loader2 } from 'lucide-react';
 import { api } from '../api.js';
@@ -8,6 +8,10 @@ import { aviso } from '../avisos.jsx';
 // Campos de filtro que se guardan en la URL (?q=…&sort=…). Así, al entrar a un disco y volver
 // con «atrás» del navegador, se restaura tu búsqueda/filtros en vez de la vista global.
 const FILTER_KEYS = ['q', 'genre', 'decade', 'year', 'format', 'lossless', 'state', 'sort', 'dupesOnly'];
+// Cuántos discos se piden de una vez. Con 33.000 álbumes el servidor tarda unos 200 ms en
+// armar la lista entera (la colapsa para fundir duplicados antes de recortar), así que
+// pedir de 500 en 500 va fino y no deja la parrilla a medias.
+const PAGINA = 500;
 const DEFAULTS = { q: '', genre: '', decade: '', year: '', format: '', lossless: '', state: '', sort: 'added', dupesOnly: '' };
 
 export default function Library() {
@@ -25,6 +29,31 @@ export default function Library() {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
   const [combining, setCombining] = useState(false);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  // El orden «aleatorio» necesita una semilla fija mientras dure la visita: sin ella cada
+  // página se barajaría por su cuenta y verías discos repetidos al seguir bajando.
+  const [semilla] = useState(() => Math.floor(Math.random() * 1e9));
+  const centinela = useRef(null);
+  // NO son estado: el estado se actualiza en el siguiente render y los eventos de scroll
+  // llegan antes, así que con `cargandoMas` a secas se solapaban peticiones.
+  const cargando = useRef(false);
+  const armado = useRef(true);
+
+  // Los parámetros de la consulta, en un solo sitio: los usan la carga inicial, «cargar
+  // más» y el refresco de después de combinar discos.
+  const consulta = useCallback(
+    (extra = {}) => {
+      const clean = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
+      return {
+        ...clean,
+        ...(selectMode ? { flat: '1' } : {}),
+        ...(f.sort === 'random' ? { seed: semilla } : {}),
+        limit: PAGINA,
+        ...extra,
+      };
+    },
+    [f, selectMode, semilla]
+  );
 
   const openDup = async (id) => {
     try {
@@ -53,8 +82,7 @@ export default function Library() {
     try {
       await api.combineAlbums([...selected]);
       exitSelect();
-      const clean = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
-      setData(await api.library({ ...clean, limit: 500 }));
+      setData(await api.library(consulta()));
     } catch (e) {
       aviso(e.message, 'error');
     } finally {
@@ -66,17 +94,76 @@ export default function Library() {
     api.libraryFilters().then(setFilters).catch(() => {});
   }, []);
 
+  // en modo selección la lista va PLANA (cada disco por separado, para poder combinarlos)
   useEffect(() => {
-    const clean = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
-    // en modo selección la lista va PLANA (cada disco por separado, para poder combinarlos)
+    let cancelado = false;
     const t = setTimeout(() => {
       api
-        .library({ ...clean, ...(selectMode ? { flat: '1' } : {}), limit: 500 })
-        .then(setData)
-        .catch((e) => setErr(e.message));
+        .library(consulta())
+        // con la biblioteca grande una respuesta tarda unos 200 ms: sin esta guardia, la
+        // de una búsqueda ya abandonada podía llegar después y pisar a la buena.
+        .then((d) => !cancelado && setData(d))
+        .catch((e) => !cancelado && setErr(e.message));
     }, 250);
-    return () => clearTimeout(t);
-  }, [f, selectMode]);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [consulta]);
+
+  // Siguiente página, al pulsar el botón o al asomar el centinela por abajo.
+  const cargarMas = useCallback(async () => {
+    if (!data || cargando.current || data.albums.length >= data.total) return;
+    cargando.current = true;
+    setCargandoMas(true);
+    try {
+      const d = await api.library(consulta({ offset: data.albums.length }));
+      setData((prev) => {
+        if (!prev) return d;
+        // si la colección cambió entre peticiones, algún disco podría repetirse
+        const vistos = new Set(prev.albums.map((a) => a.id));
+        return { total: d.total, albums: [...prev.albums, ...d.albums.filter((a) => !vistos.has(a.id))] };
+      });
+    } catch (e) {
+      aviso(e.message, 'error');
+    } finally {
+      cargando.current = false;
+      setCargandoMas(false);
+    }
+  }, [data, consulta]);
+
+  // Pintada la tanda nueva, si el pie ya quedó lejos se rearma el cerrojo. Hace falta
+  // porque si no solo se rearma cuando llega un evento de scroll con el pie lejos, y quien
+  // estaba al final y baja de golpe no generaría ninguno.
+  useEffect(() => {
+    const el = centinela.current;
+    if (el && el.getBoundingClientRect().top - window.innerHeight >= 600) armado.current = true;
+  }, [data]);
+
+  // Se carga sola al acercarte al final (600 px antes), que es como se recorre una parrilla;
+  // el botón sigue ahí para quien prefiera pedirlo a mano.
+  //
+  // UNA carga por acercamiento: el cerrojo no se rearma hasta que el pie vuelve a quedar
+  // lejos. Un gesto de rueda suelta decenas de eventos, y las tarjetas recién añadidas
+  // tardan en tener carátula —y altura—, así que sin el cerrojo el pie puede seguir en zona
+  // y encadenar tandas que nadie ha pedido. Va con un evento de scroll y no con
+  // IntersectionObserver porque ese avisa también cuando la parrilla CRECE, que es justo
+  // cuando no hay que pedir nada.
+  useEffect(() => {
+    const alBajar = () => {
+      const el = centinela.current;
+      if (!el) return;
+      if (el.getBoundingClientRect().top - window.innerHeight >= 600) {
+        armado.current = true;
+        return;
+      }
+      if (!armado.current) return;
+      armado.current = false;
+      cargarMas();
+    };
+    window.addEventListener('scroll', alBajar, { passive: true });
+    return () => window.removeEventListener('scroll', alBajar);
+  }, [cargarMas]);
 
   // refleja los filtros en la URL (replace: no ensucia el historial con cada tecla). Al abrir
   // un disco se apila una entrada nueva; «atrás» vuelve a esta URL y restaura los filtros.
@@ -92,7 +179,17 @@ export default function Library() {
 
   return (
     <div>
-      <PageTitle icon={Disc} title="Discoteca" sub={data ? `${data.total} álbumes` : 'Toda tu colección'} />
+      <PageTitle
+        icon={Disc}
+        title="Discoteca"
+        sub={
+          data
+            ? data.albums.length < data.total
+              ? `${data.albums.length.toLocaleString('es')} de ${data.total.toLocaleString('es')} álbumes`
+              : `${data.total.toLocaleString('es')} álbumes`
+            : 'Toda tu colección'
+        }
+      />
 
       <div className="flex flex-wrap gap-2 mb-5">
         <input
@@ -197,6 +294,17 @@ export default function Library() {
               onClick={!selectMode && a.dup ? () => openDup(a.id) : undefined}
             />
           ))}
+        </div>
+      )}
+
+      {data && data.albums.length < data.total && (
+        <div ref={centinela} className="mt-6 flex justify-center">
+          <Button onClick={cargarMas} disabled={cargandoMas}>
+            <span className="inline-flex items-center gap-1.5">
+              {cargandoMas && <Loader2 size={14} className="animate-spin" />}
+              {cargandoMas ? 'Cargando…' : `Ver más (quedan ${(data.total - data.albums.length).toLocaleString('es')})`}
+            </span>
+          </Button>
         </div>
       )}
 

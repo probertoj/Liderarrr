@@ -100,21 +100,36 @@ export function discBoxCounts(copies) {
   const total = contaminated ? t0 : copies.reduce((s, c) => s + (c.track_count || 0), 0);
   return { track_file_count: have, track_count: total };
 }
-function librarySort(sort) {
-  const byTitle = (a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es', { sensitivity: 'base' });
+// UN solo comparador para toda la app. `String.localeCompare(x, «es», {…})` construye un
+// Intl.Collator NUEVO en cada comparación: ordenar 27.000 discos por título tardaba 3,5
+// segundos. Reutilizándolo son décimas.
+const COMPARADOR = new Intl.Collator('es', { sensitivity: 'base' });
+
+// Barajado ESTABLE: la misma semilla da siempre el mismo orden. Hace falta porque la
+// Discoteca pide la lista por páginas, y un Math.random() en el comparador la reordenaría
+// en cada petición: verías discos repetidos al bajar y otros no saldrían nunca.
+function numeroDe(id, semilla) {
+  let x = (Number(id) || 0) ^ (Number(semilla) || 0);
+  x = Math.imul(x ^ (x >>> 16), 2246822507);
+  x = Math.imul(x ^ (x >>> 13), 3266489909);
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+
+function librarySort(sort, semilla = 0) {
+  const byTitle = (a, b) => COMPARADOR.compare(String(a.title || ""), String(b.title || ""));
   switch (sort) {
     case 'title':
       return byTitle;
     case 'artist':
       return (a, b) =>
-        String(a.album_artist || '').localeCompare(String(b.album_artist || ''), 'es', { sensitivity: 'base' }) ||
+        COMPARADOR.compare(String(a.album_artist || ""), String(b.album_artist || "")) ||
         byTitle(a, b);
     case 'year':
       return (a, b) => (b.year || 0) - (a.year || 0);
     case 'size':
       return (a, b) => (b.size_bytes || 0) - (a.size_bytes || 0);
     case 'random':
-      return () => Math.random() - 0.5;
+      return (a, b) => numeroDe(a.id, semilla) - numeroDe(b.id, semilla);
     default:
       return (a, b) => (b.added_at || 0) - (a.added_at || 0);
   }
@@ -174,7 +189,12 @@ export function libraryRows() {
     .all();
 }
 
-export function library({ q, genre, decade, year, format, state, lossless, sort, dupesOnly, flat, ids, limit = 500, offset = 0 } = {}) {
+export function library({ q, genre, decade, year, format, state, lossless, sort, dupesOnly, flat, ids, seed, limit, offset } = {}) {
+  // Del query llegan como TEXTO, y abajo se usan para cortar la lista: sin convertirlos,
+  // `offset + limit` CONCATENA («500» + 500 = «500500») y una página devolvía desde ahí
+  // hasta el final. Con 27.000 discos, pedir la segunda página traía 26.602 de golpe.
+  const tope = Math.max(1, Math.min(2000, Number(limit) || 500));
+  const desde = Math.max(0, Number(offset) || 0);
   const where = [DESCRIPTIVE];
   const args = {};
   if (q) {
@@ -226,16 +246,16 @@ export function library({ q, genre, decade, year, format, state, lossless, sort,
   // modo PLANO (para el modo selección de la Discoteca al combinar multidiscos): sin
   // colapsar nada, para poder elegir cada disco individual (aunque compartan título).
   if (flat) {
-    rows.sort(librarySort(sort));
-    return { total: rows.length, albums: rows.slice(offset, offset + limit) };
+    rows.sort(librarySort(sort, seed));
+    return { total: rows.length, albums: rows.slice(desde, desde + tope) };
   }
 
   const collapsed = collapseCopies(rows);
   // filtro "solo con duplicados": los que tienen copias difusas (badge ×N). Las cajas
   // multidisco no cuentan (llevan .discs, no .dup), que es justo lo que se quiere.
   const result = dupesOnly ? collapsed.filter((a) => a.dup) : collapsed;
-  result.sort(librarySort(sort));
-  return { total: result.length, albums: result.slice(offset, offset + limit) };
+  result.sort(librarySort(sort, seed));
+  return { total: result.length, albums: result.slice(desde, desde + tope) };
 }
 
 // Grupo de duplicados de UN álbum (para el panel al pinchar la carátula ×N en la
