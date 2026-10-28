@@ -24,9 +24,14 @@ const TRADUCCIONES = [
   [/body cannot be empty/i, 'La petición llegó sin datos'],
 ];
 
-export function motivoDeError(err) {
+// El código hace falta para redactar el caso sin motivo: un 500 es cosa nuestra y manda a
+// Diagnóstico; un 403 del servidor de ficheros estáticos, por ejemplo, no.
+export function motivoDeError(err, code = 500) {
   const bruto = String(err?.message ?? err ?? '').trim();
-  if (!bruto || GENERICOS.has(bruto)) return 'Error inesperado en el servidor (mira Diagnóstico)';
+  if (!bruto || GENERICOS.has(bruto))
+    return code >= 500
+      ? 'Error inesperado en el servidor (mira Diagnóstico)'
+      : `La petición no se pudo atender (${code})`;
   for (const [re, texto] of TRADUCCIONES) if (re.test(bruto)) return texto;
   return bruto.slice(0, 500);
 }
@@ -38,7 +43,7 @@ export function codigoDeError(err) {
 
 export function errorPayload(err) {
   const code = codigoDeError(err);
-  const error = motivoDeError(err);
+  const error = motivoDeError(err, code);
   // `message` va con el mismo texto: es el nombre que usa Fastify y el que miran los
   // clientes antiguos, y así ninguno de los dos acaba enseñando lo genérico.
   return { code, body: { error, message: error, statusCode: code } };

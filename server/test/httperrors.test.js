@@ -36,6 +36,13 @@ test('un error sin mensaje no deja a la interfaz con un aviso vacío', () => {
   assert.equal(motivoDeError('se cayó la red'), 'se cayó la red');
 });
 
+test('un fallo sin motivo por debajo de 500 no le echa la culpa al servidor', () => {
+  // @fastify/static rechaza las rutas con «..» con un 403 pelado, sin más texto que «Forbidden».
+  assert.equal(motivoDeError(new Error('Forbidden'), 403), 'La petición no se pudo atender (403)');
+  assert.equal(motivoDeError(new Error(''), 404), 'La petición no se pudo atender (404)');
+  assert.equal(motivoDeError(new Error('Internal Server Error'), 500), 'Error inesperado en el servidor (mira Diagnóstico)');
+});
+
 test('los dos mensajes de Fastify que un usuario puede provocar van en español', () => {
   assert.equal(motivoDeError(new Error('request file too large')), 'El archivo es demasiado grande');
   assert.equal(

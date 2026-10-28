@@ -1,6 +1,6 @@
 {
   "name": "@liderarrr/server",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "private": true,
   "type": "module",
   "main": "src/index.js",
@@ -10,11 +10,11 @@
     "test": "node --test \"test/**/*.test.js\""
   },
   "dependencies": {
-    "@fastify/multipart": "^8.3.0",
-    "@fastify/static": "^7.0.4",
+    "@fastify/multipart": "^10.1.6",
+    "@fastify/static": "^10.1.8",
     "better-sqlite3": "^11.5.0",
-    "fastify": "^4.28.1",
-    "music-metadata": "^10.6.0",
+    "fastify": "^5.12.7",
+    "music-metadata": "^12.3.2",
     "node-taglib-sharp": "^6.0.3"
   }
 }

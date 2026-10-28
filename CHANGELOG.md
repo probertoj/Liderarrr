@@ -7,6 +7,40 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.4.3] - 2026-10-28
+
+**Al día con los parches de seguridad.** De 16 avisos de `npm audit` (3 críticos, 10 altos) a 2,
+y los 2 que quedan no se pueden arreglar sin romper algo peor.
+
+### Cambiado
+- **Fastify 4 → 5**, con `@fastify/static` 7 → 10 y `@fastify/multipart` 8 → 10. El salto de
+  Fastify es lo que permite actualizar los otros dos, que es donde estaban los agujeros de
+  verdad: `@fastify/static` tenía un **salto de autorización por rutas no canónicas y un
+  recorrido de directorios** (la app sirve su propia interfaz, así que cualquiera que llegue al
+  puerto lo tocaba), y `@fastify/busboy` —el que lee las subidas de ficheros— **tres fallos de
+  denegación de servicio e inyección de CRLF**.
+- **music-metadata 10 → 12**: el lector de etiquetas. Su `file-type` se quedaba **en bucle
+  infinito con un ASF (.wma) malformado**, y eso lo come el escaneo de TU biblioteca. Comprobado
+  antes de subirlo que lee igual que antes todo lo que usa el escáner: título, artistas, álbum,
+  número de pista y disco, año, género, sello, los MBID de MusicBrainz, el ReplayGain, el formato
+  y la carátula incrustada; y que la duración sigue saliendo de la cabecera sin leer el fichero
+  entero.
+- Y de arrastre, ya parcheados: `fast-uri` (ocho avisos, varios de falsificación de peticiones),
+  `brace-expansion`, `source-map-js`, `vite` y `shell-quote`.
+
+### Arreglado
+- Un fallo **sin motivo propio y por debajo de 500** ya no dice «Error inesperado en el servidor»:
+  dice «La petición no se pudo atender (403)». Salió al probar lo anterior, porque el servidor de
+  ficheros estáticos rechaza las rutas con «..» con un 403 pelado, y la culpa no era del servidor.
+
+### Sin arreglar (a propósito)
+- `uuid` 8, que entra con `node-taglib-sharp` (el que escribe las etiquetas). Lo que propone npm
+  es **bajar la librería de la 6.0.3 a la 1.0.0**, cinco versiones mayores atrás, lo que se
+  llevaría por delante la escritura de etiquetas. Y el fallo solo aparece al pedir un UUID v3, v5
+  o v6 pasándole un búfer: esa librería solo llama a `v4()`, sin búfer.
+
+---
+
 ## [1.4.2] - 2026-10-28
 
 **Cuando algo falla, la app dice qué ha fallado.** Hasta ahora el aviso en pantalla era, muchas

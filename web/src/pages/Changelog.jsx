@@ -9,6 +9,16 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.4.3',
+    title: 'Al día con los parches de seguridad',
+    items: [
+      'De 16 avisos de seguridad en las dependencias (3 críticos, 10 altos) a 2. El salto gordo es Fastify 4 → 5, que es lo que permite actualizar las dos piezas donde estaban los agujeros de verdad: el servidor de ficheros estáticos (salto de autorización y recorrido de directorios: la app sirve su propia interfaz, así que cualquiera que llegara al puerto lo tocaba) y el lector de subidas de ficheros (denegación de servicio e inyección de CRLF).',
+      'También sube el lector de etiquetas (music-metadata 10 → 12), que se quedaba en bucle infinito con un .wma malformado; y eso lo come el escaneo de tu biblioteca. Comprobado antes de subirlo que sigue leyendo igual título, artistas, álbum, pista y disco, año, género, sello, los MBID, el ReplayGain, el formato, la carátula incrustada y la duración.',
+      'Los 2 avisos que quedan no se arreglan a propósito: lo que propone npm es bajar la librería que escribe las etiquetas cinco versiones mayores, y el fallo solo aparece de una forma que esa librería no usa.',
+      'De paso, un fallo sin motivo propio y por debajo de 500 ya no dice «Error inesperado en el servidor», sino «La petición no se pudo atender (403)».',
+    ],
+  },
+  {
     version: '1.4.2',
     title: 'Cuando algo falla, la app dice qué ha fallado',
     items: [
