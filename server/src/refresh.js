@@ -16,6 +16,7 @@ import { refreshSpotifyLibrary, spotifyUserConnected } from './spotifyuser.js';
 import { refreshArtistSuggestions } from './suggest.js';
 import { lastfmConfigured } from './lastfm.js';
 import { sendNotification } from './notify.js';
+import { barrerHuerfanos, resumenHuerfanos } from './orphans.js';
 import { db } from './db.js';
 
 // La rutina "poner Liderarrr al día", en orden de dependencias: primero el disco
@@ -93,6 +94,22 @@ function buildSteps() {
         const r = await runIdentify({ force: false });
         if (r.error) throw new Error(r.error);
         return `${identifyStatus.matched} identificados · ${identifyStatus.unmatched} sin coincidencia`;
+      },
+    },
+    {
+      // Aquí y no al final: escanear e identificar son los pasos que BORRAN álbumes, y lo
+      // que viene después (discografías, completismo) es justo quien lee si un disco es
+      // tuyo. Barrer en medio evita que un puntero a una copia borrada cuente como tuya.
+      key: 'limpieza',
+      label: 'Recoger restos sueltos en la base',
+      enabled: () => true,
+      run: async () => {
+        const r = barrerHuerfanos();
+        const linea = resumenHuerfanos(r);
+        // console.log pasa por diag.js: si algo se recogió, queda en Diagnóstico.
+        if (linea) console.log(`[limpieza] ${linea}`);
+        if (!linea) return 'nada suelto';
+        return `${r.borrados} borradas · ${r.soltados} punteros soltados${r.avisados ? ` · ${r.avisados} por revisar` : ''}`;
       },
     },
     {

@@ -7,6 +7,32 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.6.1] - 2026-10-28
+
+**La base recoge sus propios restos.** El esquema no tiene claves ajenas, así que cuando se
+borra un álbum o se fusiona una ficha de artista, SQLite no impide que se queden atrás las
+filas que colgaban de ellos.
+
+### Añadido
+- **Un paso más en «Identificar y sincronizar»** (y por tanto en el refresco nocturno):
+  *Recoger restos sueltos en la base*. Va justo detrás de escanear e identificar —los dos pasos
+  que borran álbumes— y antes de calcular discografías y completismo, que es quien lee si un
+  disco es tuyo.
+- **Es conservador por diseño.** Solo mira filas cuyo padre ya no existe, y **nunca toca tus
+  álbumes ni tus fichas de artista**: si un disco tuyo se queda sin ficha, lo cuenta y lo dice,
+  pero no lo borra. Lo que recoge queda apuntado en Diagnóstico.
+
+### Arreglado
+- **Un disco podía contar como tuyo después de borrarlo.** Si un lanzamiento guardaba el puntero
+  a una copia que ya no está, seguía marcado como «lo tienes»: no aparecía entre lo que te falta
+  y la auto-descarga no volvía a pedirlo nunca. Ahora el puntero se suelta y el disco vuelve a
+  contar como ausente. En la base de pruebas (32.856 álbumes) había 4 así.
+- También recoge pistas, etiquetas, créditos, letras, resúmenes de artista, discografías,
+  seguimientos y novedades que se quedaron sin su ficha; y suelta los punteros de retos y
+  descargas a álbumes borrados, sin borrar la entrada.
+
+---
+
 ## [1.6.0] - 2026-10-28
 
 **La Discoteca deja de enseñarte solo los primeros 500.** Con una biblioteca de 27.000 discos,

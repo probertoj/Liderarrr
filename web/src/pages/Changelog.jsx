@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.6.1',
+    title: 'La base recoge sus propios restos',
+    items: [
+      '«Identificar y sincronizar» tiene un paso nuevo: recoger lo que se queda suelto en la base. Al borrar un álbum o fusionar una ficha de artista, lo que colgaba de ellos —pistas, etiquetas, créditos, letras, resúmenes, discografías, seguimientos— podía quedarse ahí, porque el esquema no tiene claves ajenas que lo impidan.',
+      'Lo que de verdad molestaba: un lanzamiento que guardaba el puntero a una copia tuya ya borrada seguía contando como «lo tienes». No salía entre lo que te falta y la auto-descarga no volvía a pedirlo nunca. Ahora el puntero se suelta y el disco vuelve a contar como ausente.',
+      'Es conservador a propósito: solo toca filas cuyo padre ya no existe, y nunca tus álbumes ni tus fichas de artista. Si un disco tuyo se queda sin ficha de artista, lo cuenta y lo dice en Diagnóstico, pero no lo borra: ahí están tus ficheros.',
+    ],
+  },
+  {
     version: '1.6.0',
     title: 'La Discoteca ya no se queda en 500 discos',
     items: [
