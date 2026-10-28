@@ -105,7 +105,13 @@ jobs:
         shell: bash
         run: |
           set -eo pipefail
+          # La carpeta tiene que ser DE ese usuario, que es justo lo que se le pide a la
+          # gente en el README. El runner de GitHub no es el uid 1000, así que sin este
+          # chown se dispara la red de seguridad del entrypoint y la app sigue como root.
+          echo "runner: $(id)"
           mkdir -p /tmp/humo-puid
+          sudo chown 1000:1000 /tmp/humo-puid
+          ls -ldn /tmp/humo-puid
           docker run -d --name humo-puid -p 3862:3861 -e PUID=1000 -e PGID=1000 \
             -v /tmp/humo-puid:/data liderarrr:humo
           for i in $(seq 1 45); do curl -fsS localhost:3862/api/version >/dev/null && break; sleep 2; done
