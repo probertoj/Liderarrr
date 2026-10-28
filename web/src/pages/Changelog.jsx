@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.6.2',
+    title: 'Las rutas de la API ya se pueden probar',
+    items: [
+      'Por fuera no cambia nada. Por dentro, arrancar el servidor y registrar las rutas dejan de ser lo mismo: antes, cargar el fichero principal abría el puerto y programaba los cron, así que no había forma de probar una ruta sin levantar la app entera.',
+      'Ahora hay diez pruebas que entran por donde entras tú, y las que más importan son las de lo que destruye: borrar del disco no borra sin confirmación expresa y se niega en seco si la carpeta está fuera de tu biblioteca. La prueba deja un fichero fuera a propósito y comprueba que sigue ahí.',
+      'Son también las que habrían cazado el fallo de paginación de la versión anterior, que solo aparecía pasando por HTTP. Comprobado volviendo a meter el fallo: la prueba falla.',
+    ],
+  },
+  {
     version: '1.6.1',
     title: 'La base recoge sus propios restos',
     items: [

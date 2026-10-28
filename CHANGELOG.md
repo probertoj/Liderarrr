@@ -7,6 +7,28 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.6.2] - 2026-10-28
+
+**Las rutas de la API ya se pueden probar.** No cambia nada de lo que ves: cambia que ahora hay
+tests que entran por donde entras tú.
+
+### Cambiado
+- **Arrancar el servidor y registrar las rutas dejan de ser lo mismo.** Importar `index.js`
+  abría el puerto, programaba los cuatro cron y lanzaba las limpiezas de una vez, así que no
+  había forma de cargarlo solo para preguntarle cosas. Todo eso vive ahora en `start()`, que
+  solo corre si a ese fichero lo ejecutan como programa.
+- Con eso, de los 131 tests ya hay **10 que prueban rutas de verdad** —antes, ninguno—: la
+  Discoteca y su troceado, los filtros, una ficha que no existe, un cuerpo ilegible y, sobre
+  todo, los **guardarraíles de lo que destruye**: borrar del disco no borra sin confirmación
+  expresa y **se niega en seco si la carpeta está fuera de tu biblioteca** (el test deja un
+  fichero fuera y comprueba que sigue ahí). Igual con restaurar la base y con «ordenar en su
+  carpeta».
+- Esos tests son los que habrían cazado el fallo de paginación de la 1.6.0, que **solo existía
+  pasando por HTTP** —que es donde los parámetros llegan como texto—. Comprobado volviendo a
+  meter el fallo a propósito: la prueba falla.
+
+---
+
 ## [1.6.1] - 2026-10-28
 
 **La base recoge sus propios restos.** El esquema no tiene claves ajenas, así que cuando se

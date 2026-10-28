@@ -5,7 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   db,
   DATA_DIR,
@@ -130,7 +130,10 @@ import * as q from './queries.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf-8'));
-const app = Fastify({ logger: { level: 'info' }, bodyLimit: 20 * 1024 * 1024 });
+// Se exporta a propósito: un test puede importarla y hacerle `inject()` contra las rutas
+// DE VERDAD, sin abrir un puerto. Registrar rutas no arranca nada; lo que arranca está
+// abajo, en start(), y solo corre si a este fichero lo ejecutan como programa.
+export const app = Fastify({ logger: { level: 'info' }, bodyLimit: 20 * 1024 * 1024 });
 // Subida de ficheros para «Restaurar base de datos» (Ajustes). El límite de 4 GB cubre
 // bibliotecas grandes; el bodyLimit de arriba NO aplica a multipart, que streamea a disco.
 app.register(fastifyMultipart, { limits: { fileSize: 4 * 1024 * 1024 * 1024 } });
@@ -1567,80 +1570,89 @@ function scheduleWantedWatch() {
   }, 60 * 1000);
 }
 
-// Errores fatales: los logueamos para que se VEAN. Antes, un error no capturado
-// tumbaba el proceso y en los logs solo aparecía el crash del destructor de
-// better-sqlite3, ocultando la causa real. No salimos: preferimos seguir vivos.
-process.on('uncaughtException', (e) => console.error('[fatal] uncaughtException:', e));
-process.on('unhandledRejection', (e) => console.error('[fatal] unhandledRejection:', e));
+// Arrancar es lo ÚNICO que no pasa al importar este fichero: escuchar un puerto, programar
+// los cron y correr las limpiezas de una vez. Separarlo es lo que permite probar las rutas
+// con `app.inject(...)`, que es por donde llegan los parámetros como texto —justo donde se
+// esconden los fallos que no se ven llamando a los módulos por debajo—.
+export async function start({ port = Number(process.env.PORT) || 3861 } = {}) {
+  // Errores fatales: los logueamos para que se VEAN. Antes, un error no capturado
+  // tumbaba el proceso y en los logs solo aparecía el crash del destructor de
+  // better-sqlite3, ocultando la causa real. No salimos: preferimos seguir vivos.
+  process.on('uncaughtException', (e) => console.error('[fatal] uncaughtException:', e));
+  process.on('unhandledRejection', (e) => console.error('[fatal] unhandledRejection:', e));
 
-// Cierre limpio al parar el contenedor: cierra la BD para que better-sqlite3 no
-// pete con una aserción en su destructor durante el apagado.
-for (const sig of ['SIGTERM', 'SIGINT']) {
-  process.on(sig, () => {
+  // Cierre limpio al parar el contenedor: cierra la BD para que better-sqlite3 no
+  // pete con una aserción en su destructor durante el apagado.
+  for (const sig of ['SIGTERM', 'SIGINT']) {
+    process.on(sig, () => {
+      try {
+        db.close();
+      } catch {
+        /* noop */
+      }
+      process.exit(0);
+    });
+  }
+
+  await app.listen({ port, host: '0.0.0.0' });
+  marcarServidorEnMarcha(); // ya no estamos arrancando: un fallo de la base no debe parar esto
+  console.log(`[Liderarrr] escuchando en http://0.0.0.0:${port}`);
+  scheduleNightly();
+  scheduleAutoImport();
+  scheduleWantedWatch();
+  scheduleBackup();
+  // backfill de multidiscos: reagrupa cajas sobre lo ya escaneado, sin exigir un
+  // reescaneo completo. Diferido para no retrasar el primer request. Solo lectura.
+  setImmediate(() => {
     try {
-      db.close();
-    } catch {
-      /* noop */
+      regroupDiscs();
+    } catch (e) {
+      console.warn('[discgroup] backfill al arrancar falló:', String(e.message || e));
     }
-    process.exit(0);
+    try {
+      resumeAddQueue(); // reanuda una tanda de envío a Lidarr que quedara a medias
+    } catch (e) {
+      console.warn('[lidarr] no se pudo reanudar la cola:', String(e.message || e));
+    }
+    // limpieza ÚNICA de los ocultos que se escanearon antes de que existiera el filtro
+    // (pistas `._loquesea.flac` de Mac). Solo filas: no toca el disco.
+    try {
+      if (getSetting('junk_purged') !== '1') {
+        const r = purgeJunkFromDb();
+        setSetting('junk_purged', '1');
+        if (r.tracks || r.albums || r.covers)
+          console.log(
+            `[scan] ocultos limpiados: ${r.tracks} pistas · ${r.albums} álbumes · ${r.covers} carátulas`
+          );
+      }
+    } catch (e) {
+      console.warn('[scan] limpieza de ocultos falló (se reintentará):', String(e.message || e));
+    }
+    // limpieza ÚNICA de la discografía que se bajó del cajón de recopilatorios antes de
+    // que existiera la regla (decenas de miles de release groups ajenos). Ni tus discos
+    // ni su ficha se tocan.
+    try {
+      if (getSetting('va_purged') !== '1') {
+        const r = purgeVariousArtists();
+        setSetting('va_purged', '1');
+        if (r.rgs || r.tracked || r.ext)
+          console.log(
+            `[varios] recopilatorios fuera del completismo: ${r.rgs} lanzamientos · ${r.tracked} seguimientos · ${r.ext} novedades`
+          );
+      }
+    } catch (e) {
+      console.warn('[varios] limpieza falló (se reintentará):', String(e.message || e));
+    }
   });
+  return app;
 }
 
-const PORT = Number(process.env.PORT) || 3861;
-app
-  .listen({ port: PORT, host: '0.0.0.0' })
-  .then(() => {
-    marcarServidorEnMarcha(); // ya no estamos arrancando: un fallo de la base no debe parar esto
-    console.log(`[Liderarrr] escuchando en http://0.0.0.0:${PORT}`);
-    scheduleNightly();
-    scheduleAutoImport();
-    scheduleWantedWatch();
-    scheduleBackup();
-    // backfill de multidiscos: reagrupa cajas sobre lo ya escaneado, sin exigir un
-    // reescaneo completo. Diferido para no retrasar el primer request. Solo lectura.
-    setImmediate(() => {
-      try {
-        regroupDiscs();
-      } catch (e) {
-        console.warn('[discgroup] backfill al arrancar falló:', String(e.message || e));
-      }
-      try {
-        resumeAddQueue(); // reanuda una tanda de envío a Lidarr que quedara a medias
-      } catch (e) {
-        console.warn('[lidarr] no se pudo reanudar la cola:', String(e.message || e));
-      }
-      // limpieza ÚNICA de los ocultos que se escanearon antes de que existiera el filtro
-      // (pistas `._loquesea.flac` de Mac). Solo filas: no toca el disco.
-      try {
-        if (getSetting('junk_purged') !== '1') {
-          const r = purgeJunkFromDb();
-          setSetting('junk_purged', '1');
-          if (r.tracks || r.albums || r.covers)
-            console.log(
-              `[scan] ocultos limpiados: ${r.tracks} pistas · ${r.albums} álbumes · ${r.covers} carátulas`
-            );
-        }
-      } catch (e) {
-        console.warn('[scan] limpieza de ocultos falló (se reintentará):', String(e.message || e));
-      }
-      // limpieza ÚNICA de la discografía que se bajó del cajón de recopilatorios antes de
-      // que existiera la regla (decenas de miles de release groups ajenos). Ni tus discos
-      // ni su ficha se tocan.
-      try {
-        if (getSetting('va_purged') !== '1') {
-          const r = purgeVariousArtists();
-          setSetting('va_purged', '1');
-          if (r.rgs || r.tracked || r.ext)
-            console.log(
-              `[varios] recopilatorios fuera del completismo: ${r.rgs} lanzamientos · ${r.tracked} seguimientos · ${r.ext} novedades`
-            );
-        }
-      } catch (e) {
-        console.warn('[varios] limpieza falló (se reintentará):', String(e.message || e));
-      }
-    });
-  })
-  .catch((err) => {
+// Solo si nos ejecutan como programa (`node server/src/index.js`). Importar este fichero
+// —lo que hace un test— no abre puerto ni programa nada.
+const esElPrograma = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+if (esElPrograma) {
+  start().catch((err) => {
     app.log.error(err);
     process.exit(1);
   });
+}
