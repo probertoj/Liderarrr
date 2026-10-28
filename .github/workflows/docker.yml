@@ -1,8 +1,10 @@
 name: Construir y publicar imagen Docker
 
-# Construye la imagen y la publica en GitHub Container Registry (GHCR) en cada
-# push a main/develop y en cada tag de versión. La imagen queda en
-# ghcr.io/probertoj/liderarrr con etiquetas: latest (main), develop, y vX.Y.Z.
+# Primero pasa los tests; SOLO si pasan se construye la imagen y se publica en GitHub
+# Container Registry (GHCR), en cada push a main/develop y en cada tag de versión. La
+# imagen queda en ghcr.io/probertoj/liderarrr con etiquetas: latest (main), develop y
+# vX.Y.Z. Como un push a main publica :latest —y eso llega al NAS de cualquiera que haga
+# «docker compose pull»—, la suite es la puerta: si falla, no se publica nada.
 on:
   push:
     branches: [main, develop]
@@ -13,7 +15,36 @@ env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/liderarrr
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # La misma versión de Node que lleva la imagen (node:22-slim): lo que importa es
+      # que la suite pase DONDE va a correr la app, no donde se programa.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # ci y no install: respeta package-lock.json al pie de la letra.
+      - run: npm ci
+
+      # Una suite que no encuentra NINGÚN fichero termina con éxito y dejaría pasar todo:
+      # eso es peor que no tener puerta. Por eso no basta con que npm test salga bien, hay
+      # que ver en su salida que se ejecutó al menos un test.
+      - name: Tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee salida-tests.txt
+          grep -qE '^(#|ℹ) tests [1-9]' salida-tests.txt || {
+            echo "::error::La suite no ejecutó ningún test"
+            exit 1
+          }
+
   build:
+    needs: test # si la suite falla, aquí no se llega: no se publica imagen
     runs-on: ubuntu-latest
     permissions:
       contents: read
