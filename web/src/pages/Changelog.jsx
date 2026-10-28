@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.7.0',
+    title: 'Los discos sin identificar vuelven a intentarlo solos',
+    items: [
+      'Hasta ahora, un disco que no se identificaba a la primera no se volvía a mirar nunca más: el refresco nocturno solo repasaba los recién escaneados. Cada disco tenía un único intento en toda su vida, y la única forma de darle otro era acordarse de pulsar «Reintentar identificación» y dejar la pasada llegar al final.',
+      'Ahora cada noche se repasa una tanda de los que quedaron pendientes. Van primero los que no tienen artista, que son justo aquellos para los que hay algo nuevo que probar: sin artista, la búsqueda por texto no puede hacer nada y solo queda la huella del audio.',
+      'La tanda es de 300 por noche y no se toca el mismo disco dos veces en menos de dos semanas, porque cada uno cuesta sus llamadas a MusicBrainz y hasta cuatro huellas. Con una biblioteca de 33.516 álbumes, los 528 sin artista quedan repasados en dos noches y la cola entera da la vuelta en diez.',
+    ],
+  },
+  {
     version: '1.6.2',
     title: 'Las rutas de la API ya se pueden probar',
     items: [

@@ -21,6 +21,7 @@ import { cleanTitleForMatch } from './matchkey.js';
 export const identifyStatus = {
   running: false,
   total: 0,
+  reintentos: 0, // cuántos de esta pasada eran discos que ya habían fallado antes
   done: 0,
   matched: 0,
   unmatched: 0,
@@ -56,9 +57,18 @@ UPDATE albums SET rg_mbid=@rg_mbid, primary_type=@primary_type, secondary_types=
   year=COALESCE(year,@year), match_state='matched', match_source=@source,
   match_confidence=@confidence, matched_at=@now WHERE id=@id
 `);
+// `matched_at` hace de «última vez que lo intenté», y por eso el UPDATE tiene que entrar
+// también cuando el disco YA estaba sin identificar: si no, un reintento fallido no deja
+// huella y ese disco volvería a salir elegido todas las noches. Los estados que has puesto
+// tú a mano (rareza, bootleg, descartado) no se tocan: por eso el IN va acotado.
 const markUnmatched = db.prepare(
-  "UPDATE albums SET match_state='unmatched', matched_at=@now WHERE id=@id AND match_state='pending'"
+  "UPDATE albums SET match_state='unmatched', matched_at=@now WHERE id=@id AND match_state IN ('pending','unmatched')"
 );
+
+/** «Lo he mirado y no hay manera»: deja el disco sin identificar y apunta CUÁNDO. */
+export function apuntarIntentoFallido(albumId, now = Date.now()) {
+  return markUnmatched.run({ id: albumId, now }).changes;
+}
 
 // Ancla el MBID de artista que devuelva MusicBrainz a la fila local del álbum.
 async function anchorArtist(albumId, artistMbid) {
@@ -251,7 +261,7 @@ async function identifyAlbum(album) {
     }
   }
 
-  markUnmatched.run({ id: album.id, now: Date.now() });
+  apuntarIntentoFallido(album.id);
   return null;
 }
 
@@ -283,7 +293,45 @@ export function pickConsensusRg(votes, scanned) {
 
 // Procesa todos los álbumes pendientes (o unmatched si force). Trabajo lento en
 // segundo plano: NUNCA en la petición del usuario (respeta el límite de MB).
-export async function runIdentify({ force = false, limit = 0 } = {}) {
+// Un disco que falla queda 'unmatched' y, hasta la 1.7.0, no se volvía a mirar JAMÁS: el
+// refresco nocturno solo pedía los 'pending'. Cada disco tenía UN intento en toda su vida.
+// Eso dejaba clavados precisamente los que no tienen ni artista, que son los únicos para los
+// que hay algo nuevo que probar cada noche (la huella de AcoustID, que no depende del texto).
+const REINTENTO_DIAS = 14; // no se toca el mismo disco dos veces en menos de esto
+// Techo por pasada: cada disco cuesta sus llamadas a MusicBrainz (1 por segundo) y hasta
+// cuatro huellas con fpcalc. Con 300 por noche, 3.000 pendientes dan la vuelta en diez días.
+const REINTENTO_TANDA = 300;
+
+// A quién le toca: primero los que no tienen artista buscable (ahí la búsqueda por texto no
+// puede hacer nada y la huella es el único camino), y dentro de cada grupo, los que llevan
+// más tiempo sin que nadie los mire. Así la cola rota sola.
+/** La tanda de esta noche. Exportada para poder comprobar el reparto sin salir a la red. */
+export function colaDeReintento(tanda = REINTENTO_TANDA, dias = REINTENTO_DIAS) {
+  const corte = Date.now() - dias * 86400000;
+  return db
+    .prepare(
+      `SELECT a.id, a.title, a.album_artist, a.rg_mbid, a.primary_type, ar.mbid AS artist_mbid
+       FROM albums a LEFT JOIN artists ar ON ar.id = a.artist_id
+       WHERE a.match_state = 'unmatched' AND COALESCE(a.matched_at, 0) < @corte
+       ORDER BY CASE WHEN a.album_artist IS NULL OR a.album_artist = '' OR a.album_artist = 'Artista desconocido' THEN 0 ELSE 1 END,
+                COALESCE(a.matched_at, 0) ASC
+       LIMIT @tanda`
+    )
+    .all({ corte, tanda });
+}
+
+/** Cuántos esperan turno ahora mismo (para contarlo sin lanzar la pasada). */
+export function pendientesDeReintento(dias = REINTENTO_DIAS) {
+  const corte = Date.now() - dias * 86400000;
+  return db
+    .prepare("SELECT COUNT(*) AS n FROM albums WHERE match_state = 'unmatched' AND COALESCE(matched_at, 0) < ?")
+    .get(corte).n;
+}
+
+// `force` es el botón «Reintentar identificación»: TODO lo que no está identificado, de una.
+// `reintentar` es lo del refresco nocturno: los pendientes de siempre MÁS una tanda acotada
+// de los que ya fallaron hace tiempo.
+export async function runIdentify({ force = false, limit = 0, reintentar = false } = {}) {
   if (identifyStatus.running) return identifyStatus;
   const states = force ? "('pending','unmatched')" : "('pending')";
   let rows = db
@@ -293,11 +341,18 @@ export async function runIdentify({ force = false, limit = 0 } = {}) {
        WHERE a.match_state IN ${states} ORDER BY a.added_at DESC`
     )
     .all();
+  let reintentos = 0;
+  if (reintentar && !force) {
+    const cola = colaDeReintento();
+    reintentos = cola.length;
+    rows = rows.concat(cola);
+  }
   if (limit > 0) rows = rows.slice(0, limit);
 
   Object.assign(identifyStatus, {
     running: true,
     total: rows.length,
+    reintentos,
     done: 0,
     matched: 0,
     unmatched: 0,

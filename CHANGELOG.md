@@ -7,6 +7,37 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.7.0] - 2026-10-28
+
+**Los discos sin identificar vuelven a intentarlo solos.** Hasta ahora, un disco que no se
+identificaba a la primera no se volvía a mirar JAMÁS: el refresco nocturno solo repasaba los
+recién escaneados. Cada disco tenía un único intento en toda su vida, y la única forma de
+darle otro era acordarse de pulsar «Reintentar identificación» y dejar la pasada terminar.
+
+### Añadido
+- **Cada noche se repasa una tanda de los que quedaron sin identificar**, además de los nuevos.
+  Van primero **los que no tienen artista**: ahí la búsqueda por texto no puede hacer nada y la
+  huella acústica es el único camino, así que son los únicos para los que hay algo nuevo que
+  probar. Dentro de cada grupo, el que lleve más tiempo sin que nadie lo mire.
+- **Cadencia de 14 días y tope de 300 por noche.** El tope existe porque cada disco cuesta sus
+  llamadas a MusicBrainz (una por segundo) y hasta cuatro huellas, así que la tanda puede
+  llevarle un buen rato a la pasada nocturna. La cola rota sola: al intentarlo se apunta la
+  fecha y ese disco se va al final.
+- El paso de identificación del refresco dice cuántos de la pasada eran reintentos.
+
+### Arreglado
+- **Un reintento fallido no dejaba rastro.** El apunte de «lo he mirado y no hay manera» solo
+  entraba si el disco venía de recién escaneado, así que al reintentar uno viejo su fecha se
+  quedaba igual y habría vuelto a salir elegido todas las noches. Lo que marcas tú a mano
+  —rareza, bootleg, descartado— sigue sin tocarse.
+
+### Medido contra una biblioteca de verdad (33.516 álbumes)
+De 2.898 sin identificar, **2.891 esperan turno**; la primera tanda son 300 y **los 300 son
+«Artista desconocido»**. Los 528 que no tienen artista quedan cubiertos en **dos noches**, y la
+cola entera da la vuelta en diez.
+
+---
+
 ## [1.6.2] - 2026-10-28
 
 **Las rutas de la API ya se pueden probar.** No cambia nada de lo que ves: cambia que ahora hay

@@ -91,9 +91,12 @@ function buildSteps() {
       label: 'Identificar álbumes pendientes',
       enabled: () => true, // siempre útil; usa lo que haya configurado
       run: async () => {
-        const r = await runIdentify({ force: false });
+        // reintentar: además de los nuevos, una tanda de los que fallaron hace tiempo. Antes
+        // un disco que fallaba no se volvía a mirar nunca salvo que pulsaras el botón.
+        const r = await runIdentify({ force: false, reintentar: true });
         if (r.error) throw new Error(r.error);
-        return `${identifyStatus.matched} identificados · ${identifyStatus.unmatched} sin coincidencia`;
+        const extra = identifyStatus.reintentos ? ` (${identifyStatus.reintentos} reintentos)` : '';
+        return `${identifyStatus.matched} identificados · ${identifyStatus.unmatched} sin coincidencia${extra}`;
       },
     },
     {
