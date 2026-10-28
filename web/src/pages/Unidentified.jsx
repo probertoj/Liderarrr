@@ -4,6 +4,7 @@ import { HelpCircle, Sparkles, Check, ExternalLink, Loader2, Pencil, X, Database
 import { api } from '../api.js';
 import { openMbReleaseEditor } from '../mb.js';
 import { PageTitle, Cover, Spinner, ErrorMsg, Button } from '../components.jsx';
+import { aviso, confirmar } from '../avisos.jsx';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -26,7 +27,7 @@ function TitleInline({ album, onSaved }) {
       await api.identifyAlbum(album.id);
       await onSaved();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
       setBusy(false);
     }
   };
@@ -86,7 +87,7 @@ function ArtistInline({ album, onSaved }) {
       await api.identifyAlbum(album.id); // ya con el artista bueno, intenta casar
       await onSaved();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
       setBusy(false);
     }
   };
@@ -273,7 +274,7 @@ function RetryButton({ album, onDone }) {
         setTimeout(() => setNope(false), 2500);
       }
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
       setBusy(false);
     }
   };
@@ -288,8 +289,8 @@ function RetryButton({ album, onDone }) {
 }
 
 // Sembrar la ficha del disco en MusicBrainz (release editor seeding) directamente desde
-// la lista, sin entrar en la ficha. Si MB ya tiene un candidato muy parecido, avisa con
-// un confirm() antes de sembrar (evita crear duplicados sin recargar la fila). El detalle
+// la lista, sin entrar en la ficha. Si MB ya tiene un candidato muy parecido, pide
+// confirmación antes de sembrar (evita crear duplicados sin recargar la fila). El detalle
 // completo del aviso vive en la ficha del álbum.
 function CreateMbButton({ album }) {
   const [busy, setBusy] = useState(false);
@@ -299,17 +300,18 @@ function CreateMbButton({ album }) {
       const r = await api.mbSeed(album.id);
       if (
         r.possibleDuplicate &&
-        !confirm(
+        !(await confirmar(
           `MusicBrainz ya tiene algo muy parecido (${r.possibleDuplicate.score}%):\n` +
             `${r.possibleDuplicate.artist} — ${r.possibleDuplicate.title}\n\n` +
-            '¿Crear la ficha igualmente? (Cancela si es este disco: enlázalo desde su ficha.)'
-        )
+            '¿Crear la ficha igualmente? (Cancela si es este disco: enlázalo desde su ficha.)',
+          { aceptar: 'Crear igualmente' }
+        ))
       ) {
         return;
       }
       openMbReleaseEditor(r.fields, album.id);
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(false);
     }

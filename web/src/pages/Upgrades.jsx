@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowUpCircle, Plus, Check, Loader2, ExternalLink } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { PageTitle, Cover, Spinner, ErrorMsg, SearchModal, useLidarrEnabled } from '../components.jsx';
+import { aviso } from '../avisos.jsx';
 
 // Cola de upgrades: álbumes que tienes SIN ninguna pista sin pérdida. Por cada uno,
 // las dos vías de siempre: enviarlo a Lidarr (que busque una versión mejor) o
@@ -31,13 +32,13 @@ export default function Upgrades() {
       } else {
         const res = await api.grabBest(`${a.album_artist || ''} ${a.title}`.trim(), { rg_mbid: a.rg_mbid, artist: a.album_artist, album: a.title });
         if (!res.grabbed) {
-          alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+          aviso(`No se pudo agarrar: ${res.reason || 'sin release'}`, 'error');
           return;
         }
       }
       setDone((p) => ({ ...p, [a.id]: true }));
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(null);
     }

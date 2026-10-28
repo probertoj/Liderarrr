@@ -4,6 +4,7 @@ import { Headphones, TrendingUp, Star, EarOff, Search, Disc3, ListMusic } from '
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { api } from '../api.js';
 import { PageTitle, Stat, Spinner, ErrorMsg, Button, SearchModal, QuickSearch, AddToChallengeButton } from '../components.jsx';
+import { aviso } from '../avisos.jsx';
 
 // Ventanas de fecha para la brecha. `since` = ms (o null = todo el tiempo).
 const RANGES = [
@@ -33,7 +34,7 @@ async function downloadM3U(albumIds, name) {
     a.remove();
     URL.revokeObjectURL(url);
   } catch (e) {
-    alert(`No se pudo generar la lista: ${e.message}`);
+    aviso(`No se pudo generar la lista: ${e.message}`, 'error');
   }
 }
 
@@ -77,7 +78,7 @@ export default function Listening() {
       }
       load();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setImporting(false);
     }
@@ -345,12 +346,12 @@ function GapRow({ g }) {
         // MusicBrainz y seguimos el mejor resultado.
         const hits = await api.searchArtistMb(g.artist);
         const best = hits?.[0];
-        if (!best?.mbid) return alert('MusicBrainz no encuentra a este artista por su nombre.');
+        if (!best?.mbid) return aviso('MusicBrainz no encuentra a este artista por su nombre.', 'info');
         await api.followMbid(best.mbid, 'artist');
       }
       setFollowed(true);
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(false);
     }

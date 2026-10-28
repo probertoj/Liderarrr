@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Disc, Layers, X, Loader2 } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, AlbumCard, Spinner, ErrorMsg, DuplicateGroupPanel, Button } from '../components.jsx';
+import { aviso } from '../avisos.jsx';
 
 // Campos de filtro que se guardan en la URL (?q=…&sort=…). Así, al entrar a un disco y volver
 // con «atrás» del navegador, se restaura tu búsqueda/filtros en vez de la vista global.
@@ -29,7 +30,7 @@ export default function Library() {
     try {
       setGroup(await api.dupGroup(id));
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     }
   };
 
@@ -55,7 +56,7 @@ export default function Library() {
       const clean = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
       setData(await api.library({ ...clean, limit: 500 }));
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setCombining(false);
     }

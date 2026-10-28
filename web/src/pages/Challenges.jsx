@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download, X, ListMusic, Headphones } from 'lucide-react';
 import { api, coverUrl } from '../api.js';
 import { PageTitle, Section, Spinner, ErrorMsg, Button, SearchModal, QuickSearch, useLidarrEnabled } from '../components.jsx';
+import { aviso, confirmar } from '../avisos.jsx';
 
 // Retos: listas de álbumes "que hay que tener/oír". Anillos concéntricos de lo
 // que tienes vs lo que has escuchado, y envío en bloque a Lidarr de lo que falta.
@@ -142,7 +143,7 @@ function AddForm({ onDone }) {
       await api.addChallenge(name, text);
       onDone();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(false);
     }
@@ -158,7 +159,7 @@ function AddForm({ onDone }) {
     } catch (e) {
       setImportMsg(null);
       setBusy(false);
-      alert(e.message);
+      aviso(e.message, 'error');
       return;
     }
     clearInterval(poll.current);
@@ -177,17 +178,16 @@ function AddForm({ onDone }) {
       setBusy(false);
       if (st.error) {
         setImportMsg(null);
-        alert(st.error);
+        aviso(st.error, 'error');
         return;
       }
       setImportMsg(null);
       if (st.challengeId) {
-        alert(
+        aviso(
           `Importados ${st.count} álbumes como reto «${st.challengeName}».` +
             (st.partial
               ? '\n\n⚠️ Esa lista puede haber venido a medias. Para la completa: ábrela, baja hasta el final, copia todo y usa «pegar la lista».'
-              : '')
-        );
+              : ''), 'ok');
         onDone();
       }
     }, 2000);
@@ -274,13 +274,13 @@ function Detail({ id, onBack }) {
 
   const sendMissing = async () => {
     if (lidarrOn) {
-      if (!confirm('¿Resolver en MusicBrainz y enviar a Lidarr todos los que te faltan?')) return;
+      if (!(await confirmar('¿Resolver en MusicBrainz y enviar a Lidarr todos los que te faltan?', { aceptar: 'Enviar' }))) return;
       setSending(true);
       try {
         const r = await api.challengeToLidarr(id);
-        alert(`Encolados ${r.queued} para resolver y enviar en segundo plano.\nEl progreso está en la cola de Lidarr (Diagnóstico).`);
+        aviso(`Encolados ${r.queued} para resolver y enviar en segundo plano.\nEl progreso está en la cola de Lidarr (Diagnóstico).`, 'ok');
       } catch (e) {
-        alert(e.message);
+        aviso(e.message, 'error');
       } finally {
         setSending(false);
       }
@@ -288,7 +288,8 @@ function Detail({ id, onBack }) {
     }
     // Nativo (sin Lidarr): agarra la mejor de cada faltante, secuencial (indexers en vivo).
     const missing = (c?.items || []).filter((i) => !i.owned);
-    if (!missing.length || !confirm(`¿Buscar y descargar los ${missing.length} que te faltan? Puede tardar.`)) return;
+    if (!missing.length || !(await confirmar(`¿Buscar y descargar los ${missing.length} que te faltan? Puede tardar.`, { aceptar: 'Descargar' })))
+      return;
     setSending(true);
     try {
       for (const it of missing) {
@@ -314,15 +315,15 @@ function Detail({ id, onBack }) {
         : await api.grabBest(`${it.artist} ${it.album}`, { artist: it.artist, album: it.album });
       const ok = lidarrOn ? r.ok : r.grabbed;
       setQueued((p) => ({ ...p, [it.position]: ok ? 'ok' : 'fail' }));
-      if (!ok) alert(`No se pudo: ${r.reason || 'sin coincidencia / sin release'}`);
+      if (!ok) aviso(`No se pudo: ${r.reason || 'sin coincidencia / sin release'}`, 'error');
     } catch (e) {
       setQueued((p) => ({ ...p, [it.position]: 'fail' }));
-      alert(e.message);
+      aviso(e.message, 'error');
     }
   };
 
   const remove = async () => {
-    if (!confirm('¿Borrar este reto?')) return;
+    if (!(await confirmar('¿Borrar este reto?', { aceptar: 'Borrar', peligro: true }))) return;
     await api.deleteChallenge(id);
     onBack();
   };
@@ -337,7 +338,7 @@ function Detail({ id, onBack }) {
       setAddOpen(false);
       await load();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setAddBusy(false);
     }

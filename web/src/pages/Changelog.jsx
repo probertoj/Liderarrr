@@ -9,6 +9,16 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.5.0',
+    title: 'Se acabaron los cuadros del navegador',
+    items: [
+      'Los 103 avisos y confirmaciones de la app dejan de ser los del navegador. Aquellos congelaban la pestaña entera mientras estaban abiertos —se paraba hasta el reloj del escaneo—, salían con un «localhost:3861 dice» delante y no se parecían en nada al resto de la interfaz.',
+      'Ahora los avisos salen flotando abajo a la derecha, no bloquean nada, se van solos (los errores tardan más), se pueden cerrar a mano y nunca hay más de cuatro. Los mensajes largos respetan sus saltos de línea y hacen scroll si no caben.',
+      'Y las preguntas tienen diálogo propio, con el botón diciendo lo que va a hacer («Borrar del disco», «Reemplazar», «Importar igualmente») en vez de «Aceptar», y en rojo cuando no tiene vuelta atrás. Se cancela con Escape o pinchando fuera, y Enter solo confirma si el foco sigue en el botón.',
+      'Todo con su variante para el tema claro, que es donde el rojo pálido sobre blanco no había quien lo leyera.',
+    ],
+  },
+  {
     version: '1.4.4',
     title: 'El contenedor ya no tiene por qué ser root',
     items: [

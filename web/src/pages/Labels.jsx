@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Building2, ArrowLeft, ExternalLink, Check, Star, Loader2 } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
 import { PageTitle, AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, useLidarrEnabled } from '../components.jsx';
+import { aviso } from '../avisos.jsx';
 
 // Coincidencia laxa de nombre de sello (acentos/mayúsculas/signos) para saber si un
 // sello de la colección ya está entre los seguidos (que usan el nombre canónico de MB).
@@ -120,7 +121,7 @@ function LabelDetail({ name, onBack }) {
       await api.followLabelByName(name);
       setFollowed(true);
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setFollowBusy(false);
     }
@@ -130,7 +131,7 @@ function LabelDetail({ name, onBack }) {
     try {
       setGroup(await api.dupGroup(id));
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     }
   };
 
@@ -217,7 +218,7 @@ function LabelCompletism({ name }) {
         else await api.lidarrAdd(m.rg_mbid, null);
         pollLidarrQueue(setQueue);
       } catch (e) {
-        alert(e.message);
+        aviso(e.message, 'error');
       }
     } else {
       for (const x of list) {

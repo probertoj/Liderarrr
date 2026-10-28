@@ -4,6 +4,7 @@ import { PartyPopper, Download } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { api, coverUrl } from '../api.js';
 import { PageTitle, Spinner, StatCard, ArtistPhoto, QuickSearch } from '../components.jsx';
+import { aviso } from '../avisos.jsx';
 
 // «Resumen» tipo Wrapped: crea el resumen de un periodo (semana / mes / 3 meses / año /
 // un año concreto / todo) con un mosaico de las portadas de tus discos más escuchados.
@@ -70,7 +71,7 @@ export default function Wrapped() {
         }, 'image/png')
       );
     } catch (e) {
-      alert(`No se pudo generar la imagen: ${e.message}`);
+      aviso(`No se pudo generar la imagen: ${e.message}`, 'error');
     } finally {
       setImgBusy(false);
     }

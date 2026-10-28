@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Settings as SettingsIcon, Check, X, Loader2, Download, Upload, FolderSearch, RefreshCw, AlertTriangle, HardDrive, RotateCcw, Trash2 } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, Button } from '../components.jsx';
+import { aviso, confirmar } from '../avisos.jsx';
 
 // Panel de escaneo: progreso en vivo del recorrido de tus carpetas. Deja ver si
 // terminó o dónde va, que es justo lo que faltaba para saber si escanea todo.
@@ -30,7 +31,7 @@ function ScanPanel() {
     try {
       await api.scan(force);
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     }
     setTimeout(poll, 600);
   };
@@ -52,7 +53,9 @@ function ScanPanel() {
             </span>
           </Button>
           <Button
-            onClick={() => confirm('Reescanea TODAS las carpetas desde cero (más lento). ¿Seguir?') && start(true)}
+            onClick={async () =>
+              (await confirmar('Reescanea TODAS las carpetas desde cero (más lento). ¿Seguir?', { aceptar: 'Reescanear' })) && start(true)
+            }
             disabled={st.running}
           >
             <span className="inline-flex items-center gap-1.5">
@@ -348,7 +351,7 @@ function BackupList() {
   };
 
   const borrar = async (name) => {
-    if (!confirm(`¿Borrar la copia «${name}»?`)) return;
+    if (!(await confirmar(`¿Borrar la copia «${name}»?`, { aceptar: 'Borrar', peligro: true }))) return;
     try {
       await api.backupDelete(name);
       await load();
@@ -359,10 +362,11 @@ function BackupList() {
 
   const restaurar = async (name) => {
     if (
-      !confirm(
+      !(await confirmar(
         `Vas a REEMPLAZAR toda la base de datos por la copia «${name}».\n\n` +
-          'Se guardará un respaldo de la actual y la app se reiniciará. ¿Continuar?'
-      )
+          'Se guardará un respaldo de la actual y la app se reiniciará. ¿Continuar?',
+        { aceptar: 'Reemplazar', peligro: true }
+      ))
     )
       return;
     try {
@@ -467,10 +471,11 @@ function RestoreDatabase() {
   const restore = async () => {
     if (!file) return;
     if (
-      !confirm(
+      !(await confirmar(
         `Vas a REEMPLAZAR toda la base de datos por «${file.name}».\n\n` +
-          'Se guardará un respaldo automático de la actual y la app se reiniciará. ¿Continuar?'
-      )
+          'Se guardará un respaldo automático de la actual y la app se reiniciará. ¿Continuar?',
+        { aceptar: 'Reemplazar', peligro: true }
+      ))
     )
       return;
     setBusy(true);
@@ -574,7 +579,7 @@ export default function Settings() {
     try {
       setProfiles(await api.lidarrProfiles());
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     }
   };
 
@@ -621,7 +626,7 @@ export default function Settings() {
           <Button
             onClick={async () => {
               const r = await api.retryCovers();
-              alert(`${r.retried} carátulas se reintentarán al volver a verlas.`);
+              aviso(`${r.retried} carátulas se reintentarán al volver a verlas.`, 'ok');
             }}
           >
             Reintentar carátulas
@@ -1106,9 +1111,9 @@ export default function Settings() {
               await save();
               try {
                 const r = await api.autoLidarrRun(true);
-                alert(`Simulación: ${r.considered} candidatos.\n\n${r.log.slice(0, 15).join('\n') || '(ninguno)'}`);
+                aviso(`Simulación: ${r.considered} candidatos.\n\n${r.log.slice(0, 15).join('\n') || '(ninguno)'}`, 'info');
               } catch (e) {
-                alert(e.message);
+                aviso(e.message, 'error');
               }
             }}
           >
@@ -1209,9 +1214,9 @@ export default function Settings() {
               await save();
               try {
                 const r = await api.autograbRun(true);
-                alert(`Simulación: ${r.considered} candidatos.\n\n${(r.log || []).slice(0, 15).join('\n') || '(ninguno)'}`);
+                aviso(`Simulación: ${r.considered} candidatos.\n\n${(r.log || []).slice(0, 15).join('\n') || '(ninguno)'}`, 'info');
               } catch (e) {
-                alert(e.message);
+                aviso(e.message, 'error');
               }
             }}
           >

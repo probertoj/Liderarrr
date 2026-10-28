@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink, ChevronDown, ChevronRight, Link2, Search, X, Image as ImageIcon, Upload } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { AlbumCard, ArtistPhoto, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, WantButton, ReleaseYear, GenreChips, useLidarrEnabled } from '../components.jsx';
+import { aviso } from '../avisos.jsx';
 
 export default function ArtistDetail() {
   const { id } = useParams();
@@ -689,7 +690,7 @@ function RelChip({ a }) {
       await api.followMbid(a.mbid, 'artist');
       setFollowed(true);
     } catch (err) {
-      alert(err.message);
+      aviso(err.message, 'error');
     } finally {
       setBusy(false);
     }
@@ -742,13 +743,13 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
       } else {
         const res = await api.grabBest(`${artistName || ''} ${rg.title}`.trim(), { rg_mbid: rg.rg_mbid, artist: artistName, album: rg.title });
         if (!res.grabbed) {
-          alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+          aviso(`No se pudo agarrar: ${res.reason || 'sin release'}`, 'error');
           return;
         }
       }
       setAdded((p) => ({ ...p, [rg.rg_mbid]: true }));
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(null);
     }

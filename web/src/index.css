@@ -159,6 +159,72 @@ body {
   border-color: rgba(0, 0, 0, 0.18);
 }
 
+/* Avisos flotantes (los que sustituyen a alert()). Van en CSS y no en clases de Tailwind
+   porque .card se declara DESPUÉS de las utilidades y le ganaba al fondo y al borde. Mismo
+   criterio que los badges de arriba: translúcido sobre oscuro, y al revés en claro. */
+.aviso {
+  background: var(--color-ink-900);
+  border: 1px solid var(--color-ink-800);
+  border-radius: 12px;
+}
+.aviso-error {
+  background: rgba(220, 38, 38, 0.16);
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+.aviso-ok {
+  background: rgba(5, 150, 105, 0.16);
+  color: #a7f3d0;
+  border-color: rgba(52, 211, 153, 0.45);
+}
+.aviso-info {
+  background: var(--color-ink-850);
+  color: var(--text-body);
+  border-color: var(--color-ink-700);
+}
+:root.light .aviso-error {
+  background: #fff1f1;
+  color: #991b1b;
+  border-color: rgba(185, 28, 28, 0.35);
+}
+:root.light .aviso-ok {
+  background: #f0fdf7;
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.35);
+}
+:root.light .aviso-info {
+  background: var(--color-ink-900);
+  color: #27272a;
+  border-color: var(--color-ink-800);
+}
+
+/* Botones del diálogo de confirmación. Aquí y no en utilidades de Tailwind por lo mismo
+   que arriba, y porque en claro el rojo pálido sobre blanco no se leía. */
+.boton-si,
+.boton-peligro {
+  border: 1px solid transparent;
+}
+.boton-si {
+  background: rgba(185, 133, 47, 0.18);
+  color: #e9c57f;
+  border-color: rgba(185, 133, 47, 0.5);
+}
+.boton-peligro {
+  background: rgba(220, 38, 38, 0.18);
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.5);
+}
+:root.light .boton-si {
+  background: #fbf1dd;
+  color: #7c5310;
+  border-color: rgba(185, 133, 47, 0.45);
+}
+:root.light .boton-peligro {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: rgba(185, 28, 28, 0.4);
+}
+
 /* Drawer de navegación (móvil y tablet/horizontal): fuera de pantalla por defecto, entra
    al abrir. En escritorio (lg+, ≥1024px) NO se traslada: es una columna fija siempre
    visible. El corte es lg (no md) para que el móvil EN HORIZONTAL —cuyo ancho supera los

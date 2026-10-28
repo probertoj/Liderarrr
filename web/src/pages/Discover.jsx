@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Compass, Plus, Check, X, RefreshCw, Loader2, ExternalLink } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button, SearchModal, QuickSearch, AddToChallengeButton, WantButton, ReleaseYear, useLidarrEnabled } from '../components.jsx';
+import { aviso } from '../avisos.jsx';
 
 // Huecos: álbumes de estudio que MusicBrainz conoce de tus artistas y que no
 // tienes. Agrupados por artista, con envío a Lidarr (uno o todos) y opción de
@@ -35,13 +36,13 @@ export default function Discover() {
       } else {
         const res = await api.grabBest(`${group.artist || ''} ${rg.title}`.trim(), { rg_mbid: rg.rg_mbid, artist: group.artist, album: rg.title });
         if (!res.grabbed) {
-          alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+          aviso(`No se pudo agarrar: ${res.reason || 'sin release'}`, 'error');
           return;
         }
       }
       setAdded((p) => ({ ...p, [rg.rg_mbid]: true }));
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(null);
     }
@@ -66,7 +67,7 @@ export default function Discover() {
         }
       }
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(null);
     }

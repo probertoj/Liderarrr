@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Shapes, ArrowLeft, Search, Sparkles, ExternalLink, Download, Check, Loader2, EyeOff, Eye, X } from 'lucide-react';
 import { api } from '../api.js';
+import { aviso } from '../avisos.jsx';
 import {
   PageTitle,
   Spinner,
@@ -65,7 +66,7 @@ export default function Genres() {
       await recargar();
       api.genreTaxonomy().then(setTax).catch(() => {});
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     }
   };
   const esconder = async (slug, hidden) => {
@@ -73,7 +74,7 @@ export default function Genres() {
       await api.hideGenre(slug, hidden);
       await recargar();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     }
   };
 
@@ -542,13 +543,13 @@ function GenreRecRow({ r, onSearch, onVetoed }) {
     try {
       const res = await api.grabBest(`${r.artist} ${r.album}`, { artist: r.artist, album: r.album });
       if (!res.grabbed) {
-        alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+        aviso(`No se pudo agarrar: ${res.reason || 'sin release'}`, 'error');
         setState(null);
         return;
       }
       setState('done');
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
       setState(null);
     }
   };

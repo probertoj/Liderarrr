@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Search, Download, ExternalLink, Loader2, Check } from 'lucide-react';
 import { api } from '../api.js';
 import { Spinner, AddToChallengeButton, WantButton } from '../components.jsx';
+import { aviso } from '../avisos.jsx';
 
 // Vista MES tipo Google Calendar: una rejilla mensual que junta TODAS las fuentes de
 // lanzamientos en su día — Próximos y Estrenados recientemente (MusicBrainz), De tus
@@ -154,13 +155,13 @@ export default function MonthCalendar({ onSearch }) {
       if (e.rg_mbid) ctx.rg_mbid = e.rg_mbid;
       const res = await api.grabBest(`${e.artist} ${e.title}`, ctx);
       if (!res.grabbed) {
-        alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+        aviso(`No se pudo agarrar: ${res.reason || 'sin release'}`, 'error');
         setGrab((p) => ({ ...p, [key]: undefined }));
         return;
       }
       setGrab((p) => ({ ...p, [key]: 'done' }));
     } catch (err) {
-      alert(err.message);
+      aviso(err.message, 'error');
       setGrab((p) => ({ ...p, [key]: undefined }));
     }
   };

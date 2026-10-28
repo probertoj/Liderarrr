@@ -7,6 +7,28 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.5.0] - 2026-10-28
+
+**Se acabaron los cuadros del navegador.** Los 103 avisos y confirmaciones de la app pasan a
+ser suyos: avisos flotantes abajo a la derecha y un diálogo propio para las preguntas.
+
+### Cambiado
+- **86 `alert()` → avisos flotantes.** Los del navegador **congelan la pestaña entera** mientras
+  están abiertos —se para hasta el reloj del escaneo—, salen con un «localhost:3861 dice»
+  delante, se apilan de uno en uno y no se parecen en nada al resto de la interfaz. Los nuevos
+  no bloquean nada, se van solos (los errores tardan más en irse), se pueden cerrar a mano y se
+  quedan como mucho cuatro en pantalla.
+- **17 `confirm()` → un diálogo de la app**, con el botón diciendo lo que va a hacer («Borrar del
+  disco», «Reemplazar», «Importar igualmente») en vez de «Aceptar», y **en rojo cuando no tiene
+  vuelta atrás**. Se cancela con Escape o pinchando fuera, y Enter solo confirma si el foco sigue
+  en el botón: no se acepta un borrado sin querer.
+- Los mensajes largos se leen enteros: respetan los saltos de línea y, si no caben, el aviso hace
+  scroll en vez de crecer hasta salirse.
+- Colores con su variante para el **tema claro**, que es donde el rojo pálido sobre blanco no se
+  leía. Medido: todo por encima de 6:1 de contraste en los dos temas.
+
+---
+
 ## [1.4.4] - 2026-10-28
 
 **El contenedor ya no tiene por qué correr como root, y la imagen lleva exactamente lo que se

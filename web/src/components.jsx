@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Disc3, ImageOff, Search, X, Download, Check, Copy, Trash2, Trophy, Star, User, Loader2, ExternalLink, Heart, HeartOff, Shapes } from 'lucide-react';
 import { api, coverUrl, artistPhotoUrl, fmtBytes } from './api.js';
 import { matchKey } from './matchkey.js';
+import { aviso, confirmar } from './avisos.jsx';
 
 // ¿Lidarr configurado? La UI oculta sus caminos cuando no lo está (Lidarr es opcional:
 // el flujo nativo —buscar/descargar, auto-descarga— es el que manda). Se consulta una
@@ -458,7 +459,7 @@ export function VetoButton({ artist, album, origin, onVetoed, className }) {
       await api.vetoRecommendation(artist, album, origin);
       onVetoed?.();
     } catch (err) {
-      alert(err.message);
+      aviso(err.message, 'error');
       setBusy(false);
     }
   };
@@ -585,7 +586,7 @@ export function WantButton({ artist, title, rg_mbid, year, releaseDate, cover, o
       else await api.wantAlbum({ artist, title, rg_mbid, year, release_date: releaseDate, cover, origin });
       await reload();
     } catch (err) {
-      alert(err.message);
+      aviso(err.message, 'error');
     } finally {
       setBusy(false);
     }
@@ -956,7 +957,7 @@ export function DuplicateCopies({ copies, onChange, reason, pinned }) {
       await (clear ? api.preferCopyAuto(id) : api.preferCopy(id));
       onChange?.();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(null);
     }
@@ -972,7 +973,7 @@ export function DuplicateCopies({ copies, onChange, reason, pinned }) {
       setDismissed((p) => ({ ...p, [c.id]: true }));
       onChange?.();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(null);
     }
@@ -988,7 +989,7 @@ export function DuplicateCopies({ copies, onChange, reason, pinned }) {
       });
       onChange?.();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(null);
     }
@@ -996,11 +997,12 @@ export function DuplicateCopies({ copies, onChange, reason, pinned }) {
   // Borrado de disco: IRREVERSIBLE. Confirmación dura con la ruta y el aviso de seeding.
   const del = async (c) => {
     const ids = idsOf(c);
-    const ok = window.confirm(
+    const ok = await confirmar(
       `BORRAR DEL DISCO de forma permanente:\n\n${c.title}${c.year ? ` (${c.year})` : ''}` +
         `${ids.length > 1 ? `\n(${ids.length} discos de la caja)` : ''}\n${c.path || ''}\n\n` +
         'Se eliminan los ficheros de tu biblioteca. Es IRREVERSIBLE (no va a la Papelera) y, si esa copia está ' +
-        'seedeando en qBittorrent, puede romper el torrent.\n\n¿Borrar de verdad?'
+        'seedeando en qBittorrent, puede romper el torrent.\n\n¿Borrar de verdad?',
+      { aceptar: 'Borrar del disco', peligro: true }
     );
     if (!ok) return;
     setBusy(c.id);
@@ -1009,7 +1011,7 @@ export function DuplicateCopies({ copies, onChange, reason, pinned }) {
       setDeleted((p) => ({ ...p, [c.id]: true }));
       onChange?.();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(null);
     }
@@ -1241,7 +1243,7 @@ export function QuickSearch() {
       setQ('');
       navigate(`/artista/${r.artist_id}`);
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
       setBusy(null);
     }
   };

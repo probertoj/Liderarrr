@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Wrench, FolderInput, RefreshCw, Loader2, Check } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button } from '../components.jsx';
+import { aviso, confirmar } from '../avisos.jsx';
 
 // Correcciones: álbumes cuyo artista o título has corregido a mano. Aquí los revisas
 // todos de un vistazo y los «ordenas en su carpeta» ({artist}/{album}) — todos a la
@@ -30,7 +31,7 @@ export default function Corrections() {
       if (r.moved) setDone((p) => ({ ...p, [a.id]: r.to }));
       load();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(null);
     }
@@ -38,14 +39,15 @@ export default function Corrections() {
 
   const moveAll = async () => {
     const n = (rows || []).filter((a) => a.needsMove && !a.blocked).length;
-    if (!n || !window.confirm(`¿Ordenar en su carpeta ${n} álbum(es)? Mueve sus carpetas dentro de la biblioteca.`)) return;
+    if (!n || !(await confirmar(`¿Ordenar en su carpeta ${n} álbum(es)? Mueve sus carpetas dentro de la biblioteca.`, { aceptar: 'Ordenar' })))
+      return;
     setBulk(true);
     try {
       const r = await api.refileAllCorrections();
       load();
-      if (r.errors?.length) alert(`Movidos ${r.moved} de ${r.candidates}. ${r.errors.length} con error.`);
+      if (r.errors?.length) aviso(`Movidos ${r.moved} de ${r.candidates}. ${r.errors.length} con error.`, 'ok');
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBulk(false);
     }

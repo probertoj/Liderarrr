@@ -4,6 +4,7 @@ import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, Alert
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { openMbReleaseEditor } from '../mb.js';
 import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies, AddToChallengeButton, WantButton, ReleaseYear, GenreChips, VetoButton } from '../components.jsx';
+import { aviso, confirmar } from '../avisos.jsx';
 
 // orphan y bootleg son «de primera clase»: material fuera de catálogo (rarezas y
 // directos no oficiales) que cuenta en lo descriptivo pero no en el completismo. En toda
@@ -76,14 +77,19 @@ export default function AlbumDetail() {
   // con guardarraíles en el backend (solo dentro de music_dirs, nunca torrents/). Doble
   // confirmación dura antes de tocar nada.
   const deleteFromDisk = async () => {
-    if (!window.confirm(`¿Borrar del disco «${album.album_artist} — ${album.title}»?\n\nSe eliminan los ficheros de su carpeta en la biblioteca. Esto NO se puede deshacer.`))
+    if (
+      !(await confirmar(
+        `¿Borrar del disco «${album.album_artist} — ${album.title}»?\n\nSe eliminan los ficheros de su carpeta en la biblioteca. Esto NO se puede deshacer.`,
+        { aceptar: 'Borrar del disco', peligro: true }
+      ))
+    )
       return;
     setBusy(true);
     try {
       await api.deleteAlbum(id);
       navigate('/discoteca');
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
       setBusy(false);
     }
   };
@@ -101,7 +107,7 @@ export default function AlbumDetail() {
       setEditTitle(false);
       await load();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(false);
     }
@@ -112,18 +118,19 @@ export default function AlbumDetail() {
   // artista). No toca el origen de descargas; el seeding sobrevive (mismo volumen).
   const refile = async () => {
     if (
-      !window.confirm(
-        `¿Ordenar en su carpeta «${album.album_artist} — ${album.title}»?\n\nMueve la carpeta del álbum a la estructura {artista}/{álbum} dentro de la biblioteca. No toca el origen de descargas.`
-      )
+      !(await confirmar(
+        `¿Ordenar en su carpeta «${album.album_artist} — ${album.title}»?\n\nMueve la carpeta del álbum a la estructura {artista}/{álbum} dentro de la biblioteca. No toca el origen de descargas.`,
+        { aceptar: 'Ordenar' }
+      ))
     )
       return;
     setBusy(true);
     try {
       const r = await api.refileAlbum(id);
-      alert(r.moved ? `Movido a:\n${r.to}` : r.message || 'Ya estaba en su carpeta.');
+      aviso(r.moved ? `Movido a:\n${r.to}` : r.message || 'Ya estaba en su carpeta.', 'ok');
       await load();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(false);
     }
@@ -744,14 +751,15 @@ function TagWriter({ albumId }) {
   };
 
   const write = async () => {
-    if (!confirm('Se escribirán los identificadores de MusicBrainz en los ficheros de este álbum. ¿Continuar?')) return;
+    if (!(await confirmar('Se escribirán los identificadores de MusicBrainz en los ficheros de este álbum. ¿Continuar?', { aceptar: 'Escribir' })))
+      return;
     setWriting(true);
     try {
       const r = await api.writeTags(albumId);
       setDone(r);
       await load();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setWriting(false);
     }
@@ -933,20 +941,20 @@ function DiscBox({ album, onDone }) {
     try {
       setBox(await api.identifyBox(album.id));
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setIdent(false);
     }
   };
 
   const separate = async () => {
-    if (!window.confirm('¿Separar la caja multidisco? Cada disco vuelve a ser un álbum independiente.')) return;
+    if (!(await confirmar('¿Separar la caja multidisco? Cada disco vuelve a ser un álbum independiente.', { aceptar: 'Separar' }))) return;
     setBusy(true);
     try {
       await api.uncombineAlbum(album.id);
       await onDone();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(false);
     }
@@ -1370,7 +1378,7 @@ function TrackList({ album }) {
     try {
       await api.fetchAlbumLyrics(album.id);
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
       return;
     }
     clearInterval(sondeo.current);
@@ -1566,13 +1574,13 @@ function MissingFromArtistRow({ m, artist }) {
     try {
       const res = await api.grabBest(`${artist} ${m.title}`, { rg_mbid: m.rg_mbid, artist, album: m.title });
       if (!res.grabbed) {
-        alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+        aviso(`No se pudo agarrar: ${res.reason || 'sin release'}`, 'error');
         setState(null);
         return;
       }
       setState('done');
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
       setState(null);
     }
   };
@@ -1620,13 +1628,13 @@ function RecAlbumRow({ r, onVetoed }) {
     try {
       const res = await api.grabBest(`${r.artist} ${r.album}`, { artist: r.artist, album: r.album });
       if (!res.grabbed) {
-        alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+        aviso(`No se pudo agarrar: ${res.reason || 'sin release'}`, 'error');
         setGrabState(null);
         return;
       }
       setGrabState('done');
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
       setGrabState(null);
     }
   };
@@ -1642,7 +1650,7 @@ function RecAlbumRow({ r, onVetoed }) {
       }
       setFollowed(true);
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setFbusy(false);
     }

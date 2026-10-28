@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { DownloadCloud, Link2, RefreshCw, Zap, EyeOff, Layers } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button } from '../components.jsx';
+import { aviso, confirmar } from '../avisos.jsx';
 
 // Estilo del badge de diagnóstico por ítem (por qué no se auto-importa). Los códigos los
 // fija el servidor en importer.js classifyPending().
@@ -38,7 +39,7 @@ function AutoImportPanel() {
       await api.autoImportRun();
       await load();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(false);
     }
@@ -362,10 +363,12 @@ export default function Imports() {
   };
 
   // importar uno, avisando si ya parece estar en la biblioteca
-  const runWithWarn = (it) => {
+  const runWithWarn = async (it) => {
     if (
       it.inLibrary &&
-      !window.confirm(`«${it.album || it.name}» ya parece estar en tu biblioteca. ¿Importar igualmente? Creará una copia organizada aparte.`)
+      !(await confirmar(`«${it.album || it.name}» ya parece estar en tu biblioteca. ¿Importar igualmente? Creará una copia organizada aparte.`, {
+        aceptar: 'Importar igualmente',
+      }))
     )
       return;
     run(it);
@@ -374,7 +377,7 @@ export default function Imports() {
   // importar en lote las que NO están ya en la biblioteca
   const importAll = async () => {
     const todo = (data?.items || []).filter((it) => !done[it.source_dir] && !it.inLibrary);
-    if (!todo.length || !window.confirm(`¿Importar ${todo.length} descargas a la biblioteca?`)) return;
+    if (!todo.length || !(await confirmar(`¿Importar ${todo.length} descargas a la biblioteca?`, { aceptar: 'Importar' }))) return;
     setBulkBusy(true);
     try {
       for (const it of todo) {

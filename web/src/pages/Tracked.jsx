@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Star, Search, Plus, Sparkles, X, RefreshCw } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button, ProgressBar } from '../components.jsx';
+import { aviso } from '../avisos.jsx';
 
 // Seguidos (favoritos): los artistas cuya obra quieres completar. Alimentan los
 // huecos, el calendario y el auto-Lidarr. Puedes seguir de tu biblioteca o buscar
@@ -111,7 +112,7 @@ function SimilarSuggestions({ onFollowed }) {
       setItems((p) => p.filter((x) => x.name !== s.name));
       onFollowed?.();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(null);
     }
@@ -126,7 +127,7 @@ function SimilarSuggestions({ onFollowed }) {
       await api.refreshSuggestions();
       await load();
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setRefreshing(false);
     }
@@ -205,7 +206,7 @@ function MbSearch({ onFollowed }) {
     try {
       setResults(await api.searchArtistMb(q));
     } catch (e2) {
-      alert(e2.message);
+      aviso(e2.message, 'error');
     } finally {
       setBusy(false);
     }

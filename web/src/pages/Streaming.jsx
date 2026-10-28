@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Library, Download, ExternalLink, RefreshCw, Loader2, Check, Disc3 } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button, AddToChallengeButton, WantButton } from '../components.jsx';
+import { aviso } from '../avisos.jsx';
 
 // Página «Streaming» (1.0): la brecha entre tu COLECCIÓN LOCAL y tu BIBLIOTECA GUARDADA de
 // Spotify. Dos lados: lo que tienes en streaming y no en disco (→ descargar) y lo que tienes
@@ -188,7 +189,7 @@ export default function Streaming() {
       await api.spotifySaveToLibrary(r.artist, r.title);
       setSavedLocal((p) => ({ ...p, [r.album_id]: true }));
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setSavingLocal(null);
     }
@@ -199,12 +200,12 @@ export default function Streaming() {
     try {
       const res = await api.grabBest(`${r.artist} ${r.title}`, { artist: r.artist, album: r.title });
       if (!res.grabbed) {
-        alert(`No se pudo agarrar: ${res.reason || 'sin release'}`);
+        aviso(`No se pudo agarrar: ${res.reason || 'sin release'}`, 'error');
         return;
       }
       setAdded((p) => ({ ...p, [r.id]: true }));
     } catch (e) {
-      alert(e.message);
+      aviso(e.message, 'error');
     } finally {
       setBusy(null);
     }

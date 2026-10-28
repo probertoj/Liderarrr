@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { api } from './api.js';
 import { Spinner, ErrorBoundary } from './components.jsx';
+import { Avisos } from './avisos.jsx';
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Library = lazy(() => import('./pages/Library.jsx'));
@@ -388,6 +389,9 @@ export default function App() {
         </ErrorBoundary>
         </main>
       </div>
+      {/* avisos y confirmaciones: fuera del ErrorBoundary y de las rutas, para que
+          sobrevivan a un cambio de página */}
+      <Avisos />
     </div>
   );
 }
