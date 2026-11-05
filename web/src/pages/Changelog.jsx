@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.7.1',
+    title: 'En el móvil ya se ve cuánto dura cada canción',
+    items: [
+      'La duración de las pistas se salía de la pantalla del móvil: caía 23 píxeles fuera del borde y la fila no se desplaza a lo ancho, así que no había manera de verla. Se la comía la etiqueta técnica repetida en cada fila («FLAC · 812k · 16bit»).',
+      'Ahora el formato se dice una sola vez, arriba junto a «Pistas», y avisa si el disco mezcla formatos. Por fila solo se marca la pista que se sale del resto: la MP3 entre FLACs, o la que va a 16 bits cuando las demás van a 24. En pantalla grande la columna técnica sigue entera y es esa pista la que va resaltada.',
+      'Y tres avisos de seguridad nuevos, de arrastre, parcheados: de cinco a dos.',
+    ],
+  },
+  {
     version: '1.7.0',
     title: 'Los discos sin identificar vuelven a intentarlo solos',
     items: [

@@ -225,6 +225,16 @@ body {
   border-color: rgba(185, 28, 28, 0.4);
 }
 
+/* La pista que NO va como las demás del disco (la MP3 entre FLACs, la que va a 44 cuando
+   el resto va a 96). En CSS y no en utilidades por lo de siempre, y porque el ámbar claro
+   sobre blanco no se lee. */
+.pista-distinta {
+  color: #fcd34d;
+}
+:root.light .pista-distinta {
+  color: #92400e;
+}
+
 /* Drawer de navegación (móvil y tablet/horizontal): fuera de pantalla por defecto, entra
    al abrir. En escritorio (lg+, ≥1024px) NO se traslada: es una columna fija siempre
    visible. El corte es lg (no md) para que el móvil EN HORIZONTAL —cuyo ancho supera los

@@ -7,6 +7,30 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.7.1] - 2026-11-05
+
+**En el móvil no se veía cuánto dura ninguna canción.** Salió en una ronda de pruebas hecha
+como las hace un usuario: con el móvil en la mano, no llamando a funciones por dentro.
+
+### Arreglado
+- **La duración de cada pista se salía de la pantalla.** Medido a 375 px: el número caía 23
+  píxeles fuera del borde, y la fila no se puede desplazar a lo ancho, así que no había forma
+  humana de verlo. La culpa era la etiqueta técnica repetida en cada fila —`FLAC · 812k ·
+  16bit`— comiéndose el ancho.
+- Ahora **el formato se dice una sola vez**, arriba, junto a «Pistas» («· FLAC · 16bit»), y si el
+  disco mezcla formatos lo avisa («y otros»). Por fila solo se marca **la pista que se sale del
+  resto** —la MP3 entre FLACs, la que va a 16 bits cuando las demás van a 24—, que es justo la
+  que querías ver. En pantalla grande la columna técnica sigue ahí, entera, y es esa pista la que
+  va resaltada.
+
+### Seguridad
+- Tres avisos nuevos de esta semana, todos de arrastre por `@fastify/static` (`glob`,
+  `minimatch`), parcheados sin romper nada. De **5 a 2**; los dos que quedan son el `uuid` de
+  `node-taglib-sharp`, cuyo «arreglo» sigue siendo bajar cinco versiones mayores la librería que
+  escribe las etiquetas.
+
+---
+
 ## [1.7.0] - 2026-10-28
 
 **Los discos sin identificar vuelven a intentarlo solos.** Hasta ahora, un disco que no se

@@ -1412,11 +1412,25 @@ function TrackList({ album }) {
   const conLetra = Object.values(estado).filter((e) => e.state === 'found' || e.state === 'instrumental').length;
   const buscadas = Object.values(estado).filter((e) => e.state).length;
 
+  // El formato se dice UNA vez, arriba. Repetirlo en cada fila («FLAC · 812k · 16bit»)
+  // se comía el ancho en el móvil y dejaba la DURACIÓN fuera de pantalla, sin forma de
+  // verla. Por fila solo se marca la pista que se sale del resto, que es la que importa.
+  const ficha = (t) => [t.format, t.bit_depth ? `${t.bit_depth}bit` : null].filter(Boolean).join(" · ");
+  const cuenta = new Map();
+  for (const t of album.tracks) cuenta.set(ficha(t), (cuenta.get(ficha(t)) || 0) + 1);
+  const dominante = [...cuenta.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
   return (
     <div className="card overflow-hidden mb-6">
       <div className="px-4 py-2.5 border-b border-ink-800 flex items-center justify-between gap-2 text-sm text-neutral-400 flex-wrap">
         <span className="inline-flex items-center gap-2">
           <Music2 size={15} /> Pistas
+          {dominante && (
+            <span className="text-xs text-neutral-600">
+              · {dominante}
+              {cuenta.size > 1 ? " y otros" : ""}
+            </span>
+          )}
           {conLetra > 0 && (
             <span className="text-xs text-neutral-600">
               · {conLetra} con letra{buscadas > conLetra ? ` (${buscadas - conLetra} sin)` : ''}
@@ -1461,7 +1475,12 @@ function TrackList({ album }) {
                 <tr className="border-b border-ink-850/60 last:border-0 hover:bg-ink-850/40">
                   <td className="py-2 px-4 text-neutral-600 w-10 text-right">{t.num || '·'}</td>
                   <td className="py-2 pr-4">
-                    <div className="truncate">{t.title}</div>
+                    <div className="truncate">
+                      {t.title}
+                      {ficha(t) !== dominante && (
+                        <span className="sm:hidden ml-2 text-[11px] pista-distinta whitespace-nowrap">{ficha(t)}</span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-2 pr-2 w-8">
                     <button
@@ -1486,7 +1505,7 @@ function TrackList({ album }) {
                       <Mic2 size={13} />
                     </button>
                   </td>
-                  <td className="py-2 pr-4 text-neutral-500 whitespace-nowrap">
+                  <td className={`hidden sm:table-cell py-2 pr-4 whitespace-nowrap ${ficha(t) !== dominante ? 'pista-distinta' : 'text-neutral-500'}`}>
                     <span className={t.lossless ? 'text-emerald-400/80' : ''}>{t.format}</span>
                     {t.bitrate ? ` · ${Math.round(t.bitrate / 1000)}k` : ''}
                     {t.bit_depth ? ` · ${t.bit_depth}bit` : ''}
