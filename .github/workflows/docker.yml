@@ -75,14 +75,19 @@ jobs:
 
       # Primero se construye SOLO en local. Nada se publica hasta que la imagen demuestre
       # que arranca, porque un fallo aquí llega al NAS de la gente con el siguiente pull.
+      # La caché va SEPARADA por referencia. Publicar una versión empuja main, develop y el
+      # tag casi a la vez (medido: las tres tiradas arrancaron en 6 segundos), y las tres
+      # escribían en la misma caché a la vez. Con el mismo commit, la del tag falló en el humo
+      # y las otras dos pasaron: justo lo que se espera de una caché pisoteada. Separarlas no
+      # cuesta nada y quita de en medio la única diferencia entre las tres.
       - name: Construir (local, para probarla)
         uses: docker/build-push-action@v6
         with:
           context: .
           load: true
           tags: liderarrr:humo
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ github.ref_name }}
+          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}
 
       # Caso de siempre: sin PUID el contenedor sigue siendo root. Está aquí porque es lo
       # que tiene todo el mundo instalado, y lo que NO debe cambiar nunca sin querer.
@@ -131,4 +136,4 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
+          cache-from: type=gha,scope=${{ github.ref_name }}
