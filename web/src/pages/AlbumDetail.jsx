@@ -5,6 +5,7 @@ import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { openMbReleaseEditor } from '../mb.js';
 import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies, AddToChallengeButton, WantButton, ReleaseYear, GenreChips, VetoButton } from '../components.jsx';
 import { aviso, confirmar } from '../avisos.jsx';
+import { deDondeVienes } from '../volver.js';
 
 // orphan y bootleg son «de primera clase»: material fuera de catálogo (rarezas y
 // directos no oficiales) que cuenta en lo descriptivo pero no en el completismo. En toda
@@ -140,11 +141,13 @@ export default function AlbumDetail() {
   if (!album) return <Spinner label="Cargando álbum…" />;
 
   const incomplete = album.track_file_count < album.track_count;
+  // De dónde viniste de verdad, con los filtros que llevabas puestos.
+  const volver = deDondeVienes();
 
   return (
     <div>
-      <Link to="/discoteca" className="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-gold-400 mb-4">
-        <ArrowLeft size={15} /> Discoteca
+      <Link to={volver.to} className="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-gold-400 mb-4">
+        <ArrowLeft size={15} /> {volver.label}
       </Link>
 
       <div className="flex flex-col md:flex-row gap-6 mb-6">

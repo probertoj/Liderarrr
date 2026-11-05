@@ -7,6 +7,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.7.2] - 2026-11-05
+
+**El enlace de volver de una ficha ya no se inventa de dónde venías.**
+
+### Arreglado
+- La ficha de disco llevaba un «← Discoteca» fijo, y eso fallaba de dos maneras. Si venías de
+  la Discoteca **con un filtro puesto, lo perdía** —mientras que el atrás del navegador sí lo
+  conservaba, así que había dos «atrás» que no hacían lo mismo—. Y si llegabas desde la página
+  de un artista, desde Huecos o desde un género, te mandaba a un sitio donde no habías estado.
+- Ahora el enlace te devuelve **a la lista de la que viniste, con los filtros que llevabas**, y
+  se llama como esa lista: «← Artista», «← Huecos», «← Calidad y disco». Si llegas de fuera —un
+  enlace guardado, una pestaña nueva— sigue diciendo «← Discoteca», como siempre.
+
+---
+
 ## [1.7.1] - 2026-11-05
 
 **En el móvil no se veía cuánto dura ninguna canción.** Salió en una ronda de pruebas hecha

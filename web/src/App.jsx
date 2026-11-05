@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { api } from './api.js';
 import { Spinner, ErrorBoundary } from './components.jsx';
+import { recordarLista } from './volver.js';
 import { Avisos } from './avisos.jsx';
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
@@ -253,6 +254,11 @@ export default function App() {
     document.documentElement.classList.toggle('light', theme === 'light');
     localStorage.setItem('theme', theme);
   }, [theme]);
+  // Apunta la última lista por la que pasaste, CON sus filtros, para que el enlace de
+  // volver de una ficha te devuelva de donde viniste y no a un sitio fijo.
+  useEffect(() => {
+    recordarLista(location.pathname, location.search);
+  }, [location.pathname, location.search]);
   // Móvil: al abrir el menú, congela el scroll del fondo (si no, se desplaza «por debajo»
   // del drawer al arrastrar). Se restaura al cerrar o desmontar.
   useEffect(() => {

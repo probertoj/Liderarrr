@@ -9,6 +9,14 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.7.2',
+    title: 'El enlace de volver ya no se inventa de dónde venías',
+    items: [
+      'La ficha de disco llevaba un «← Discoteca» fijo. Si venías de la Discoteca con un filtro puesto, lo perdía (el atrás del navegador sí lo conservaba, así que había dos «atrás» que no hacían lo mismo). Y si llegabas desde un artista, desde Huecos o desde un género, te mandaba a un sitio donde no habías estado.',
+      'Ahora te devuelve a la lista de la que viniste, con los filtros que llevabas, y se llama como esa lista: «← Artista», «← Huecos», «← Calidad y disco». Si abres un enlace guardado en una pestaña nueva, sigue diciendo «← Discoteca» como siempre.',
+    ],
+  },
+  {
     version: '1.7.1',
     title: 'En el móvil ya se ve cuánto dura cada canción',
     items: [
