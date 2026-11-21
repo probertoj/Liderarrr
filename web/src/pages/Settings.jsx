@@ -292,18 +292,23 @@ const ExternalLinkIcon = () => (
 function TestButton({ service, label, beforeTest }) {
   const [state, setState] = useState(null); // null | 'run' | ok | err
   const [msg, setMsg] = useState('');
+  // Renglones extra que una prueba quiera enseñar (hoy, los indexers de Prowlarr uno a uno).
+  const [detalles, setDetalles] = useState([]);
   return (
+    <div>
     <div className="flex items-center gap-2">
       <Button
         onClick={async () => {
           setState('run');
           setMsg('');
+          setDetalles([]);
           try {
             // guarda primero: el test corre contra la config del SERVIDOR, así que sin
             // guardar probaría con lo viejo. Así siempre prueba lo que hay en pantalla.
             if (beforeTest) await beforeTest();
             const r = await api.test(service);
             setState(r.ok ? 'ok' : 'err');
+            setDetalles(Array.isArray(r.detalles) ? r.detalles : []);
             setMsg(r.ok ? Object.values(r).filter((v) => typeof v === 'string')[0] || 'OK' : r.error || 'Error');
           } catch (e) {
             setState('err');
@@ -319,6 +324,17 @@ function TestButton({ service, label, beforeTest }) {
         </span>
       </Button>
       {msg && <span className={`text-xs ${state === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>{msg}</span>}
+    </div>
+      {detalles.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {detalles.map((d) => (
+            <li key={d.nombre} className="text-xs flex items-start gap-2">
+              <span className={`prueba-${d.estado} shrink-0 font-medium`}>{d.nombre}</span>
+              <span className="text-neutral-500">{d.texto}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

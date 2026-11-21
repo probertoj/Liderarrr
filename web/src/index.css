@@ -235,6 +235,26 @@ body {
   color: #92400e;
 }
 
+/* Resultado de una prueba de Ajustes, renglón a renglón (los indexers de Prowlarr). */
+.prueba-ok {
+  color: #6ee7b7;
+}
+.prueba-aviso {
+  color: #fcd34d;
+}
+.prueba-mal {
+  color: #fca5a5;
+}
+:root.light .prueba-ok {
+  color: #065f46;
+}
+:root.light .prueba-aviso {
+  color: #92400e;
+}
+:root.light .prueba-mal {
+  color: #991b1b;
+}
+
 /* Drawer de navegación (móvil y tablet/horizontal): fuera de pantalla por defecto, entra
    al abrir. En escritorio (lg+, ≥1024px) NO se traslada: es una columna fija siempre
    visible. El corte es lg (no md) para que el móvil EN HORIZONTAL —cuyo ancho supera los

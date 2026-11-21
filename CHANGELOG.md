@@ -7,6 +7,27 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.7.3] - 2026-11-21
+
+**«Probar Prowlarr» te dice qué indexer está callado y por qué.** Una búsqueda de Prowlarr es
+un agregado: si un tracker no contesta, llegan los resultados de los demás y nadie avisa.
+Desde Liderarrr solo se veía «de Redacted no sale nada».
+
+### Añadido
+- **Ajustes → Probar Prowlarr** lista ahora cada indexer con su estado, lo peor primero:
+  - **desactivado**, o **apartado por fallos** hasta tal hora (Prowlarr deja de consultarlo y
+    solo lo apunta en su log de depuración);
+  - **«Freeload Only» activado** en Redacted: descarta todo lo que no sea freeload, o sea casi
+    todo;
+  - **«Use Freeleech Tokens» en Required**: se salta cada torrent en el que no puedas gastar
+    token;
+  - **tope de consultas** por día u hora: al llegar, devuelve vacío sin ningún mensaje;
+  - que **no declare la categoría de música**, que es la que piden estas búsquedas.
+- Son dos consultas a la configuración del propio Prowlarr: **no sale ninguna petición al
+  tracker**, y la API key del indexer no viaja en el informe.
+
+---
+
 ## [1.7.2] - 2026-11-05
 
 **El enlace de volver de una ficha ya no se inventa de dónde venías.**

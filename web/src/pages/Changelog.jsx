@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.7.3',
+    title: '«Probar Prowlarr» te dice qué indexer está callado',
+    items: [
+      'Una búsqueda de Prowlarr junta lo de todos tus trackers: si uno no contesta, llegan los resultados de los demás y nadie avisa. Desde Liderarrr solo se veía que de ese tracker no salía nada.',
+      'Ahora Ajustes → Probar Prowlarr lista cada indexer con lo que le pasa: desactivado, apartado por fallos hasta tal hora, con «Freeload Only» activado, con los tokens de freeleech en «Required», con un tope de consultas, o sin la categoría de música.',
+      'Lo lee de la configuración del propio Prowlarr: no sale ninguna petición al tracker.',
+    ],
+  },
+  {
     version: '1.7.2',
     title: 'El enlace de volver ya no se inventa de dónde venías',
     items: [
