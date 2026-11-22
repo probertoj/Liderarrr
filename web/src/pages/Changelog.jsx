@@ -9,6 +9,19 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.7.4',
+    title: 'Repaso a fondo: lo que podía estropear tus datos o cansar a los trackers',
+    items: [
+      'Repaso a fondo del servidor, hecho pasando la app entera por una copia de una base real y leyendo el código en busca de lo que puede dañar datos.',
+      'Trackers: la auto-descarga tenía un tope que contaba descargas y no búsquedas, así que un disco sin release se buscaba todas las noches sin contar. Ahora el tope cuenta discos buscados y lo que no dio nada no se reintenta hasta pasados 3 días. Lidarr pasa por el mismo freno que Prowlarr y Jackett.',
+      'Importación: un pedido registrado sin artista ya no manda el disco a «Artista desconocido»; si las etiquetas no lo dicen, se saca del nombre de la carpeta. No se mezclan dos copias en una carpeta, y una importación a medias no se da por hecha.',
+      'Reescanear una carpeta borraba las letras de ese disco: ya no. Y escribir etiquetas no puede romper lo que siembras, porque el fichero se separa antes de la descarga.',
+      'Los títulos en otro alfabeto o de solo símbolos («Корвет», «>>>>») se confundían entre sí: tener uno contaba como tener los demás.',
+      'Guardar Ajustes ya no puede rebobinar el estado interno (una pestaña vieja podía repetir el refresco nocturno). Las credenciales que estaban en claro se cifran al arrancar, y el token de Spotify ya no sale por la API.',
+      '«Probar AcoustID» comprueba la clave de verdad, y «Enviar prueba» ya no dice «enviada» sin webhook.',
+    ],
+  },
+  {
     version: '1.7.3',
     title: '«Probar Prowlarr» te dice qué indexer está callado',
     items: [

@@ -1,4 +1,5 @@
 import { db, getSetting, setSetting } from './db.js';
+import { acquire } from './ratelimit.js';
 
 // Lidarr es el ACTUADOR, no el catálogo (igual que Radarr en PowaFlex). Solo dos
 // cosas: le mandamos álbumes a monitorizar desde los huecos, y le pedimos un
@@ -10,9 +11,14 @@ export function lidarrConfig() {
   return { url, key };
 }
 
-async function lidarrFetch(path, { method = 'GET', body } = {}) {
+// `tracker: true` en las llamadas que hacen que Lidarr salga a los indexers (buscar un
+// álbum, listar sus releases, agarrar una). Pasan por el mismo freno que Prowlarr y
+// Jackett: antes iban sueltas, y «enviar todos» lanzaba una búsqueda por disco tan rápido
+// como Lidarr contestara. Lo demás (perfiles, artistas, colas) es Lidarr hablando solo.
+async function lidarrFetch(path, { method = 'GET', body, tracker = false } = {}) {
   const { url, key } = lidarrConfig();
   if (!url || !key) throw new Error('Lidarr no configurado (URL o API key vacíos)');
+  if (tracker) await acquire('indexer');
   const t0 = Date.now();
   let res;
   try {
@@ -142,7 +148,7 @@ async function monitorFromLibrary(artistId, rgMbid) {
   const album = (albums || []).find((a) => a.foreignAlbumId === rgMbid);
   if (!album) return null;
   await lidarrFetch('/album/monitor', { method: 'PUT', body: { albumIds: [album.id], monitored: true } });
-  await lidarrFetch('/command', { method: 'POST', body: { name: 'AlbumSearch', albumIds: [album.id] } });
+  await lidarrFetch('/command', { method: 'POST', body: { name: 'AlbumSearch', albumIds: [album.id] }, tracker: true });
   return { ok: true, title: album.title };
 }
 
@@ -230,7 +236,7 @@ export async function lidarrReleases(rgMbid, artistMbid) {
   if (!rgMbid) throw new Error('Falta rg_mbid');
   const album = await findLidarrAlbum(rgMbid, artistMbid);
   if (!album) return { inLibrary: false, releases: [] };
-  const rel = await lidarrFetch(`/release?albumId=${album.id}`);
+  const rel = await lidarrFetch(`/release?albumId=${album.id}`, { tracker: true });
   const releases = (rel || []).map((r) => ({
     guid: r.guid,
     indexerId: r.indexerId,
@@ -253,7 +259,7 @@ export async function lidarrReleases(rgMbid, artistMbid) {
 // Descarga (grab) una release concreta elegida en la búsqueda interactiva.
 export async function lidarrGrab({ guid, indexerId }) {
   if (!guid || indexerId == null) throw new Error('Release inválida (falta guid o indexerId)');
-  await lidarrFetch('/release', { method: 'POST', body: { guid, indexerId } });
+  await lidarrFetch('/release', { method: 'POST', body: { guid, indexerId }, tracker: true });
   return { ok: true };
 }
 

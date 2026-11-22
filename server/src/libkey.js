@@ -51,9 +51,11 @@ export function isJunkLabel(name) {
 // /volumen/.musica es legítima y tiene que escanearse igual.
 const JUNK_NAMES = new Set(['__macosx', '@eadir', '$recycle.bin', 'system volume information', 'lost+found']);
 
+// Punto + cifra NO es basura: «.38 Special» o «.5 The Gray Chapter» son nombres de verdad
+// y el escáner se los saltaba (y su disco no aparecía nunca, ni recién importado).
 export function isJunkEntry(name) {
   const n = String(name || '');
-  return (n.startsWith('.') && !n.startsWith('..')) || JUNK_NAMES.has(n.toLowerCase());
+  return (n.startsWith('.') && !n.startsWith('..') && !/^\.\d/.test(n)) || JUNK_NAMES.has(n.toLowerCase());
 }
 
 // Trozos de una ruta, con la barra que sea (la base guarda las rutas del NAS con / y las de

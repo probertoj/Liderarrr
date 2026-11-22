@@ -43,6 +43,8 @@ export async function sendNotification(title, message, { force = false } = {}) {
 }
 
 export async function notifyTest() {
-  await sendNotification('Liderarr', 'Notificación de prueba: si ves esto, ya está conectado. 🎵', { force: true });
+  const r = await sendNotification('Liderarr', 'Notificación de prueba: si ves esto, ya está conectado. 🎵', { force: true });
+  // sin URL no se manda nada: antes decía «enviada» igualmente
+  if (r?.skipped) throw new Error('Falta la URL del webhook: pégala arriba antes de probar.');
   return { ok: true, name: 'Notificación de prueba enviada' };
 }

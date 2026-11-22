@@ -63,6 +63,17 @@ export async function fingerprint(filePath) {
 }
 
 // Resuelve una huella contra la API de AcoustID. Devuelve el mejor recording
+// Por qué rechaza AcoustID las consultas, para que se vea en Diagnóstico. Se avisa una vez
+// por motivo distinto, no una por pista.
+export const acoustidEstado = { rechazos: 0, ultimoMotivo: null };
+function apuntarRechazo(motivo) {
+  acoustidEstado.rechazos++;
+  if (acoustidEstado.ultimoMotivo !== motivo) {
+    acoustidEstado.ultimoMotivo = motivo;
+    console.warn(`[acoustid] AcoustID rechaza las consultas: ${motivo}`);
+  }
+}
+
 // MBID con su score, o null. Guarda el resultado en la caché de la huella.
 export async function lookup(filePath) {
   const key = getSetting('acoustid_key');
@@ -90,12 +101,27 @@ export async function lookup(filePath) {
       body: params,
       signal: AbortSignal.timeout(20000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // AcoustID contesta 400 con el motivo en JSON (clave mala, huella mala…). Antes se
+      // tiraba sin mirar: con una clave rechazada, todo salía «sin reconocer» y nada lo decía.
+      let motivo = `HTTP ${res.status}`;
+      try {
+        const j = await res.json();
+        if (j?.error?.message) motivo = `${j.error.message} (código ${j.error.code})`;
+      } catch {
+        /* sin cuerpo legible: vale el código HTTP */
+      }
+      apuntarRechazo(motivo);
+      return null;
+    }
     data = await res.json();
   } catch {
     return null;
   }
-  if (data.status !== 'ok') return null;
+  if (data.status !== 'ok') {
+    apuntarRechazo(data?.error?.message || 'respuesta sin «status: ok»');
+    return null;
+  }
 
   let best = null;
   for (const r of data.results || []) {
@@ -117,8 +143,38 @@ export async function lookup(filePath) {
   return best;
 }
 
+// Prueba de verdad: además de mirar que haya clave y fpcalc, le hace a AcoustID una
+// consulta con una huella que no vale. Si la clave es mala contesta «invalid API key»; si
+// es buena, se queja de la huella. Así se distingue una clave rechazada de una que funciona.
 export async function acoustidTest() {
-  const ok = await fpcalcAvailable();
+  const fpcalc = await fpcalcAvailable();
   const key = getSetting('acoustid_key');
-  return { ok: ok && !!key, fpcalc: ok, key: !!key };
+  if (!key) {
+    return { ok: false, fpcalc, key: false, error: `Falta la API key de AcoustID${fpcalc ? '' : ' y no se encuentra fpcalc (Chromaprint)'}` };
+  }
+  if (!fpcalc) {
+    return { ok: false, fpcalc, key: true, error: 'No se encuentra fpcalc (Chromaprint): sin él no se pueden calcular las huellas' };
+  }
+  try {
+    await acquire('acoustid', servicio('acoustid'));
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
+      body: new URLSearchParams({ client: key, duration: '120', fingerprint: 'AQAAAA' }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const j = await res.json().catch(() => null);
+    const msg = String(j?.error?.message || '');
+    if (j?.error?.code === 4 || /api key/i.test(msg)) {
+      return {
+        ok: false,
+        fpcalc,
+        key: true,
+        error: `AcoustID rechaza la clave («${msg || 'invalid API key'}»). Tiene que ser la clave de APLICACIÓN (acoustid.org → «Register your application»), no la de usuario.`,
+      };
+    }
+  } catch (e) {
+    return { ok: false, fpcalc, key: true, error: `No se pudo contactar con AcoustID (${String(e.message || e)})` };
+  }
+  return { ok: true, fpcalc, key: true, name: 'AcoustID acepta la clave y fpcalc está instalado' };
 }

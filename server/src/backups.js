@@ -95,18 +95,19 @@ export async function runBackup(motivo = 'manual') {
   if (backupStatus.running) throw new Error('ya hay una copia en marcha');
   fs.mkdirSync(DIR, { recursive: true });
 
-  // Antes de nada, sitio. Llenar el volumen guardando copias sería repetir exactamente el
-  // accidente del que esta función viene a protegernos.
-  const necesario = Math.round(dbBytes() * 1.2);
-  const libre = espacioLibre();
-  if (libre && libre.free < necesario) {
-    const gb = (x) => (x / 1024 ** 3).toFixed(1);
-    throw new Error(`no hay sitio para la copia: hacen falta ~${gb(necesario)} GB y quedan ${gb(libre.free)} GB`);
-  }
-
   backupStatus.running = true;
   const t0 = Date.now();
   try {
+    // Antes de nada, sitio. Llenar el volumen guardando copias sería repetir exactamente el
+    // accidente del que esta función viene a protegernos. La comprobación va DENTRO del try:
+    // fuera, el fallo por falta de sitio —justo el caso para el que existe esto— se saltaba
+    // la espera entre reintentos, el aviso y el error del panel, y se repetía cada minuto.
+    const necesario = Math.round(dbBytes() * 1.2);
+    const libre = espacioLibre();
+    if (libre && libre.free < necesario) {
+      const gb = (x) => (x / 1024 ** 3).toFixed(1);
+      throw new Error(`no hay sitio para la copia: hacen falta ~${gb(necesario)} GB y quedan ${gb(libre.free)} GB`);
+    }
     const destino = path.join(DIR, nombreNuevo());
     // Se escribe a un nombre provisional y se renombra al final. Así una copia que falla a
     // medias NUNCA destruye la que ya había (dos copias en el mismo minuto comparten nombre),

@@ -20,6 +20,11 @@ function torznabUrl(url, key, params) {
   return `${url}/api/v2.0/indexers/all/results/torznab/api?apikey=${enc(key)}&${qs}`;
 }
 
+// La API key de Jackett viaja en la URL. Si la URL está mal escrita (sin http://), el error
+// de fetch la cita entera, con la clave: se tacha antes de que llegue al registro, a
+// Diagnóstico o a la pantalla.
+export const sinClave = (texto) => String(texto).replace(/(apikey=)[^&\s"')]+/gi, '$1•••');
+
 async function torznabFetch(params, { limited = true } = {}) {
   const { url, key } = jackettConfig();
   if (!url || !key) throw new Error('Jackett no configurado (URL o API key vacios)');
@@ -33,7 +38,7 @@ async function torznabFetch(params, { limited = true } = {}) {
   } catch (err) {
     const ms = Date.now() - t0;
     const why =
-      err?.name === 'TimeoutError' || /aborted/i.test(String(err?.message)) ? `timeout tras ${ms}ms` : String(err?.message || err);
+      err?.name === 'TimeoutError' || /aborted/i.test(String(err?.message)) ? `timeout tras ${ms}ms` : sinClave(err?.message || err);
     console.warn(`[jackett] x ${params.t} - ${why}`);
     throw new Error(`No se pudo contactar con Jackett: ${why}`);
   }

@@ -58,6 +58,43 @@ async function fileDiff(trackPath, desired, trackRecordingId) {
   return changes;
 }
 
+// Un disco importado por hardlink comparte inodo con la copia que siembra el torrent:
+// escribirle etiquetas cambiaría TAMBIÉN los bytes de la descarga, el cliente fallaría la
+// comprobación de hash y servirías trozos malos en un tracker privado. Antes de escribir
+// se separa: copia → se escribe en la copia → se pone en su sitio. El fichero de la
+// descarga no se toca (su inodo sigue igual); el precio es que ese fichero pasa a ocupar
+// sitio dos veces. Devuelve true si hubo que separarlo.
+export function separarDelTorrent(p) {
+  const st = fs.statSync(p);
+  if (st.nlink <= 1) return false;
+  const tmp = `${p}.liderarrr-tmp`;
+  try {
+    fs.copyFileSync(p, tmp);
+    try {
+      fs.utimesSync(tmp, st.atime, st.mtime);
+    } catch {
+      /* las fechas son un detalle: no impiden seguir */
+    }
+    fs.renameSync(tmp, p);
+  } catch (e) {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      /* no llegó a crearse */
+    }
+    throw new Error(`no se pudo separar del fichero de la descarga (${e.message})`);
+  }
+  return true;
+}
+
+export const enlazado = (p) => {
+  try {
+    return fs.statSync(p).nlink > 1;
+  } catch {
+    return false;
+  }
+};
+
 function writable(p) {
   try {
     fs.accessSync(p, fs.constants.W_OK);
@@ -84,7 +121,7 @@ export async function previewAlbumTags(albumId) {
   for (const t of tracks) {
     const changes = await fileDiff(t.path, desired, t.mb_recording_id);
     total += changes.length;
-    out.push({ path: t.path, format: t.format, writable: writable(t.path), changes });
+    out.push({ path: t.path, format: t.format, writable: writable(t.path), enlazado: enlazado(t.path), changes });
   }
   return {
     eligible: true,
@@ -107,10 +144,12 @@ export async function writeAlbumTags(albumId) {
   }
   const tracks = db.prepare('SELECT id, path, mb_recording_id FROM tracks WHERE album_id = ?').all(albumId);
   let written = 0;
+  let separados = 0;
   const errors = [];
   for (const t of tracks) {
     try {
       if (!writable(t.path)) throw new Error('fichero de solo lectura (¿está la música montada en :ro?)');
+      if (separarDelTorrent(t.path)) separados++;
       const file = File.createFromPath(t.path);
       const tag = file.tag;
       // solo asignamos si tenemos valor: nunca borramos lo que ya haya
@@ -128,5 +167,5 @@ export async function writeAlbumTags(albumId) {
       errors.push({ path: t.path, error: String(err.message || err) });
     }
   }
-  return { written, total: tracks.length, errors: errors.slice(0, 30) };
+  return { written, total: tracks.length, separados, errors: errors.slice(0, 30) };
 }

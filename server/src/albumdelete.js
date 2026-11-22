@@ -34,7 +34,10 @@ export function deleteAlbumFromDisk(albumId, { confirm } = {}) {
     .all(albumId)
     .map((t) => t.path)
     .filter(Boolean);
-  const dir = album.path || null;
+  // Un disco cuyas pistas están sueltas en la RAÍZ de la biblioteca: se borran sus pistas,
+  // pero no se «limpia la carpeta», porque esa carpeta es la biblioteca entera.
+  const esRaiz = (p) => roots.includes(norm(p));
+  const dir = album.path && !esRaiz(album.path) ? album.path : null;
 
   // GUARDARRAIL: todo lo que se vaya a tocar DEBE estar dentro de la biblioteca.
   for (const t of trackPaths) if (!within(t)) throw new Error(`Ruta fuera de la biblioteca, abortado: ${t}`);
@@ -57,8 +60,12 @@ export function deleteAlbumFromDisk(albumId, { confirm } = {}) {
     }
   });
   if (remaining.length) {
+    const borrados = trackPaths.length - remaining.length;
+    // Decir la verdad: si alguno sí se borró, el disco ha quedado a medias en la carpeta.
     throw new Error(
-      `No se pudieron borrar ${remaining.length} de ${trackPaths.length} ficheros (¿biblioteca montada en solo lectura?). No se ha cambiado nada.`
+      borrados
+        ? `Se borraron ${borrados} ficheros, pero ${remaining.length} no se dejaron (¿permisos distintos?). El disco ha quedado A MEDIAS en tu carpeta y sigue en la app: revísalo.`
+        : `No se pudo borrar ninguno de los ${trackPaths.length} ficheros (¿biblioteca montada en solo lectura?). No se ha cambiado nada.`
     );
   }
 

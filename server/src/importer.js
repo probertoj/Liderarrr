@@ -19,6 +19,78 @@ import { isJunkEntry } from './libkey.js';
 const AUDIO_EXT = new Set(['.flac', '.mp3', '.m4a', '.ogg', '.opus', '.wav', '.ape', '.wv', '.aac', '.aiff', '.wma']);
 const KEEP_EXT = new Set([...AUDIO_EXT, '.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.cue', '.log', '.m3u', '.m3u8']);
 
+// ¿`hijo` está dentro de `raiz`? Con frontera de carpeta: «torrents-x» no está dentro de
+// «torrents», cosa que un startsWith a secas daba por buena.
+function dentroDe(hijo, raiz) {
+  const h = path.resolve(hijo);
+  const r = path.resolve(raiz);
+  return h === r || h.startsWith(r.endsWith(path.sep) ? r : r + path.sep);
+}
+
+// Un dato de artista/álbum que sirve: ni vacío ni las palabras «undefined»/«null», que es
+// lo que llega cuando alguien convierte a texto un valor que no existe. Así nació una
+// carpeta llamada literalmente «undefined» en la biblioteca.
+const vale = (v) => {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s && !/^(undefined|null|nan)$/i.test(s) ? s : null;
+};
+
+// «Artista - Álbum (2016) [FLAC]» → { artist, album, year }. Es como llegan nombradas casi
+// todas las descargas; se usa SOLO cuando las etiquetas no dicen el artista.
+export function deducirDeCarpeta(nombre) {
+  let t = String(nombre || '').trim();
+  let year = null;
+  for (;;) {
+    const m = t.match(/\s*[[(]([^\])]*)[)\]]\s*$/);
+    if (!m) break;
+    const y = m[1].match(/\b(19|20)\d{2}\b/);
+    if (y && !year) year = Number(y[0]);
+    t = t.slice(0, m.index).trim();
+  }
+  const fin = t.match(/\s+[-–—]\s*((?:19|20)\d{2})\s*$/);
+  if (fin) {
+    if (!year) year = Number(fin[1]);
+    t = t.slice(0, fin.index).trim();
+  }
+  const m = t.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+  if (!m) return { artist: null, album: t || null, year };
+  // «2016 - Álbum»: lo primero es el año, no un artista
+  if (/^(19|20)\d{2}$/.test(m[1].trim())) return { artist: null, album: m[2].trim(), year: year || Number(m[1]) };
+  return { artist: m[1].trim(), album: m[2].trim(), year };
+}
+
+// De dónde sale cada dato del destino, por orden: lo que diga quien llama (el registro de
+// descargas o lo que tecleaste) → las etiquetas → el nombre de la carpeta → la carpeta de
+// encima. Un dato vacío NO pisa al siguiente: antes un pedido registrado sin artista
+// borraba el de las etiquetas y el disco acababa en «Artista desconocido».
+export function resolverMeta(tags = {}, override = {}, carpeta = '', carpetaPadre = null) {
+  const deCarpeta = deducirDeCarpeta(carpeta);
+  const artist = vale(override.artist) || vale(tags.artist) || deCarpeta.artist || vale(carpetaPadre);
+  const album = vale(override.album) || vale(tags.album) || deCarpeta.album || vale(carpeta);
+  const year = Number(override.year) || Number(tags.year) || deCarpeta.year || null;
+  return { artist: artist || null, album: album || null, year };
+}
+
+// Dónde enlazar sin mezclar. Si la carpeta de destino ya tiene OTROS ficheros de audio
+// (lo típico: tenías el MP3 y ahora llega el FLAC), enlazar dentro dejaba un solo disco
+// con las dos tandas de pistas. Se va a una carpeta hermana con el formato en el nombre:
+// quedan como dos copias del mismo disco, que es lo que la app ya sabe gestionar.
+export function destinoLibre(destDir, relFiles) {
+  const clave = (r) => r.split(path.sep).join('/').toLowerCase();
+  const mios = new Set(relFiles.map(clave));
+  const tieneAjenos = (dir) =>
+    fs.existsSync(dir) && walkKeep(dir).some((r) => AUDIO_EXT.has(path.extname(r).toLowerCase()) && !mios.has(clave(r)));
+  if (!tieneAjenos(destDir)) return destDir;
+  const primero = relFiles.find((r) => AUDIO_EXT.has(path.extname(r).toLowerCase())) || '';
+  const fmt = path.extname(primero).slice(1).toUpperCase() || 'COPIA';
+  for (let i = 1; i <= 20; i++) {
+    const cand = `${destDir} [${fmt}${i > 1 ? ` ${i}` : ''}]`;
+    if (!tieneAjenos(cand)) return cand;
+  }
+  throw new Error(`Ya existe «${destDir}» con otros ficheros de audio dentro y no se pudo elegir una carpeta aparte.`);
+}
+
 export function importConfig() {
   return {
     enabled: getSetting('allow_import') === '1',
@@ -285,7 +357,7 @@ export async function listAlbumSubfolders(sourceDir) {
   const { source } = importConfig();
   if (!source) throw new Error('Configura la carpeta de descargas en Ajustes.');
   const base = path.resolve(sourceDir);
-  if (!base.startsWith(path.resolve(source))) throw new Error('La carpeta está fuera de la carpeta de descargas.');
+  if (!dentroDe(base, source)) throw new Error('La carpeta está fuera de la carpeta de descargas.');
   let entries;
   try {
     entries = fs
@@ -331,15 +403,16 @@ export async function importFolder(sourceDir, override = {}) {
   if (!enabled) throw new Error('La importación está desactivada. Actívala en Ajustes → Importar descargas.');
   if (!source || !dest) throw new Error('Configura las carpetas de descargas y de biblioteca en Ajustes.');
   const norm = path.resolve(sourceDir);
-  if (!norm.startsWith(path.resolve(source))) throw new Error('La carpeta de origen está fuera de la carpeta de descargas.');
+  if (!dentroDe(norm, source)) throw new Error('La carpeta de origen está fuera de la carpeta de descargas.');
   if (!fs.existsSync(norm)) throw new Error('La carpeta de origen ya no existe.');
 
   const files = walkKeep(norm);
   const audio = files.filter((r) => AUDIO_EXT.has(path.extname(r).toLowerCase())).sort();
   if (!audio.length) throw new Error('La carpeta no tiene ficheros de audio que importar.');
   const tags = await readTags(path.join(norm, audio[0]));
-  const meta = { ...tags, ...override };
-  const destDir = path.join(
+  const padre = path.dirname(norm);
+  const meta = resolverMeta(tags, override, path.basename(norm), path.resolve(padre) !== path.resolve(source) ? path.basename(padre) : null);
+  const destPrevisto = path.join(
     dest,
     renderPath(getSetting('import_naming'), {
       artist: meta.artist || 'Artista desconocido',
@@ -347,6 +420,7 @@ export async function importFolder(sourceDir, override = {}) {
       year: meta.year || null,
     })
   );
+  const destDir = destinoLibre(destPrevisto, files);
 
   // Si origen y biblioteca están en montajes distintos, el hardlink da EXDEV. Con
   // "copiar si no se puede enlazar" activo, se copia (ocupa el doble); si no, se avisa.
@@ -385,6 +459,14 @@ export async function importFolder(sourceDir, override = {}) {
       }
     }
   }
+  if (errors.length) {
+    // Antes se apuntaba como importada igualmente: el pedido se cerraba, llegaba el aviso de
+    // «disco importado» y en la biblioteca quedaba medio disco, o ninguno. Ahora no se da
+    // por hecha; lo ya enlazado se queda y la próxima pasada completa lo que falte.
+    throw new Error(
+      `No se pudieron enlazar ${errors.length} de ${files.length} ficheros (${errors[0]}). No se da por importada.`
+    );
+  }
   recordImport.run(norm, destDir, Date.now());
   // cierra el pedido correspondiente en el registro de descargas (manual o auto): sin esto,
   // importar a mano dejaba la descarga en "pedido" para siempre.
@@ -405,12 +487,15 @@ export async function importFile(sourceFile, override = {}) {
   if (!enabled) throw new Error('La importación está desactivada. Actívala en Ajustes → Importar descargas.');
   if (!source || !dest) throw new Error('Configura las carpetas de descargas y de biblioteca en Ajustes.');
   const norm = path.resolve(sourceFile);
-  if (!norm.startsWith(path.resolve(source))) throw new Error('El fichero de origen está fuera de la carpeta de descargas.');
+  if (!dentroDe(norm, source)) throw new Error('El fichero de origen está fuera de la carpeta de descargas.');
   if (!fs.existsSync(norm)) throw new Error('El fichero de origen ya no existe.');
   if (!AUDIO_EXT.has(path.extname(norm).toLowerCase())) throw new Error('El fichero no es de audio.');
 
   const tags = await readTags(norm);
-  const meta = { ...tags, ...override };
+  // de un fichero suelto no se deduce el artista por el nombre («01 - Tema» no es un artista);
+  // sí vale la carpeta que lo contiene si no es la raíz de descargas
+  const padre = path.dirname(norm);
+  const meta = resolverMeta(tags, override, '', path.resolve(padre) !== path.resolve(source) ? path.basename(padre) : null);
   const base = path.basename(norm, path.extname(norm));
   const destDir = path.join(
     dest,

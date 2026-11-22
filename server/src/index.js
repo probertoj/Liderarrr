@@ -15,6 +15,8 @@ import {
   setSetting,
   stageDatabaseImport,
   marcarServidorEnMarcha,
+  SECRET_SETTING_KEYS,
+  esAjusteInterno,
 } from './db.js';
 import { runScan, scanStatus, purgeJunkFromDb } from './scanner.js';
 import { purgeVariousArtists } from './various.js';
@@ -156,13 +158,16 @@ if (process.env.LIDERARRR_AUTH) {
   app.addHook('onRequest', async (req, reply) => {
     if (AUTH_OPEN_PATHS.has((req.raw.url || '').split('?')[0])) return;
     const ip = req.ip || 'desconocida';
-    if (crypto.timingSafeEqual(digest(req.headers.authorization), expected)) {
-      fails.delete(ip);
-      return;
-    }
+    // El bloqueo va ANTES de mirar la contraseña. Al revés, una contraseña correcta seguía
+    // entrando con el bloqueo puesto: 429 o 200 decían si habías acertado y se podía
+    // probar sin límite.
     if (tooManyFails(ip)) {
       reply.header('Retry-After', '300');
       return reply.code(429).send({ error: 'Demasiados intentos, prueba en unos minutos' });
+    }
+    if (crypto.timingSafeEqual(digest(req.headers.authorization), expected)) {
+      fails.delete(ip);
+      return;
     }
     fails.set(ip, [...(fails.get(ip) || []), Date.now()]);
     reply.header('WWW-Authenticate', 'Basic realm="Liderarrr", charset="UTF-8"');
@@ -197,11 +202,14 @@ app.get('/api/update-check', async () => updateCheck());
 app.get('/api/diag', async () => ({ ...diagnostics(), space: estadoEspacio() }));
 
 // --- ajustes ----------------------------------------------------------------
-const SECRET_KEYS = new Set(['lidarr_key', 'prowlarr_key', 'jackett_key', 'qbittorrent_pass', 'lastfm_key', 'lastfm_secret', 'acoustid_key', 'discogs_token', 'plex_token', 'spotify_client_secret', 'notify_url', 'listenbrainz_token']);
+// Una sola lista de qué es secreto: la de db.js. Había dos y no coincidían, así que el
+// token de Spotify salía por GET /api/settings.
+const SECRET_KEYS = SECRET_SETTING_KEYS;
 app.get('/api/settings', async () => {
   const raw = getAllSettings();
   const out = {};
   for (const [k, v] of Object.entries(raw)) {
+    if (k === 'auto_grab_tried') continue; // memoria interna de la auto-descarga
     // no devolvemos secretos en claro: solo si están puestos
     out[k] = SECRET_KEYS.has(k) ? (v ? '••••••••' : '') : v;
   }
@@ -212,6 +220,7 @@ app.put('/api/settings', async (req) => {
   const body = req.body || {};
   for (const [k, v] of Object.entries(body)) {
     if (SECRET_KEYS.has(k) && v === '••••••••') continue; // no sobrescribas con el placeholder
+    if (esAjusteInterno(k)) continue; // estado de la app, no un ajuste: no se pisa desde fuera
     setSetting(k, v === '' ? null : v);
   }
   return { ok: true };
@@ -565,11 +574,14 @@ app.post('/api/spotify/library/save', async (req, reply) => {
 // Callback OAuth para quien sirva Liderarr por HTTPS y registre ESTA ruta como redirect: si
 // llega el code, se completa solo. En el flujo por defecto (loopback 127.0.0.1) nadie sirve
 // esto y el usuario pega el code a mano; da igual.
+// El texto que se pinta en /callback sale en parte de la URL (?error=…): se escapa.
+const escHtml = (s) =>
+  String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 app.get('/callback', async (req, reply) => {
   const code = req.query?.code;
   const page = (msg, ok) =>
     reply.type('text/html').send(
-      `<!doctype html><meta charset=utf-8><title>Liderarrr · Spotify</title><body style="font-family:system-ui;background:#14141a;color:#eee;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center;max-width:420px;padding:24px"><h2 style="color:${ok ? '#4ade80' : '#f87171'}">${msg}</h2><p style="color:#999">Ya puedes cerrar esta pestaña y volver a Liderarrr.</p></div></body>`
+      `<!doctype html><meta charset=utf-8><title>Liderarrr · Spotify</title><body style="font-family:system-ui;background:#14141a;color:#eee;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center;max-width:420px;padding:24px"><h2 style="color:${ok ? '#4ade80' : '#f87171'}">${escHtml(msg)}</h2><p style="color:#999">Ya puedes cerrar esta pestaña y volver a Liderarrr.</p></div></body>`
     );
   // reconstruye la query (code o error) para que spotifyConnect dé el mensaje adecuado
   const qs = Object.entries(req.query || {})

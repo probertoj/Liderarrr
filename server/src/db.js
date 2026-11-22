@@ -763,7 +763,7 @@ const setStmt = db.prepare(
 
 // Claves sensibles: se guardan como AES-256-GCM si hay LIDERARRR_SECRET; si no,
 // en claro (compatible) y se avisa una vez. La lectura es transparente.
-const SECRET_SETTING_KEYS = new Set([
+export const SECRET_SETTING_KEYS = new Set([
   'lidarr_key',
   'lastfm_key',
   'lastfm_secret',
@@ -791,21 +791,37 @@ function encryptValue(v) {
   return `enc:v1:${iv.toString('base64')}:${tag.toString('base64')}:${ct.toString('base64')}`;
 }
 
-function decryptValue(v) {
-  if (typeof v !== 'string' || !v.startsWith('enc:v1:') || !secretKey) return v;
+// Un valor cifrado que NO se puede descifrar (falta LIDERARRR_SECRET o ha cambiado) no es
+// la credencial: antes se devolvía el texto cifrado tal cual y se mandaba a Last.fm,
+// Discogs o Spotify como si fuera la clave. Spotify respondía «invalid_grant» y la app
+// borraba el token bueno para siempre. Ahora cuenta como «sin configurar» y se avisa.
+const sinDescifrarAvisados = new Set();
+function sinDescifrar(key) {
+  if (!sinDescifrarAvisados.has(key)) {
+    sinDescifrarAvisados.add(key);
+    console.warn(
+      `[Liderarrr] No se puede leer «${key || 'una credencial'}»: está cifrada y LIDERARRR_SECRET falta o ha cambiado. Vuelve a escribirla en Ajustes.`
+    );
+  }
+  return null;
+}
+
+function decryptValue(v, key) {
+  if (typeof v !== 'string' || !v.startsWith('enc:v1:')) return v;
+  if (!secretKey) return sinDescifrar(key);
   try {
     const [, , ivB, tagB, ctB] = v.split(':');
     const decipher = crypto.createDecipheriv('aes-256-gcm', secretKey, Buffer.from(ivB, 'base64'));
     decipher.setAuthTag(Buffer.from(tagB, 'base64'));
     return Buffer.concat([decipher.update(Buffer.from(ctB, 'base64')), decipher.final()]).toString('utf8');
   } catch {
-    return v;
+    return sinDescifrar(key);
   }
 }
 
 export function getSetting(key, fallback = null) {
   const row = getStmt.get(key);
-  return row ? decryptValue(row.value) : fallback;
+  return row ? decryptValue(row.value, key) : fallback;
 }
 
 export function setSetting(key, value) {
@@ -820,6 +836,43 @@ export function setSetting(key, value) {
   }
   return setStmt.run(key, stored);
 }
+
+// Estado que la app apunta para sí misma (cuándo corrió cada tarea, colas, marcas de
+// migración). NO son ajustes del usuario: la página de Ajustes los recibía y los devolvía
+// enteros al guardar, así que una pestaña abierta desde ayer rebobinaba «último refresco
+// nocturno» (y el refresco se repetía), restauraba una cola de Lidarr ya enviada o pisaba
+// el token de Spotify renovado. PUT /api/settings los ignora.
+export const INTERNAL_SETTING_KEYS = new Set([
+  'last_scan',
+  'lidarr_add_queue',
+  'lastfm_last_scrobble',
+  'lb_last_listen',
+  'spotify_refresh_token',
+  'spotify_lib_synced_at',
+  'junk_purged',
+  'va_purged',
+  'lk_relative',
+  'auto_grab_tried',
+]);
+export const esAjusteInterno = (k) => INTERNAL_SETTING_KEYS.has(k) || /_last_run$/.test(String(k));
+
+// Las credenciales guardadas en claro (antes de definir LIDERARRR_SECRET, o antes de que
+// su clave entrara en la lista) se quedaban en claro para siempre: la página manda el
+// marcador «••••» de lo que no tocas y eso no se vuelve a guardar. Se cifran al arrancar.
+export function cifrarPendientes() {
+  if (!secretKey) return 0;
+  let n = 0;
+  for (const k of SECRET_SETTING_KEYS) {
+    const row = getStmt.get(k);
+    if (row && typeof row.value === 'string' && row.value && !row.value.startsWith('enc:v1:')) {
+      setStmt.run(k, encryptValue(row.value));
+      n++;
+    }
+  }
+  if (n) console.log(`[Liderarrr] ${n} credencial(es) que estaban en claro ya están cifradas en disco.`);
+  return n;
+}
+cifrarPendientes();
 
 export function getAllSettings() {
   const out = {};

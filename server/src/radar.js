@@ -36,6 +36,7 @@ export function parseBuyMusicClub(html) {
 async function fetchCuratorPage(username) {
   const res = await fetch(`${BMC}/user/${encodeURIComponent(username)}`, {
     headers: { 'User-Agent': UA, Accept: 'text/html' },
+    signal: AbortSignal.timeout(20000), // era la única petición externa sin límite de tiempo
   });
   if (res.status === 404) throw new Error('Ese usuario no existe en buymusic.club');
   if (!res.ok) throw new Error(`buymusic.club respondió ${res.status}`);

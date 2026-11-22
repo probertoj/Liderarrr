@@ -7,6 +7,67 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.7.4] - 2026-11-22
+
+**Repaso a fondo del servidor.** Salió de pasar la app entera por una copia de una base real
+(33.516 álbumes) y de leer el código buscando lo que puede dañar datos. Nada de esto se veía
+en el día a día, que es justo el problema.
+
+### Trackers
+- **La auto-descarga tenía un tope que no topaba.** Contaba descargas conseguidas, no
+  búsquedas: un disco sin release (o que aún no ha salido) costaba una o dos búsquedas y no
+  contaba. Con 150 candidatos eran unas 300 búsquedas cada noche. Ahora el tope cuenta discos
+  **buscados**, lo que no dio nada no se reintenta hasta pasados 3 días, y lo ya publicado va
+  antes que lo que está por salir.
+- **Lidarr pasa por el mismo freno** que Prowlarr y Jackett cuando su petición acaba en un
+  tracker (buscar un álbum, listar sus releases, agarrar una).
+- **Un título corto ya no agarra cualquier cosa.** «1», «X» o «Up» casaban con cualquier año o
+  formato del nombre de la release; ahora tienen que aparecer como palabra.
+
+### Importación
+- **Un pedido registrado sin artista borraba el artista de las etiquetas** y el disco acababa en
+  «Artista desconocido». Ahora un dato vacío no pisa nada, y si las etiquetas tampoco lo dicen
+  se saca del nombre de la carpeta («Artista - Álbum (2016) [FLAC]»).
+- Las palabras «undefined» y «null» ya no pueden acabar siendo el nombre de una carpeta.
+- **No se mezclan dos copias en una carpeta.** Si el destino ya tiene otros ficheros de audio
+  (tenías el MP3 y llega el FLAC), va a una carpeta hermana con el formato en el nombre.
+- **Una importación con ficheros que no se pudieron enlazar ya no se da por hecha.**
+- Los nombres que empiezan por punto y cifra («.38 Special») ya no se toman por basura.
+
+### Tu biblioteca
+- **Reescanear una carpeta borraba las letras de ese disco** (bastaba con guardarle una
+  carátula). Las letras y las huellas acústicas se conservan.
+- **Escribir etiquetas ya no puede romper lo que siembras:** si el fichero está enlazado a la
+  descarga, primero se separa de ella.
+- **Los títulos en otro alfabeto o de solo símbolos** («Корвет», «>>>>», «♡») se quedaban en
+  nada al compararlos, así que tener uno contaba como tener todos los demás.
+- «Ordenar en su carpeta» se niega si dentro de la carpeta viven otros discos, y si la base
+  no acepta el cambio devuelve la carpeta a su sitio.
+- «Borrar del disco» dice la verdad si solo pudo borrar una parte, y nunca «limpia» la raíz
+  de la biblioteca.
+
+### Ajustes y seguridad
+- **Guardar Ajustes ya no puede rebobinar el estado de la app.** El servidor ignora las marcas
+  internas (último refresco nocturno, cola de Lidarr, token de Spotify…) que la página
+  devolvía al guardar: una pestaña abierta desde ayer podía repetir el refresco nocturno.
+- El token de Spotify ya no sale por la API de ajustes.
+- **Las credenciales que estaban guardadas en claro se cifran al arrancar** (si tienes
+  `LIDERARRR_SECRET`). Y si la frase de paso falta o cambia, la app lo dice en vez de mandar
+  el texto cifrado a Last.fm o Spotify como si fuera la clave.
+- La página de retorno de Spotify escapaba mal un texto que viene de la URL.
+- El bloqueo por intentos fallidos de contraseña ahora bloquea de verdad.
+- La API key de Jackett ya no puede aparecer en un mensaje de error.
+
+### Mensajes que mentían o callaban
+- «Enviar prueba» decía «enviada» sin webhook configurado.
+- **«Probar AcoustID» comprueba la clave de verdad** y explica qué falla. Además, cuando
+  AcoustID rechaza las consultas ahora queda dicho en Diagnóstico: antes todo salía «sin
+  reconocer» y nada lo explicaba.
+- Una copia de seguridad que falla por falta de sitio ya avisa y espera, en vez de
+  reintentarse cada minuto en silencio.
+
+---
+
 ## [1.7.3] - 2026-11-21
 
 **«Probar Prowlarr» te dice qué indexer está callado y por qué.** Una búsqueda de Prowlarr es

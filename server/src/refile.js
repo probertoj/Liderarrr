@@ -44,6 +44,19 @@ export function refileAlbum(albumId, { confirm } = {}) {
   if (destDir === cur) return { ok: true, moved: false, path: cur, message: 'El álbum ya está en su carpeta' };
   if (fs.existsSync(destDir)) throw new Error(`Ya existe una carpeta en el destino: ${destDir}`);
 
+  // Se mueve la carpeta ENTERA. Si dentro viven otros discos (el típico: pistas sueltas en
+  // la carpeta del artista y, al lado, subcarpetas con sus otros álbumes) se irían detrás,
+  // y esos discos quedarían apuntando a rutas que ya no existen.
+  const dentro = db
+    .prepare('SELECT title, path FROM albums WHERE id != ?')
+    .all(albumId)
+    .filter((o) => norm(o.path).startsWith(cur + '/'));
+  if (dentro.length) {
+    throw new Error(
+      `Dentro de esta carpeta hay ${dentro.length} disco(s) más (p. ej. «${dentro[0].title}»): moverla se los llevaría detrás. Sepáralos primero o mueve este a mano.`
+    );
+  }
+
   fs.mkdirSync(path.dirname(destDir), { recursive: true });
   try {
     fs.renameSync(cur, destDir);
@@ -53,7 +66,20 @@ export function refileAlbum(albumId, { confirm } = {}) {
     throw new Error(`No se pudo mover la carpeta: ${e.message}`);
   }
 
-  return applyMove(albumId, a, cur, destDir, roots);
+  try {
+    return applyMove(albumId, a, cur, destDir, roots);
+  } catch (e) {
+    // La base no aceptó el cambio (otra ficha ya ocupa esa ruta, por ejemplo). La carpeta
+    // ya está movida: se devuelve a su sitio para que disco y base sigan diciendo lo mismo.
+    try {
+      fs.renameSync(destDir, cur);
+    } catch (e2) {
+      throw new Error(
+        `La carpeta se movió a ${destDir}, la base no se pudo actualizar (${e.message}) y tampoco se pudo devolver a su sitio (${e2.message}). Reescanea la biblioteca.`
+      );
+    }
+    throw new Error(`No se pudo actualizar la base (${e.message}). La carpeta se ha devuelto a su sitio: no ha cambiado nada.`);
+  }
 }
 
 // aplica el movimiento en BD (extraído para reutilizar): path, local_key (la ruta

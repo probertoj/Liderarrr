@@ -132,6 +132,31 @@ ON CONFLICT(local_key) DO UPDATE SET
 `);
 const getAlbumId = db.prepare('SELECT id FROM albums WHERE local_key = ?');
 const clearTracks = db.prepare('DELETE FROM tracks WHERE album_id = ?');
+// Lo que cuelga de una pista y hay que conservar al reescanear su carpeta. Las pistas se
+// borran y se vuelven a insertar con un id NUEVO; las letras van por id de pista, así que
+// se quedaban sueltas y la limpieza nocturna las borraba. Bastaba con guardar una
+// carátula o un .lrc (cambia la fecha de la carpeta) para perder las letras del disco.
+const pistasDe = db.prepare(
+  'SELECT t.id, t.path, t.size_bytes, t.acoustid, (SELECT 1 FROM lyrics l WHERE l.track_id = t.id) AS con_letra FROM tracks t WHERE t.album_id = ?'
+);
+const pistasNuevas = db.prepare('SELECT id, path, size_bytes FROM tracks WHERE album_id = ?');
+const moverLetra = db.prepare('UPDATE lyrics SET track_id = ? WHERE track_id = ?');
+const ponerHuella = db.prepare('UPDATE tracks SET acoustid = ? WHERE id = ? AND acoustid IS NULL');
+// Sustituye las pistas de un álbum sin perder letras ni huellas: se casan por ruta.
+export const reemplazarPistas = db.transaction((albumId, rows) => {
+  const antes = pistasDe.all(albumId).filter((t) => t.con_letra || t.acoustid);
+  clearTracks.run(albumId);
+  insertTracksTx(albumId, rows);
+  if (!antes.length) return;
+  const porRuta = new Map(pistasNuevas.all(albumId).map((t) => [t.path, t]));
+  for (const v of antes) {
+    const n = porRuta.get(v.path);
+    if (!n) continue; // el fichero ya no está: su letra sí es huérfana de verdad
+    if (v.con_letra) moverLetra.run(n.id, v.id);
+    // la huella solo vale si es el mismo fichero (mismo tamaño), no otro con el mismo nombre
+    if (v.acoustid && v.size_bytes === n.size_bytes) ponerHuella.run(v.acoustid, n.id);
+  }
+});
 const insertTrack = db.prepare(`
 INSERT INTO tracks (album_id, disc, num, title, artist, duration_ms, path, format, codec,
   bitrate, sample_rate, bit_depth, channels, size_bytes, lossless, has_replaygain, mb_recording_id)
@@ -278,8 +303,7 @@ async function ingestFolder({ dir, files }) {
   });
 
   const albumId = getAlbumId.get(localKey).id;
-  clearTracks.run(albumId);
-  insertTracksTx(albumId, tracks);
+  reemplazarPistas(albumId, tracks);
 
   for (const g of genres) {
     insertGenre.run(g);

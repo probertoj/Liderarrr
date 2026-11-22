@@ -60,6 +60,30 @@ function artistMatches(nt, artist) {
   return w.length > 0 && nt.includes(w[0]);
 }
 
+// ¿El título de la release nombra este álbum? Para títulos largos basta con que lo
+// contenga. Para los cortos («1», «X», «Up», «III») eso casaba con cualquier año o
+// formato («…2001flac16bit…») y se agarraba lo primero del artista: ahí se exige que
+// aparezca como palabra entera.
+const palabras = (s) =>
+  String(s || '')
+    .normalize('NFD')
+    .toLowerCase()
+    .replace(/\p{M}+/gu, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean);
+export function nombraElAlbum(tituloRelease, album) {
+  const nal = normName(album);
+  if (!nal) return true;
+  if (nal.length >= 5) return normName(tituloRelease).includes(nal);
+  const pr = palabras(tituloRelease);
+  const pa = palabras(album);
+  if (!pa.length) return normName(tituloRelease).includes(nal);
+  for (let i = 0; i + pa.length <= pr.length; i++) if (pa.every((w, j) => pr[i + j] === w)) return true;
+  return false;
+}
+
 export function pickBestRelease(results, { artist, album, minSeeders = 1, freeleechOnly = false, trackerPriority = [], requireArtist = false } = {}) {
   const na = normName(artist);
   const nal = normName(album);
@@ -70,7 +94,7 @@ export function pickBestRelease(results, { artist, album, minSeeders = 1, freele
     // indexer no informa el factor (freeleech null), se descarta por seguridad.
     if (freeleechOnly && r.freeleech !== true) continue;
     const nt = normName(r.title);
-    if (nal && !nt.includes(nal)) continue; // no parece ser ese álbum
+    if (nal && !nombraElAlbum(r.title, album)) continue; // no parece ser ese álbum
     if (requireArtist && artist && !artistMatches(nt, artist)) continue; // ni de este artista
     // Calidad/relevancia SIN seeders: así, a igual calidad, manda la prioridad de tracker
     // y solo después los seeders (antes los seeders entraban en el score y colaban).
@@ -131,6 +155,32 @@ export function autoGrabConfig() {
   };
 }
 
+// Memoria de intentos. El tope de la tanda contaba DESCARGAS, no búsquedas: un disco sin
+// release (o que aún no ha salido) costaba una o dos búsquedas al tracker y no contaba,
+// así que con 150 candidatos eran ~300 búsquedas cada noche, todas las noches. Ahora el
+// tope cuenta discos BUSCADOS, y el que no dio nada no se vuelve a buscar hasta pasados
+// unos días: las noches siguientes les toca a otros.
+export const REINTENTO_GRAB_DIAS = 3;
+function leerIntentos() {
+  try {
+    const o = JSON.parse(getSetting('auto_grab_tried') || '{}');
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  } catch {
+    return {};
+  }
+}
+
+// Qué se busca esta noche y en qué orden: fuera lo intentado hace poco; primero lo ya
+// publicado (lo más nuevo antes), al final lo que todavía no ha salido.
+export function ordenarCandidatos(candidatos, intentos = {}, hoy = new Date().toISOString().slice(0, 10), ahora = Date.now()) {
+  const espera = REINTENTO_GRAB_DIAS * DAY;
+  const vivos = candidatos.filter((c) => !(Number(intentos[c.rg_mbid]) > 0 && ahora - Number(intentos[c.rg_mbid]) < espera));
+  const fecha = (c) => String(c.first_release || '');
+  const publicados = vivos.filter((c) => fecha(c) <= hoy).sort((a, b) => fecha(b).localeCompare(fecha(a)));
+  const porVenir = vivos.filter((c) => fecha(c) > hoy).sort((a, b) => fecha(a).localeCompare(fecha(b)));
+  return [...publicados, ...porVenir];
+}
+
 // ④ Recorre huecos/estrenos de artistas seguidos y agarra la mejor release de cada uno.
 // Salta lo que ya tienes, lo ya pedido (ledger) y lo descartado. Tope por tanda (los
 // indexers se consultan en vivo y es lento). Un fallo en uno no tumba a los demás.
@@ -165,8 +215,10 @@ export async function runAutoGrab({ months, lookbackDays, limit, dryRun = false 
       .filter((c) => !requested.has(c.rg_mbid) && !isOwned(c.rg_mbid, c.artist, c.title));
     autoGrabStatus.considered = candidates.length;
 
-    let n = 0;
-    for (const c of candidates) {
+    const intentos = leerIntentos();
+    const cola = ordenarCandidatos(candidates, intentos);
+    let n = 0; // discos BUSCADOS en esta tanda (no solo los que se descargan)
+    for (const c of cola) {
       if (n >= cap) break;
       if (dryRun) {
         autoGrabStatus.log.push(`(simulado) ${c.artist} — ${c.title} · ${c.first_release}`);
@@ -179,17 +231,27 @@ export async function runAutoGrab({ months, lookbackDays, limit, dryRun = false 
           artist: c.artist,
           album: c.title,
         });
+        n++;
         if (res.grabbed) {
           autoGrabStatus.grabbed++;
-          n++;
+          delete intentos[c.rg_mbid];
           autoGrabStatus.log.push(`✓ ${c.artist} — ${c.title} · ${res.release} (${res.seeders ?? '?'} seeders)`);
         } else {
+          intentos[c.rg_mbid] = Date.now();
           autoGrabStatus.log.push(`· ${c.artist} — ${c.title}: ${res.reason}`);
         }
       } catch (e) {
+        n++; // también cuenta: la búsqueda pudo llegar al tracker antes de fallar
         autoGrabStatus.log.push(`⚠️ ${c.title}: ${String(e.message || e)}`);
       }
     }
+    if (!dryRun) {
+      // solo se recuerda lo que sigue siendo candidato: la memoria no crece sin fin
+      const vigentes = new Set(candidates.map((c) => c.rg_mbid));
+      setSetting('auto_grab_tried', JSON.stringify(Object.fromEntries(Object.entries(intentos).filter(([k]) => vigentes.has(k)))));
+    }
+    const enEspera = candidates.length - cola.length;
+    if (enEspera > 0) autoGrabStatus.log.push(`(${enEspera} sin buscar esta noche: se intentaron hace menos de ${REINTENTO_GRAB_DIAS} días)`);
     autoGrabStatus.log = autoGrabStatus.log.slice(0, 100);
     autoGrabStatus.lastRun = Date.now();
     setSetting('auto_grab_last_run', String(Date.now()));

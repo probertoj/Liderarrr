@@ -11,12 +11,22 @@
 const EDITION_RE =
   /(deluxe|expanded|remaster|anniversary|edition|reissue|re-?master|mono|stereo|bonus|special|version|explicit|flac|mp3|vinyl|\d{2,3}\s*bit|\d{2,3}(\.\d)?\s*khz|hi-?res|24-?96|16-?44)/i;
 
+// ¿Lleva alguna letra que no sea del alfabeto latino (cirílico, griego, japonés…)?
+export const NO_LATINA = /[^\P{L}\p{Script=Latin}]/u;
+
 // Nombre (artista/sello) → minúsculas sin diacríticos ni signos.
+//
+// Antes se quedaba SOLO con a-z y 0-9, así que «Кино», «坂本龍一», «>>>>» o «♡» daban
+// todos la cadena vacía: discos distintos compartían clave y uno contaba como tener los
+// demás. Ahora, si hay letras de otro alfabeto se conservan, y lo que es solo símbolos
+// se queda tal cual. Para nombres en alfabeto latino el resultado no cambia, que es lo
+// que mantiene válidas las claves ya guardadas.
 export function normName(s) {
-  return String(s || '')
-    .normalize('NFD')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '');
+  const txt = String(s || '').normalize('NFD').toLowerCase();
+  const latino = txt.replace(/[^a-z0-9]+/g, '');
+  if (latino && !NO_LATINA.test(txt)) return latino;
+  const amplio = txt.replace(/\p{M}+/gu, '').replace(/[^\p{L}\p{N}]+/gu, '');
+  return amplio || latino || txt.replace(/\s+/g, '');
 }
 
 // Título limpio para casar: quita corchetes/paréntesis FINALES que sean año o edición

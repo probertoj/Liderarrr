@@ -506,12 +506,16 @@ export function artists({ q, sort, limit = 5000, tracked, missing } = {}) {
 // (Deluxe Edition) CD2" caen en el mismo grupo.
 const DUP_STRIP = /\b(deluxe|remaster(ed)?|expanded|anniversary|edition|version|reissue|mono|stereo|bonus|remix(es|ed)?|disc\s*\d+|cd\s*\d+)\b/gi;
 export function normalizeForDup(title) {
-  return String(title || '')
+  const base = String(title || '')
     .toLowerCase()
     .replace(/[([{][^)\]}]*[)\]}]/g, ' ')
-    .replace(DUP_STRIP, ' ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
+    .replace(DUP_STRIP, ' ');
+  const latino = base.replace(/[^a-z0-9]+/g, ' ').trim();
+  // Igual que normName: un título en otro alfabeto o de solo símbolos no puede quedarse
+  // en nada, o dos discos distintos del mismo artista salen como copias el uno del otro.
+  if (latino && !/[^\P{L}\p{Script=Latin}]/u.test(base)) return latino;
+  const amplio = base.replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  return amplio || latino || String(title || '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
 // Puntúa una copia para recomendar cuál CONSERVAR (mayor = mejor): manda la
