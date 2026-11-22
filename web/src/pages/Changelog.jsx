@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.9.2',
+    title: '«¿Qué álbumes son?», agrupado por lo que importa',
+    items: [
+      'Las listas de Calidad y disco se agrupaban por frecuencia de muestreo exacta: trece pestañas, con «44,1 kHz» conteniendo casi toda la biblioteca y frecuencias con un solo álbum.',
+      'Ahora son cinco, por lo que importa: Alta resolución (más de 16 bits o más de 48 kHz, sin pérdida), Por debajo de CD, Mezclan frecuencias, Sin ReplayGain y Sin imagen en la carpeta.',
+      'La frecuencia exacta pasa a ser un filtro dentro de cada lista y un dato de cada fila («24 bits · 96 kHz»).',
+    ],
+  },
+  {
     version: '1.9.1',
     title: '«¿Qué álbumes son?», al final de Calidad y disco',
     items: [

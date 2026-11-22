@@ -7,6 +7,26 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.9.2] - 2026-11-22
+
+**Las listas de calidad se agrupaban por frecuencia de muestreo exacta, y eso no decía nada.**
+Con una biblioteca real salían trece pestañas: «44,1 kHz» con casi todos los discos (es la
+norma, no una lista), frecuencias con un solo álbum, y la profundidad de bits sin mirar.
+
+### Cambiado
+- Las pestañas de *Calidad y disco → ¿Qué álbumes son?* pasan a ser cinco:
+  - **Alta resolución:** sin pérdida a más de 16 bits o a más de 48 kHz. Un disco a 24 bits y
+    44,1 kHz también lo es, y antes quedaba escondido entre los de «44,1 kHz».
+  - **Por debajo de CD:** alguna pista a menos de 44,1 kHz. Los más claros de sustituir.
+  - **Mezclan frecuencias:** pistas a distinta frecuencia dentro del mismo disco.
+  - **Sin ReplayGain** y **Sin imagen en la carpeta**, como estaban.
+- La frecuencia exacta es ahora un **filtro dentro de cada lista** (y un dato de cada fila:
+  «24 bits · 96 kHz»), no una pestaña.
+- La calidad CD no tiene lista (es casi todo), y lo que tiene pérdida ya tiene su página en
+  *Candidatos a upgrade*.
+
+---
+
 ## [1.9.1] - 2026-11-22
 
 ### Cambiado
