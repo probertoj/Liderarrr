@@ -19,6 +19,7 @@ import {
   esAjusteInterno,
 } from './db.js';
 import { discosDesaparecidos, olvidarDisco, olvidarTodos, marcarDesaparecidos } from './missing.js';
+import { limpiarMbidInvalidos } from './mbid.js';
 import { warmCovers, coverWarmStatus, coversPendientes } from './covers.js';
 import { runScan, scanStatus, purgeJunkFromDb } from './scanner.js';
 import { purgeVariousArtists } from './various.js';
@@ -1678,6 +1679,16 @@ export async function start({ port = Number(process.env.PORT) || 3861 } = {}) {
       resumeAddQueue(); // reanuda una tanda de envío a Lidarr que quedara a medias
     } catch (e) {
       console.warn('[lidarr] no se pudo reanudar la cola:', String(e.message || e));
+    }
+    // MBID que no lo son (dos pegados, un número de Discogs, un id de Spotify): se quitan en
+    // cada arranque. Es barato y un reescaneo forzado de ficheros viejos no los vuelve a colar,
+    // pero una base restaurada de una copia antigua sí puede traerlos.
+    try {
+      const r = limpiarMbidInvalidos(db);
+      if (r.artistas || r.albumes || r.pistas)
+        console.log(`[mbid] identificadores que no eran de MusicBrainz, fuera: ${r.artistas} artistas · ${r.albumes} álbumes · ${r.pistas} pistas`);
+    } catch (e) {
+      console.warn('[mbid] limpieza de identificadores falló:', String(e.message || e));
     }
     // limpieza ÚNICA de los ocultos que se escanearon antes de que existiera el filtro
     // (pistas `._loquesea.flac` de Mac). Solo filas: no toca el disco.

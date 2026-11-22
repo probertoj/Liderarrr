@@ -7,6 +7,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.8.2] - 2026-11-22
+
+**Artistas con un «MBID» que no era un MBID.** Lo que traen las etiquetas en «MusicBrainz
+Artist Id» se guardaba tal cual, y hay etiquetadores que meten ahí dos identificadores pegados
+(una colaboración), un número de Discogs o un id de Spotify. Cada refresco le pedía a
+MusicBrainz la discografía de algo que no existe: error 400 en Diagnóstico todas las noches, y
+ese artista sin discografía ni completismo.
+
+### Arreglado
+- De las etiquetas solo se acepta un identificador de MusicBrainz de verdad (artista, álbum,
+  edición y grabación). Si vienen dos pegados, vale el primero.
+- **Al arrancar se limpian los que ya estaban guardados mal.** Solo se quita el identificador;
+  la ficha, sus discos y su seguimiento no cambian, y la identificación normal le pondrá el
+  bueno cuando lo encuentre.
+
+---
+
 ## [1.8.1] - 2026-11-22
 
 **Cuatro flecos que quedaban del repaso.**

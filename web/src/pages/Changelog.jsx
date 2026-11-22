@@ -9,6 +9,14 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.8.2',
+    title: 'Identificadores de MusicBrainz que no lo eran',
+    items: [
+      'Había artistas con un «MBID» que no lo era: dos identificadores pegados (una colaboración), un número de Discogs o un id de Spotify, copiados de las etiquetas tal cual. MusicBrainz los rechazaba en cada refresco y ese artista se quedaba sin discografía.',
+      'Ahora de las etiquetas solo se acepta un identificador de MusicBrainz de verdad, y al arrancar se limpian los que ya estaban mal guardados. La ficha y sus discos no cambian.',
+    ],
+  },
+  {
     version: '1.8.1',
     title: 'Flecos del repaso',
     items: [

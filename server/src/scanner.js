@@ -3,6 +3,7 @@ import path from 'node:path';
 import { parseFile } from 'music-metadata';
 import { db, getSetting, setSetting } from './db.js';
 import { albumKey, splitRoots, isJunkLabel, isJunkEntry, pathSegments } from './libkey.js';
+import { unMbid } from './mbid.js';
 import { regroupDiscs } from './discgroup.js';
 
 // Raíces de la biblioteca para CALCULAR la identidad de cada álbum (clave relativa
@@ -238,7 +239,7 @@ async function ingestFolder({ dir, files }) {
       size_bytes: size,
       lossless: f.lossless || isLossless(f.codec || fmt) ? 1 : 0,
       has_replaygain: c.replaygain_track_gain != null || c.replaygain_album_gain != null ? 1 : 0,
-      mb_recording_id: first(c.musicbrainz_recordingid),
+      mb_recording_id: unMbid(c.musicbrainz_recordingid),
     });
 
     // metadatos de álbum: se toman del primer fichero que los tenga. Los MBID se
@@ -247,9 +248,10 @@ async function ingestFolder({ dir, files }) {
     albumMeta.albumArtist ||= c.albumartist || c.artist;
     albumMeta.artist ||= c.artist;
     albumMeta.year ||= c.year || (c.date ? Number(String(c.date).slice(0, 4)) : null);
-    albumMeta.rgMbid ||= first(c.musicbrainz_releasegroupid);
-    albumMeta.relMbid ||= first(c.musicbrainz_albumid);
-    albumMeta.artistMbid ||= first(c.musicbrainz_albumartistid) || first(c.musicbrainz_artistid);
+    // unMbid: lo de las etiquetas solo vale si es un MBID de verdad (ver mbid.js)
+    albumMeta.rgMbid ||= unMbid(c.musicbrainz_releasegroupid);
+    albumMeta.relMbid ||= unMbid(c.musicbrainz_albumid);
+    albumMeta.artistMbid ||= unMbid(c.musicbrainz_albumartistid) || unMbid(c.musicbrainz_artistid);
     albumMeta.totalTracks ||= c.track?.of || null;
     if ((c.disk?.of || 1) > albumMeta.discs) albumMeta.discs = c.disk.of;
   }
