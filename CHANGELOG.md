@@ -7,6 +7,24 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.9.3] - 2026-11-22
+
+**«Candidatos a upgrade» miraba cada copia por separado.** Una copia en MP3 salía como
+candidata aunque tuvieras ese mismo disco en FLAC en otra carpeta: «69 Love Songs» en MP3, con
+cinco copias en FLAC al lado. Pedir su upgrade era descargar lo que ya tienes.
+
+### Arreglado
+- La lista solo propone los discos que **solo** tienes con pérdida. «El mismo disco» es el
+  mismo lanzamiento de MusicBrainz o, si no está identificado, mismo artista y mismo título.
+- Las copias con pérdida de discos que ya tienes sin pérdida van **aparte, al final**, como
+  copias que sobran, cada una con un enlace a «la copia buena» para comprobarlo antes de
+  descartarla.
+- Tener solo **una parte** sin pérdida (un volumen de una caja) no cubre el disco entero: sigue
+  siendo candidato, y la fila lo dice.
+- Una copia sin pérdida que está en la Papelera no cuenta como tenerlo.
+
+---
+
 ## [1.9.2] - 2026-11-22
 
 **Las listas de calidad se agrupaban por frecuencia de muestreo exacta, y eso no decía nada.**

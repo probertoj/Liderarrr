@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.9.3',
+    title: 'Un disco que ya tienes en FLAC no es un candidato a upgrade',
+    items: [
+      '«Candidatos a upgrade» miraba cada copia por separado: una copia en MP3 salía como candidata aunque tuvieras ese mismo disco en FLAC en otra carpeta.',
+      'Ahora la lista solo propone lo que solo tienes con pérdida. Las copias con pérdida de discos que ya tienes sin pérdida van aparte, al final, con un enlace a «la copia buena».',
+      'Tener solo una parte sin pérdida (un volumen de una caja) no cubre el disco entero: sigue siendo candidato y la fila lo dice.',
+    ],
+  },
+  {
     version: '1.9.2',
     title: '«¿Qué álbumes son?», agrupado por lo que importa',
     items: [

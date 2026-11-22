@@ -81,11 +81,46 @@ export async function resolveAlbumLabel(albumId) {
 // Cola de upgrades: álbumes que tienes SIN NINGUNA pista sin pérdida (todo MP3/AAC),
 // candidatos naturales a buscar una edición mejor. Ordenados por lo que más pesa
 // (los más grandes en lossy suelen ser los que más ganarías reencodeando/sustituyendo).
+//
+// Pero una copia en MP3 de un disco que YA tienes en FLAC en otra carpeta no es un
+// candidato: ese disco ya está «subido». Salía igualmente («69 Love Songs» en MP3 con
+// cinco copias en FLAC al lado), y pedir su upgrade era descargar lo que ya tienes. Cada
+// fila lleva ahora `tiene_sin_perdida` (y `lossless_copy_id`, la ficha de esa copia): la
+// página las aparta como «copias que sobran» en vez de proponerlas.
+//
+// «El mismo disco» es el mismo release group de MusicBrainz y, si no está identificado,
+// mismo artista y mismo título de fondo (normalizeForDup, como los duplicados). Y solo
+// cuenta como cubierto si entre tus copias sin pérdida suman al menos tantas pistas como
+// la copia con pérdida: tener el volumen 1 en FLAC no cubre la caja entera en MP3. En ese
+// caso sigue siendo candidato, marcado `parcial`.
 export function upgradeCandidates() {
   const owned = new Set(db.prepare('SELECT rg_mbid FROM lidarr_albums').all().map((r) => r.rg_mbid));
+  const clave = (artista, titulo) => `${String(artista || '').toLowerCase().trim()}|${normalizeForDup(titulo)}`;
+  const porRg = new Map();
+  const porClave = new Map();
+  const apunta = (mapa, k, a) => {
+    const m = mapa.get(k);
+    // se guarda la copia con más pistas como «la» copia a enseñar, y la suma de todas
+    if (!m) mapa.set(k, { id: a.id, mayor: a.n, pistas: a.n });
+    else {
+      m.pistas += a.n;
+      if (a.n > m.mayor) Object.assign(m, { id: a.id, mayor: a.n });
+    }
+  };
+  for (const a of db
+    .prepare(
+      `SELECT a.id, a.rg_mbid, a.album_artist, a.title, SUM(t.lossless) AS n
+       FROM albums a JOIN tracks t ON t.album_id = a.id
+       WHERE a.match_state NOT IN ('dismissed')
+       GROUP BY a.id HAVING n > 0`
+    )
+    .iterate()) {
+    if (a.rg_mbid) apunta(porRg, a.rg_mbid, a);
+    apunta(porClave, clave(a.album_artist, a.title), a);
+  }
   return db
     .prepare(
-      `SELECT a.id, a.title, a.album_artist, a.year, a.cover, a.size_bytes, a.rg_mbid,
+      `SELECT a.id, a.title, a.album_artist, a.year, a.cover, a.size_bytes, a.rg_mbid, a.track_file_count,
         ar.mbid AS artist_mbid,
         (SELECT MAX(t.bitrate) FROM tracks t WHERE t.album_id=a.id) AS max_bitrate,
         (SELECT GROUP_CONCAT(DISTINCT t.format) FROM tracks t WHERE t.album_id=a.id) AS formats
@@ -95,6 +130,11 @@ export function upgradeCandidates() {
        ORDER BY a.size_bytes DESC`
     )
     .all()
+    .map((r) => {
+      const copia = (r.rg_mbid && porRg.get(r.rg_mbid)) || porClave.get(clave(r.album_artist, r.title)) || null;
+      const cubierto = !!copia && copia.pistas >= (r.track_file_count || 1);
+      return { ...r, lossless_copy_id: copia?.id ?? null, tiene_sin_perdida: cubierto, parcial: !!copia && !cubierto };
+    })
     .map((r) => ({
       ...r,
       max_kbps: r.max_bitrate ? Math.round(r.max_bitrate / 1000) : null,

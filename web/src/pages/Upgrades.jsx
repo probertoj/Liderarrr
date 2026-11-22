@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpCircle, Plus, Check, Loader2, ExternalLink } from 'lucide-react';
+import { ArrowUpCircle, Plus, Check, Loader2, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { PageTitle, Cover, Spinner, ErrorMsg, SearchModal, useLidarrEnabled } from '../components.jsx';
 import { aviso } from '../avisos.jsx';
@@ -30,8 +30,14 @@ export default function Upgrades() {
       paraCola.current?.(); // el sondeo de la cola de Lidarr no sigue al irte
     };
   }, []);
+  // Una copia con pérdida de un disco que ya tienes sin pérdida en otra carpeta no es un
+  // candidato: va aparte, como copia que sobra (el servidor marca `tiene_sin_perdida`).
+  const candidatos = useMemo(() => (rows ? rows.filter((a) => !a.tiene_sin_perdida) : null), [rows]);
+  const sobran = useMemo(() => (rows ? rows.filter((a) => a.tiene_sin_perdida) : []), [rows]);
+  const [verSobran, setVerSobran] = useState(false);
   // Eran 2.133 fichas pintadas de golpe (55.000 nodos): de 150 en 150.
-  const tandas = useTandas(rows, { tamano: 150 });
+  const tandas = useTandas(candidatos, { tamano: 150 });
+  const tandasSobran = useTandas(sobran, { tamano: 100 });
 
   // Con Lidarr → que busque una versión mejor. Sin Lidarr → descarga nativa de la mejor
   // release (agarra un rip sin pérdida; el auto-import la coloca junto a la que tienes).
@@ -66,7 +72,7 @@ export default function Upgrades() {
       <PageTitle
         icon={ArrowUpCircle}
         title="Candidatos a upgrade"
-        sub={rows.length ? `${cuenta(tandas)} álbumes sin ninguna pista sin pérdida` : ''}
+        sub={candidatos.length ? `${cuenta(tandas)} álbumes que solo tienes con pérdida` : ''}
       />
       {queue &&
         (queue.running ? (
@@ -79,9 +85,9 @@ export default function Upgrades() {
           </p>
         ))}
 
-      {rows.length === 0 ? (
+      {candidatos.length === 0 ? (
         <div className="card p-8 text-center text-neutral-400">
-          Nada que mejorar: todos tus álbumes tienen al menos una pista sin pérdida. 🎉
+          Nada que mejorar: de todos tus álbumes tienes alguna copia sin pérdida. 🎉
         </div>
       ) : (
         <div className="space-y-2">
@@ -106,6 +112,7 @@ export default function Upgrades() {
                       <span className="text-amber-400">{a.formats}</span>
                       {a.max_kbps ? ` ${a.max_kbps} kbps` : ''}
                     </span>
+                    {a.parcial && <span className="text-neutral-400"> · tienes una parte sin pérdida</span>}
                   </div>
                 </Link>
                 <div className="text-right shrink-0 text-sm hidden sm:block">
@@ -151,6 +158,52 @@ export default function Upgrades() {
             </div>
           ))}
           <VerMas tandas={tandas} />
+        </div>
+      )}
+
+      {sobran.length > 0 && (
+        <div className="card p-4 mt-6">
+          <button
+            type="button"
+            onClick={() => setVerSobran((v) => !v)}
+            aria-expanded={verSobran}
+            className="w-full flex items-start gap-2 text-left"
+          >
+            {verSobran ? <ChevronDown size={16} className="shrink-0 mt-0.5" /> : <ChevronRight size={16} className="shrink-0 mt-0.5" />}
+            <span className="min-w-0">
+              <span className="text-sm text-neutral-200">
+                {sobran.length === 1 ? '1 copia con pérdida' : `${sobran.length.toLocaleString('es-ES')} copias con pérdida`} de discos que ya tienes sin
+                pérdida
+              </span>
+              <span className="block text-xs text-neutral-500 mt-0.5">
+                No son candidatos: el disco ya lo tienes en buena calidad en otra carpeta. Esta copia la puedes descartar o borrar desde su
+                ficha.
+              </span>
+            </span>
+          </button>
+          {verSobran && (
+            <>
+            <ul className="mt-3 space-y-1">
+              {tandasSobran.visibles.map((a) => (
+                <li key={a.id} className="flex items-baseline gap-3 text-sm bg-ink-850/50 rounded px-2.5 py-1.5">
+                  <Link to={`/album/${a.id}`} className="min-w-0 flex-1 truncate hover:text-gold-400">
+                    {a.album_artist} — {a.title}
+                    {a.year ? <span className="text-neutral-500"> · {a.year}</span> : null}
+                  </Link>
+                  <span className="text-xs text-amber-400 shrink-0 hidden sm:inline">
+                    {a.formats} · {fmtBytes(a.size_bytes)}
+                  </span>
+                  {a.lossless_copy_id && (
+                    <Link to={`/album/${a.lossless_copy_id}`} className="text-xs text-gold-400 hover:underline shrink-0">
+                      la copia buena
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <VerMas tandas={tandasSobran} />
+            </>
+          )}
         </div>
       )}
 
