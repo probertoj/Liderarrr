@@ -9,6 +9,13 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.9.1',
+    title: '«¿Qué álbumes son?», al final de Calidad y disco',
+    items: [
+      'En Calidad y disco, el bloque «¿Qué álbumes son?» pasa al final de la página: es la lista larga, y formatos, álbumes más pesados y duplicados van antes.',
+    ],
+  },
+  {
     version: '1.9.0',
     title: 'Tres cosas traídas del fork de tinker-net',
     items: [

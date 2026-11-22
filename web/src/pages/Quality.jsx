@@ -69,7 +69,6 @@ export default function Quality() {
 
       <CarpetasPerdidas onChange={() => cargar((e) => aviso(e.message, 'error'))} />
       <CaratulasPendientes />
-      <QualityLists />
 
       {/* grid-cols-1 y min-w-0: sin ellos la columna única del móvil se ensanchaba hasta el
           título más largo de las listas de abajo (1.257 px en una pantalla de 375). */}
@@ -140,6 +139,11 @@ export default function Quality() {
             </>
           )}
         </div>
+      </div>
+
+      {/* al final de la página: es la lista larga, lo demás se ve de un vistazo */}
+      <div className="mt-4">
+        <QualityLists />
       </div>
 
       {group && (

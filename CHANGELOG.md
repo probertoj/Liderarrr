@@ -7,6 +7,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.9.1] - 2026-11-22
+
+### Cambiado
+- En *Calidad y disco*, el bloque **«¿Qué álbumes son?»** pasa al final de la página. Es la
+  lista larga; formatos, álbumes más pesados y duplicados se ven de un vistazo y van antes.
+
+---
+
 ## [1.9.0] - 2026-11-22
 
 **Tres cosas traídas del fork de [tinker-net](https://github.com/tinker-net/Liderarrr).** Alguien
