@@ -52,6 +52,9 @@ export const api = {
   coversWarmStart: (limit) => req('/covers/warm', { method: 'POST', body: { limit } }),
   coversWarmCancel: () => req('/covers/warm/cancel', { method: 'POST' }),
   // discos cuya carpeta ya no está
+  // qué álbumes son: por frecuencia de muestreo, sin ReplayGain o sin imagen en la carpeta
+  qualityLists: () => req('/quality/lists'),
+  qualityList: (kind, rate) => req(`/quality/list?${new URLSearchParams(rate ? { kind, rate } : { kind })}`),
   missing: () => req('/missing'),
   missingCheck: () => req('/missing/check', { method: 'POST' }),
   missingForget: (id) => req(`/missing/${id}/forget`, { method: 'POST', body: { confirm: true } }),

@@ -7,6 +7,41 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.9.0] - 2026-11-22
+
+**Tres cosas traídas del fork de [tinker-net](https://github.com/tinker-net/Liderarrr).** Alguien
+se ha llevado Liderarrr a su casa y ha resuelto por su cuenta cosas que aquí estaban peor o no
+estaban. Se han portado a mano, con sus tests; gracias.
+
+### Añadido
+- **¿Qué álbumes son?** *Calidad y disco* daba los totales; ahora da los nombres: qué álbumes
+  están a 44,1 kHz, a 48 kHz o a cualquier otra frecuencia, cuáles tienen pistas sin ReplayGain
+  y cuáles no tienen imagen en su carpeta. Con buscador y un botón para **copiar la lista**
+  (también cuando abres la app por HTTP). Un álbum que mezcla frecuencias sale en las dos
+  listas y lo dice.
+- Las tarjetas de arriba cuentan **álbumes**, con las pistas debajo: «¿cuántos discos tengo con
+  pérdida?» es la pregunta, no cuántas pistas.
+
+### Mejorado
+- **La carátula ya no tiene que llamarse «cover».** Solo se reconocía una imagen con «cover»,
+  «folder», «front» o «album» en el nombre; un disco con `scan.jpg` o `portada.png` contaba
+  como sin imagen. Ahora vale cualquier imagen de la carpeta (las de siempre tienen
+  preferencia). Se aplica sola en el próximo escaneo, también a los discos que no han cambiado.
+- **Carpetas que ya no están, más fino:**
+  - «No lo puedo leer» ya no es «no existe». Solo cuenta como desaparecido lo que el sistema
+    dice que no existe; un fallo de permisos o un corte de la red es una duda, y con la duda
+    no se marca ni se quita nada.
+  - También se detecta la carpeta que sigue ahí pero **ya sin audio** dentro.
+  - Una carpeta de música se da por viva solo si conserva alguno de tus discos, no porque
+    «no esté vacía» (detrás de un volumen caído pueden quedar restos).
+  - Al quitar una ficha, la discografía y los retos pasan a apuntar a la **otra copia** del
+    disco si la hay, en vez de quedarse sin disco hasta la limpieza de la noche.
+
+Lo que **no** se ha traído del fork: que las fichas se borren solas sin preguntar. Aquí se
+marcan y decides tú.
+
+---
+
 ## [1.8.2] - 2026-11-22
 
 **Artistas con un «MBID» que no era un MBID.** Lo que traen las etiquetas en «MusicBrainz

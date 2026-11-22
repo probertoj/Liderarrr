@@ -20,6 +20,7 @@ import {
 } from './db.js';
 import { discosDesaparecidos, olvidarDisco, olvidarTodos, marcarDesaparecidos } from './missing.js';
 import { limpiarMbidInvalidos } from './mbid.js';
+import { registerQualityLists } from './qualitylists.js';
 import { warmCovers, coverWarmStatus, coversPendientes } from './covers.js';
 import { runScan, scanStatus, purgeJunkFromDb } from './scanner.js';
 import { purgeVariousArtists } from './various.js';
@@ -1045,6 +1046,9 @@ app.post('/api/albums/:id/state', async (req, reply) => {
   }
 });
 // papelera: listar descartados y restaurar uno (deshacer un "Descartar")
+// qué álbumes son: por frecuencia de muestreo, sin ReplayGain, sin imagen en la carpeta
+registerQualityLists(app);
+
 app.get('/api/dismissed', async () => q.dismissedAlbums());
 // discos cuya carpeta ya no está: listarlos, volver a mirar y quitarlos de la app (solo filas)
 app.get('/api/missing', async () => discosDesaparecidos());

@@ -16,7 +16,7 @@ const { app } = await import('../src/index.js');
 app.log.level = 'silent';
 const { expireStaleDownloads, activeRequestRgs, caducaDias } = await import('../src/downloads.js');
 const { reabrirPedidosViejos } = await import('../src/wanted.js');
-const { marcarDesaparecidos, discosDesaparecidos, olvidarDisco, olvidarTodos } = await import('../src/missing.js');
+const { marcarDesaparecidos, discosDesaparecidos, olvidarDisco, olvidarTodos, estadoDeCarpeta } = await import('../src/missing.js');
 const { coversPendientes } = await import('../src/covers.js');
 const q = await import('../src/queries.js');
 
@@ -62,10 +62,14 @@ test('un deseo «pedido» que no llegó vuelve a la búsqueda', () => {
 
 // --- carpetas que ya no están ----------------------------------------------------------
 const carpeta = (n) => path.join(MUSICA, 'Artista', `Disco ${String(n).padStart(2, '0')}`);
+const conAudio = (n) => {
+  fs.mkdirSync(carpeta(n), { recursive: true });
+  fs.writeFileSync(path.join(carpeta(n), '01.flac'), 'audio');
+};
 test('un disco cuya carpeta ya no existe se marca, y se desmarca si vuelve', () => {
   const ins = db.prepare("INSERT INTO albums (id, local_key, path, album_artist, title, match_state) VALUES (?, ?, ?, 'Artista', ?, 'matched')");
   for (let n = 1; n <= 40; n++) {
-    fs.mkdirSync(carpeta(n), { recursive: true });
+    conAudio(n);
     ins.run(1000 + n, `k${n}`, p(carpeta(n)), `Disco ${n}`);
   }
   db.prepare("INSERT INTO tracks (album_id, title, path) VALUES (1001, 'pista', ?)").run(p(path.join(carpeta(1), '01.flac')));
@@ -77,10 +81,40 @@ test('un disco cuya carpeta ya no existe se marca, y se desmarca si vuelve', () 
   assert.equal(r.nuevos, 2);
   assert.deepEqual(discosDesaparecidos().map((d) => d.id), [1001, 1002]);
 
-  fs.mkdirSync(carpeta(2), { recursive: true }); // la renombraste y la has devuelto
+  conAudio(2); // la renombraste y la has devuelto
   const r2 = marcarDesaparecidos();
   assert.equal(r2.recuperados, 1);
   assert.deepEqual(discosDesaparecidos().map((d) => d.id), [1001]);
+});
+
+test('la carpeta que sigue ahí pero ya sin audio también cuenta como desaparecida', () => {
+  // te llevaste las pistas a otro sitio y quedó la carpeta con la carátula
+  fs.rmSync(path.join(carpeta(40), '01.flac'));
+  fs.writeFileSync(path.join(carpeta(40), 'cover.jpg'), 'img');
+  fs.writeFileSync(path.join(carpeta(40), '._01.flac'), 'resto de Mac: no es audio');
+  assert.equal(estadoDeCarpeta({ path: p(carpeta(40)) }), 'falta');
+  assert.equal(marcarDesaparecidos().nuevos, 1);
+  // vuelven las pistas: se desmarca
+  conAudio(40);
+  assert.equal(marcarDesaparecidos().recuperados, 1);
+  // atajo: si la carpeta no ha cambiado desde el último escaneo, no hace falta abrirla…
+  assert.equal(estadoDeCarpeta({ path: p(carpeta(39)), scanned_at: Date.now() + 60000 }), 'esta');
+  // …y un fichero donde debería haber una carpeta no prueba nada
+  assert.equal(estadoDeCarpeta({ path: p(path.join(carpeta(39), '01.flac')) }), 'duda');
+});
+
+test('«no lo puedo leer» no es «no existe»: con la duda no se marca ni se desmarca', () => {
+  // un volumen que da error de permisos o de red al mirar una carpeta
+  const conDudas = (a, opts) => (a.id === 1038 ? 'duda' : estadoDeCarpeta(a, opts));
+  const r = marcarDesaparecidos(Date.now(), conDudas);
+  assert.equal(r.nuevos, 0);
+  assert.equal(r.dudas, 1);
+  assert.equal(db.prepare('SELECT missing_since FROM albums WHERE id = 1038').get().missing_since, null);
+  // y uno ya marcado no se quita de la app mientras no se pueda comprobar
+  db.prepare('UPDATE albums SET missing_since = 1 WHERE id = 1038').run();
+  assert.throws(() => olvidarDisco(1038, { confirm: true }, conDudas), /no se puede comprobar/);
+  assert.equal(db.prepare('SELECT count(*) n FROM albums WHERE id = 1038').get().n, 1);
+  db.prepare('UPDATE albums SET missing_since = NULL WHERE id = 1038').run();
 });
 
 test('quitar de la app pide confirmación, no borra lo que ha vuelto y solo toca filas', () => {
@@ -94,23 +128,53 @@ test('quitar de la app pide confirmación, no borra lo que ha vuelto y solo toca
   // marcado, pero la carpeta reaparece antes de confirmar: se queda
   fs.rmSync(carpeta(3), { recursive: true });
   marcarDesaparecidos();
-  fs.mkdirSync(carpeta(3), { recursive: true });
+  conAudio(3);
   assert.throws(() => olvidarDisco(1003, { confirm: true }), /ha vuelto a aparecer/);
   assert.equal(db.prepare('SELECT missing_since FROM albums WHERE id = 1003').get().missing_since, null);
 });
 
+test('al quitar una ficha, la discografía y los retos pasan a la otra copia del disco', () => {
+  // renombraste la carpeta: el escáner creó la ficha nueva (1050) y la vieja (1004) quedó colgando
+  const RG = '11111111-2222-3333-4444-555555555555';
+  db.prepare('UPDATE albums SET rg_mbid = ? WHERE id = 1004').run(RG);
+  const nueva = path.join(MUSICA, 'Artista', 'Disco 04 (renombrado)');
+  fs.mkdirSync(nueva, { recursive: true });
+  fs.writeFileSync(path.join(nueva, '01.flac'), 'audio');
+  db.prepare("INSERT INTO albums (id, local_key, path, album_artist, title, rg_mbid, match_state) VALUES (1050, 'k1050', ?, 'Artista', 'Disco 4', ?, 'matched')").run(p(nueva), RG);
+  db.prepare("INSERT INTO artists (id, name) VALUES (900, 'Artista')").run();
+  db.prepare("INSERT INTO release_groups (rg_mbid, artist_id, title, primary_type, is_owned, owned_album_id) VALUES (?, 900, 'Disco 4', 'Album', 1, 1004)").run(RG);
+
+  fs.rmSync(carpeta(4), { recursive: true });
+  assert.equal(marcarDesaparecidos().nuevos, 1);
+  olvidarDisco(1004, { confirm: true });
+  assert.deepEqual(db.prepare('SELECT is_owned, owned_album_id FROM release_groups WHERE rg_mbid = ?').get(RG), { is_owned: 1, owned_album_id: 1050 });
+
+  // y si NO hay otra copia, deja de contar como tuyo
+  const RG2 = '99999999-2222-3333-4444-555555555555';
+  db.prepare('UPDATE albums SET rg_mbid = ? WHERE id = 1005').run(RG2);
+  db.prepare("INSERT INTO release_groups (rg_mbid, artist_id, title, primary_type, is_owned, owned_album_id) VALUES (?, 900, 'Disco 5', 'Album', 1, 1005)").run(RG2);
+  fs.rmSync(carpeta(5), { recursive: true });
+  marcarDesaparecidos();
+  olvidarDisco(1005, { confirm: true });
+  assert.deepEqual(db.prepare('SELECT is_owned, owned_album_id FROM release_groups WHERE rg_mbid = ?').get(RG2), { is_owned: 0, owned_album_id: null });
+});
+
 test('si de golpe falta media biblioteca, lo raro es el volumen: no se marca nada', () => {
-  // 39 discos quedan; desaparecen 30 a la vez (un volumen que no ha montado bien)
-  for (let n = 4; n <= 33; n++) fs.rmSync(carpeta(n), { recursive: true });
+  // desaparecen 28 a la vez (un volumen que no ha montado bien)
+  for (let n = 6; n <= 33; n++) fs.rmSync(carpeta(n), { recursive: true });
   const r = marcarDesaparecidos();
   assert.equal(r.nuevos, 0);
   assert.equal(r.dudosas.length, 1);
   assert.equal(discosDesaparecidos().length, 0);
   assert.throws(() => olvidarTodos(), /Sin confirmar/);
-  assert.deepEqual(olvidarTodos({ confirm: true }), { ok: true, quitados: 0, vueltos: 0 });
-  // y con la raíz vacía del todo, tampoco
+  assert.deepEqual(olvidarTodos({ confirm: true }), { ok: true, quitados: 0, vueltos: 0, dudas: 0 });
+  // una raíz que existe y no está vacía, pero sin NADA de tu música (un montaje caído con
+  // restos): tampoco se toca. Antes bastaba con que no estuviera vacía.
   fs.rmSync(path.join(MUSICA, 'Artista'), { recursive: true });
-  assert.equal(marcarDesaparecidos().nuevos, 0);
+  fs.mkdirSync(path.join(MUSICA, '@eaDir'), { recursive: true });
+  const r2 = marcarDesaparecidos();
+  assert.equal(r2.nuevos, 0);
+  assert.equal(r2.dudosas.length, 1);
   fs.mkdirSync(path.join(MUSICA, 'Artista'), { recursive: true });
 });
 

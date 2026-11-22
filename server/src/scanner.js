@@ -43,7 +43,8 @@ export const scanStatus = {
   error: null,
 };
 
-const isAudio = (f) => AUDIO_EXT.has(path.extname(f).toLowerCase());
+export const isAudio = (f) => AUDIO_EXT.has(path.extname(f).toLowerCase());
+const COVER_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 const isLossless = (fmt) => /flac|alac|wav|ape|wavpack|aiff|pcm/i.test(fmt || '');
 // music-metadata devuelve varios MBID como ARRAY (álbumes con varios artistas).
 // Nos quedamos con el primero: pasar un array a una consulta de un solo hueco
@@ -64,6 +65,7 @@ async function scanTree(dir, onFolder) {
   }
   const files = [];
   const subdirs = [];
+  const images = [];
   for (const e of entries) {
     // Ocultos y basura del sistema fuera, carpetas y ficheros: un `._x.flac` tiene la
     // extensión de una pista pero no es audio (ver isJunkEntry en libkey.js).
@@ -71,24 +73,24 @@ async function scanTree(dir, onFolder) {
     const full = path.join(dir, e.name);
     if (e.isDirectory()) subdirs.push(full);
     else if (e.isFile() && isAudio(e.name)) files.push(full);
+    else if (e.isFile() && COVER_EXT.has(path.extname(e.name).toLowerCase())) images.push(e.name);
   }
-  if (files.length) await onFolder({ dir, files });
+  if (files.length) await onFolder({ dir, files, cover: findCover(dir, images) });
   for (const sd of subdirs) await scanTree(sd, onFolder);
 }
 
-function findCover(dir, files) {
-  try {
-    for (const f of fs.readdirSync(dir)) {
-      if (isJunkEntry(f)) continue; // un `._cover.jpg` no es una imagen
-      const ext = path.extname(f).toLowerCase();
-      if (!['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) continue;
-      const base = path.basename(f, ext).toLowerCase();
-      if (COVER_NAMES.some((n) => base.includes(n))) return path.join(dir, f);
-    }
-  } catch {
-    /* noop */
-  }
-  return null;
+// La carátula de una carpeta: la imagen que se llame «cover», «folder», «front»… y, si no
+// hay ninguna con esos nombres, la primera que haya. Antes solo valían esos nombres, así
+// que un disco con «scan.jpg» o «portada.png» contaba como sin imagen. `images` son los
+// nombres que scanTree ya listó (sin ocultos ni basura): no se vuelve a leer la carpeta.
+export function findCover(dir, images) {
+  const nombres = [...images].sort((a, b) => a.localeCompare(b));
+  const preferida = nombres.find((n) => {
+    const base = path.basename(n, path.extname(n)).toLowerCase();
+    return COVER_NAMES.some((c) => base.includes(c));
+  });
+  const elegida = preferida ?? nombres[0];
+  return elegida ? path.join(dir, elegida) : null;
 }
 
 const upsertArtist = db.prepare(
@@ -189,7 +191,7 @@ async function parseTags(file) {
   ]);
 }
 
-async function ingestFolder({ dir, files }) {
+async function ingestFolder({ dir, files, cover }) {
   const tracks = [];
   let totalSize = 0;
   let totalDur = 0;
@@ -301,7 +303,7 @@ async function ingestFolder({ dir, files }) {
     duration_ms: Math.round(totalDur),
     added_at: Math.round(stat.mtimeMs),
     scanned_at: Date.now(),
-    cover: findCover(dir, files),
+    cover: cover || null,
   });
 
   const albumId = getAlbumId.get(localKey).id;
@@ -323,10 +325,12 @@ async function ingestFolder({ dir, files }) {
 }
 
 // datos de un álbum ya en BD por su identidad, para el salto incremental.
-const scannedAtOf = db.prepare('SELECT id, scanned_at, path FROM albums WHERE local_key = ?');
+const scannedAtOf = db.prepare('SELECT id, scanned_at, path, cover FROM albums WHERE local_key = ?');
 // si la carpeta se saltó pero su ruta cambió (p. ej. tras cambiar el montaje a /data),
 // se actualiza la ruta sin re-ingerir: identidad intacta, ruta al día.
-const fixAlbumPath = db.prepare('UPDATE albums SET path = ? WHERE id = ?');
+// …y la carátula: una carpeta que no ha cambiado se salta, así que sin esto un disco cuya
+// imagen no se reconocía antes (no se llamaba «cover») se quedaría sin ella para siempre.
+const fixAlbumPath = db.prepare('UPDATE albums SET path = ?, cover = COALESCE(cover, ?) WHERE id = ?');
 
 // Recorre la biblioteca. `opts.roots` sobrescribe music_dirs; `opts.force` reescanea
 // TODO (ignora el salto incremental).
@@ -371,7 +375,7 @@ export async function runScan(opts = {}) {
         if (mtime && mtime <= existing.scanned_at) {
           // misma identidad y sin cambios: se salta. Pero si la ruta cambió (montaje
           // nuevo), se actualiza para que carátulas y rutas apunten al sitio real.
-          if (existing.path !== folder.dir) fixAlbumPath.run(folder.dir, existing.id);
+          if (existing.path !== folder.dir || (!existing.cover && folder.cover)) fixAlbumPath.run(folder.dir, folder.cover || null, existing.id);
           scanStatus.skipped++;
           return;
         }

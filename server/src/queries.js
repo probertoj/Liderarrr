@@ -806,6 +806,17 @@ export function qualityOverview() {
     SUM(CASE WHEN lossless=0 THEN 1 ELSE 0 END) AS lossy,
     COUNT(*) AS total FROM tracks`).get();
   const noReplaygain = db.prepare('SELECT COUNT(*) AS n FROM tracks WHERE has_replaygain = 0').get().n;
+  // Los mismos datos contados por ÁLBUM, que es lo que uno quiere saber («¿cuántos discos
+  // tengo con pérdida?») y no por pista. Basta una pista para que el álbum cuente.
+  const albumCounts = db.prepare(`SELECT
+    COUNT(DISTINCT CASE WHEN t.lossless = 1 THEN a.id END) AS lossless,
+    COUNT(DISTINCT CASE WHEN t.lossless = 0 THEN a.id END) AS lossy,
+    COUNT(DISTINCT CASE WHEN t.has_replaygain = 0 THEN a.id END) AS noReplaygain,
+    COUNT(CASE WHEN t.lossless = 1 THEN 1 END) AS losslessTracks,
+    COUNT(CASE WHEN t.lossless = 0 THEN 1 END) AS lossyTracks,
+    COUNT(CASE WHEN t.has_replaygain = 0 THEN 1 END) AS noReplaygainTracks
+    FROM albums a JOIN tracks t ON t.album_id = a.id
+    WHERE a.${DESCRIPTIVE}`).get();
   const noCover = db.prepare(`SELECT COUNT(*) AS n FROM albums WHERE ${DESCRIPTIVE} AND (cover IS NULL OR cover='')`).get().n;
   // álbumes con formatos mezclados dentro del mismo disco (FLAC + MP3)
   const mixed = db.prepare(`SELECT a.id, a.title, a.album_artist,
@@ -815,7 +826,7 @@ export function qualityOverview() {
     GROUP BY a.id HAVING COUNT(DISTINCT t.format) > 1 ORDER BY a.album_artist`).all();
   const heaviest = db.prepare(`SELECT id, title, album_artist, size_bytes FROM albums
     WHERE ${DESCRIPTIVE} ORDER BY size_bytes DESC LIMIT 20`).all();
-  return { byFormat, lossless, noReplaygain, noCover, mixed, heaviest };
+  return { byFormat, lossless, noReplaygain, noCover, mixed, heaviest, albumCounts };
 }
 
 // Duplicados: mismo artista+título en más de una carpeta.

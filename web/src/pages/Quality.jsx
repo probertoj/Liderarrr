@@ -5,6 +5,7 @@ import { api, fmtBytes } from '../api.js';
 import { PageTitle, Stat, Spinner, ErrorMsg, DuplicateGroupPanel } from '../components.jsx';
 import { aviso } from '../avisos.jsx';
 import { CaratulasPendientes, CarpetasPerdidas } from '../mantenimiento.jsx';
+import QualityLists from './QualityLists.jsx';
 
 export default function Quality() {
   const [ov, setOv] = useState(null);
@@ -36,21 +37,39 @@ export default function Quality() {
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!ov) return <Spinner />;
 
+  const miles = (n) => Number(n || 0).toLocaleString('es-ES');
+  const pistas = (n) => `${miles(n)} ${n === 1 ? 'pista' : 'pistas'}`;
+  // un servidor anterior a esta versión no manda albumCounts: se cae a los de pistas
+  const ac = ov.albumCounts || {
+    lossless: ov.lossless.lossless,
+    lossy: ov.lossless.lossy,
+    noReplaygain: ov.noReplaygain,
+    losslessTracks: ov.lossless.lossless,
+    lossyTracks: ov.lossless.lossy,
+    noReplaygainTracks: ov.noReplaygain,
+  };
+
   return (
     <div>
       <PageTitle icon={HardDrive} title="Calidad y disco" sub="Formatos, metadatos y duplicados" />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Stat label="Pistas sin pérdida" value={ov.lossless.lossless || 0} sub={`de ${ov.lossless.total}`} />
-        <Stat label="Con pérdida" value={ov.lossless.lossy || 0} />
-        <Stat label="Sin ReplayGain" value={ov.noReplaygain} sub="volumen sin normalizar" />
+        {/* contado por ÁLBUM (con las pistas debajo): «¿cuántos discos tengo con pérdida?» es
+            la pregunta, no cuántas pistas. Idea del fork de tinker-net. */}
+        <Stat label="Álbumes sin pérdida" value={miles(ac.lossless)} sub={pistas(ac.losslessTracks)} />
+        <Stat label="Álbumes con pérdida" value={miles(ac.lossy)} sub={pistas(ac.lossyTracks)} />
+        <Stat label="Álbumes sin ReplayGain" value={miles(ac.noReplaygain)} sub={pistas(ac.noReplaygainTracks)} />
         {/* no es «sin carátula»: es sin fichero de imagen en la carpeta. La mayoría la lleva
             incrustada en el audio y se ve igual. */}
-        <Stat label="Sin imagen en la carpeta" value={ov.noCover} sub="la carátula sale del audio o de fuera" />
+        <Stat label="Sin imagen en la carpeta" value={miles(ov.noCover)} sub="la carátula sale del audio o de fuera" />
       </div>
+      <p className="-mt-3 mb-6 text-xs text-neutral-500">
+        Basta una pista para que el álbum cuente: si mezcla audio con y sin pérdida, sale en los dos totales.
+      </p>
 
       <CarpetasPerdidas onChange={() => cargar((e) => aviso(e.message, 'error'))} />
       <CaratulasPendientes />
+      <QualityLists />
 
       {/* grid-cols-1 y min-w-0: sin ellos la columna única del móvil se ensanchaba hasta el
           título más largo de las listas de abajo (1.257 px en una pantalla de 375). */}

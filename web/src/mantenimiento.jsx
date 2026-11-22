@@ -160,7 +160,10 @@ export function CarpetasPerdidas({ onChange }) {
     setOcupado('todos');
     try {
       const r = await api.missingForgetAll();
-      aviso(`${r.quitados} fichas quitadas${r.vueltos ? ` · ${r.vueltos} carpetas habían vuelto y se quedan` : ''}.`, 'ok');
+      aviso(
+        `${r.quitados} fichas quitadas${r.vueltos ? ` · ${r.vueltos} carpetas habían vuelto y se quedan` : ''}${r.dudas ? ` · ${r.dudas} no se pudieron comprobar y se quedan` : ''}.`,
+        'ok'
+      );
     } catch (e) {
       aviso(e.message, 'error');
     } finally {
@@ -181,7 +184,7 @@ export function CarpetasPerdidas({ onChange }) {
             {miles(lista.length)} {lista.length === 1 ? 'disco apunta' : 'discos apuntan'} a una carpeta que ya no está
           </h2>
           <p className="text-xs text-neutral-500 mt-1">
-            Pasa cuando mueves o renombras una carpeta con otra herramienta: aparece un disco nuevo y el viejo se queda aquí, contando como
+            Pasa cuando mueves, renombras o vacías una carpeta con otra herramienta: aparece un disco nuevo y el viejo se queda aquí, contando como
             tuyo. No se quita nada por su cuenta, por si es un volumen que no ha montado.
           </p>
         </div>

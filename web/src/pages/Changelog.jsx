@@ -9,6 +9,17 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.9.0',
+    title: 'Tres cosas traídas del fork de tinker-net',
+    items: [
+      'Tres cosas traídas del fork de tinker-net (github.com/tinker-net/Liderarrr), portadas a mano y con sus tests. Gracias.',
+      '¿Qué álbumes son? Calidad y disco daba los totales y ahora da los nombres: qué álbumes están a 44,1 kHz, a 48 kHz o a otra frecuencia, cuáles tienen pistas sin ReplayGain y cuáles no tienen imagen en su carpeta. Con buscador y botón para copiar la lista.',
+      'Las tarjetas de Calidad cuentan álbumes, con las pistas debajo.',
+      'La carátula ya no tiene que llamarse «cover»: vale cualquier imagen de la carpeta. Se aplica sola en el próximo escaneo.',
+      'Carpetas que ya no están, más fino: un fallo de permisos o de red ya no cuenta como «desaparecido», se detecta la carpeta que se quedó sin audio, y al quitar una ficha la discografía pasa a la otra copia del disco si la hay.',
+    ],
+  },
+  {
     version: '1.8.2',
     title: 'Identificadores de MusicBrainz que no lo eran',
     items: [
