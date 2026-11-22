@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { PartyPopper, Download } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { api, coverUrl } from '../api.js';
-import { PageTitle, Spinner, StatCard, ArtistPhoto, QuickSearch } from '../components.jsx';
+import { PageTitle, Spinner, ErrorMsg, StatCard, ArtistPhoto, QuickSearch } from '../components.jsx';
 import { aviso } from '../avisos.jsx';
+import { useChartTheme } from '../charts.js';
 
 // «Resumen» tipo Wrapped: crea el resumen de un periodo (semana / mes / 3 meses / año /
 // un año concreto / todo) con un mosaico de las portadas de tus discos más escuchados.
@@ -25,12 +26,26 @@ export default function Wrapped() {
   const [genre, setGenre] = useState(''); // «tu año en shoegaze»
   const [genreOpts, setGenreOpts] = useState([]);
   const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  const [reintento, setReintento] = useState(0);
   const [imgBusy, setImgBusy] = useState(false);
+  const ch = useChartTheme();
 
   useEffect(() => {
     setData(null);
-    api.wrapped(sel.since, sel.until, genre || undefined).then(setData).catch(() => setData({ empty: true }));
-  }, [sel, genre]);
+    setErr(null);
+    // Guardia contra respuestas viejas («Todo el tiempo» tarda más que «Última semana»), y un
+    // fallo se enseña como fallo: antes cualquier error salía como «aún no hay escuchas
+    // importadas», en una pantalla sin selector de periodo de la que no se podía salir.
+    let vigente = true;
+    api
+      .wrapped(sel.since, sel.until, genre || undefined)
+      .then((d) => vigente && setData(d))
+      .catch((e) => vigente && setErr(e.message));
+    return () => {
+      vigente = false;
+    };
+  }, [sel, genre, reintento]);
 
   // los géneros canónicos para el selector (los mismos de la sección «Géneros»)
   useEffect(() => {
@@ -46,7 +61,9 @@ export default function Wrapped() {
       if (sel.since) p.set('since', String(sel.since));
       if (sel.until) p.set('until', String(sel.until));
       p.set('label', sel.label);
-      const svg = await (await fetch(`/api/listening/wrapped/image?${p}`)).text();
+      const res = await fetch(`/api/listening/wrapped/image?${p}`);
+      if (!res.ok) throw new Error(`el servidor respondió ${res.status}`);
+      const svg = await res.text();
       const img = new Image();
       await new Promise((res, rej) => {
         img.onload = res;
@@ -146,7 +163,14 @@ export default function Wrapped() {
         )}
       </div>
 
-      {!data ? (
+      {err ? (
+        <ErrorMsg>
+          No se pudo montar el resumen: {err}{' '}
+          <button onClick={() => setReintento((n) => n + 1)} className="underline">
+            Reintentar
+          </button>
+        </ErrorMsg>
+      ) : !data ? (
         <Spinner label="Montando tu resumen…" />
       ) : data.totals.scrobbles === 0 && data.addedCount === 0 ? (
         <div className="card p-8 text-center text-neutral-400">Nada registrado en «{sel.label}».</div>
@@ -166,7 +190,10 @@ export default function Wrapped() {
                 <h2 className="text-sm text-neutral-400">Tus discos más escuchados</h2>
                 <button
                   onClick={downloadImage}
-                  disabled={imgBusy}
+                  // La imagen del servidor no sabe de géneros: con uno elegido saldría un top
+                  // distinto del que ves aquí, así que no se ofrece.
+                  disabled={imgBusy || !!genre}
+                  title={genre ? 'La imagen solo se genera con «Todos los géneros»' : 'Descarga el mosaico como imagen'}
                   className="text-xs px-2.5 py-1.5 rounded-lg border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 inline-flex items-center gap-1.5 disabled:opacity-60"
                 >
                   <Download size={13} /> {imgBusy ? 'Generando…' : 'Descargar imagen'}
@@ -185,7 +212,7 @@ export default function Wrapped() {
               <h2 className="text-sm text-neutral-400 mb-3">Artistas más escuchados</h2>
               <div className="space-y-1.5">
                 {data.topArtists.map((a, i) => (
-                  <div key={a.artist} className="flex items-center gap-2.5 text-sm">
+                  <div key={`${a.artist}-${i}`} className="flex items-center gap-2.5 text-sm">
                     <span className={`shrink-0 w-5 text-right font-display ${i < 3 ? 'text-gold-400' : 'text-neutral-600'}`}>{i + 1}</span>
                     <ArtistPhoto id={a.artist_id} name={a.artist} size={30} />
                     <div className="min-w-0 flex-1 truncate">
@@ -209,9 +236,9 @@ export default function Wrapped() {
                 <h2 className="text-sm text-neutral-400 mb-3">Escuchas por mes</h2>
                 <ResponsiveContainer width="100%" height={230}>
                   <BarChart data={data.byMonth.map((m) => ({ ...m, m: fmtMonth(m.month) }))}>
-                    <XAxis dataKey="m" tick={{ fill: '#888', fontSize: 12 }} />
-                    <Tooltip contentStyle={{ background: '#191921', border: '1px solid #2c2c39', borderRadius: 8 }} />
-                    <Bar dataKey="plays" fill="#d4a24a" radius={[4, 4, 0, 0]} />
+                    <XAxis dataKey="m" tick={{ fill: ch.axis, fontSize: 12 }} />
+                    <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
+                    <Bar dataKey="plays" name="Escuchas" fill={ch.accent} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -271,7 +298,7 @@ function MosaicCell({ a, rank }) {
         <div className="text-[10px] text-white/70 truncate">{a.artist}</div>
       </div>
       {!a.owned && (
-        <span className="absolute bottom-1 left-1 text-[9px] px-1 py-px rounded bg-amber-600/90 text-amber-50 group-hover:opacity-0">
+        <span className="absolute bottom-1 left-1 text-[9px] px-1 py-px rounded bg-amber-700/90 text-amber-50 group-hover:opacity-0">
           no la tienes
         </span>
       )}

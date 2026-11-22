@@ -9,6 +9,20 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.8.0',
+    title: 'Repaso a fondo de la interfaz, y cuatro tareas de mantenimiento nuevas',
+    items: [
+      'La otra mitad del repaso: la interfaz. Las 25 páginas se recorrieron sobre una copia de una base real, en tema claro y en móvil, midiendo contraste y desbordes.',
+      'Nuevo: carátulas de antemano. Tres de cada cuatro discos no tienen imagen en su carpeta y la carátula se resolvía la primera vez que los abrías; ahora se van dejando listas cada noche, y en Calidad y disco puedes adelantar una tanda.',
+      'Nuevo: carpetas que ya no están. Si mueves o renombras una carpeta con otra herramienta, el disco viejo se quedaba contando como tuyo. Ahora aparece en Calidad y disco y lo quitas tú (solo la ficha, ningún fichero).',
+      'Nuevo: Artistas avisa cuando un nombre tiene dos fichas con los discos repartidos, y las funde con un clic. Y una descarga pedida que no llega en 14 días deja de bloquear que se vuelva a pedir.',
+      'El tema claro se lee: los textos de color estaban pensados para fondo oscuro y sobre blanco no llegaban a 3:1. De paso, el dorado de botones y pestañas activas no generaba ningún estilo; ahora sí.',
+      'En el móvil ya no se sale nada de la pantalla, y las listas largas cargan por tandas: Artistas pintaba 5.000 fichas de golpe y Sin identificar tardaba 6,5 segundos en dejarse tocar.',
+      'La app recuerda dónde estabas: la Discoteca vuelve a la misma altura, y Lanzamientos, Géneros, Sellos, Retos y Artistas guardan pestaña y filtros.',
+      'En los diálogos de borrar el foco empieza en «Cancelar» (antes Enter confirmaba), Ajustes guarda solo lo que cambias, y muchos botones que callaban al fallar ahora lo dicen.',
+    ],
+  },
+  {
     version: '1.7.4',
     title: 'Repaso a fondo: lo que podía estropear tus datos o cansar a los trackers',
     items: [

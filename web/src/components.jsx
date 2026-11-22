@@ -70,18 +70,42 @@ export function Spinner({ label }) {
   );
 }
 
+// Con las clases de los avisos y no con `card` + utilidades rojas: `.card` va después de
+// Tailwind y le pisaba el fondo y el borde, así que en el tema claro quedaba rosa pálido
+// sobre blanco (1,9:1). `.aviso-error` tiene su variante clara.
 export function ErrorMsg({ children }) {
-  return <div className="card p-4 text-red-300 border-red-900/60 bg-red-950/30">{children}</div>;
+  return (
+    <div className="aviso aviso-error p-4 text-sm" role="alert">
+      {children}
+    </div>
+  );
+}
+
+// Cierra con Escape lo que esté abierto (modales, menús). La pregunta de `confirmar()`
+// escucha en captura y corta la tecla, así que un Escape ahí no cierra también esto.
+export function useEscape(alCerrar, activo = true) {
+  const ref = useRef(alCerrar);
+  ref.current = alCerrar;
+  useEffect(() => {
+    if (!activo) return undefined;
+    const alPulsar = (e) => {
+      if (e.key === 'Escape') ref.current?.();
+    };
+    window.addEventListener('keydown', alPulsar);
+    return () => window.removeEventListener('keydown', alPulsar);
+  }, [activo]);
 }
 
 // El estado de emparejado, con color y sentido. orphan y bootleg son de primera clase.
 const STATE_META = {
-  matched: { label: 'identificado', cls: 'bg-emerald-900/50 text-emerald-300 border-emerald-800/60' },
-  pending: { label: 'pendiente', cls: 'bg-neutral-800 text-neutral-300 border-neutral-700' },
-  unmatched: { label: 'sin identificar', cls: 'bg-amber-900/40 text-amber-300 border-amber-800/60' },
+  // Las tres primeras y «descartado» usan las pastillas de index.css (con variante clara):
+  // con utilidades a pelo, «pendiente» era gris oscuro sobre gris oscuro en el tema claro.
+  matched: { label: 'identificado', cls: 'diag-ok' },
+  pending: { label: 'pendiente', cls: 'diag-muted' },
+  unmatched: { label: 'sin identificar', cls: 'diag-warn' },
   orphan: { label: 'rareza', cls: 'bg-violet-900/40 text-violet-300 border-violet-800/60' },
   bootleg: { label: 'bootleg', cls: 'bg-rose-900/40 text-rose-300 border-rose-800/60' },
-  dismissed: { label: 'descartado', cls: 'bg-neutral-900 text-neutral-500 border-neutral-800' },
+  dismissed: { label: 'descartado', cls: 'diag-muted' },
 };
 export function StateBadge({ state }) {
   const m = STATE_META[state] || STATE_META.pending;
@@ -252,7 +276,7 @@ export function AlbumCard({ album, onClick, selectable = false, selected = false
       ) : (
         <>
           {incomplete && (
-            <span className="absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/90 text-amber-50">
+            <span className="absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-700/90 text-amber-50">
               {album.track_file_count}/{album.track_count}
             </span>
           )}
@@ -283,7 +307,9 @@ export function AlbumCard({ album, onClick, selectable = false, selected = false
             </div>
           )}
           {/* «Añadir a reto» visible al pasar el ratón (además del clic derecho en la tarjeta) */}
-          <div className="absolute bottom-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Invisible también significa intocable: con solo opacity-0 el botón seguía ahí
+              y en el móvil un toque en la esquina de la carátula abría el menú de retos. */}
+          <div className="absolute bottom-1.5 right-1.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto transition-opacity">
             <AddToChallengeButton
               artist={album.album_artist}
               title={album.title}
@@ -622,19 +648,30 @@ export function WantButton({ artist, title, rg_mbid, year, releaseDate, cover, o
 export function ChallengeContextMenu({ x, y, artist, title, onClose, containing = [], onAdded }) {
   const [list, setList] = useState(null);
   const [msg, setMsg] = useState(null);
+  const [fallo, setFallo] = useState(false); // el mensaje es un error: no va en verde
   const [busy, setBusy] = useState(false);
   const inIds = new Set(containing.map((c) => c.id));
+  useEscape(onClose);
   useEffect(() => {
-    api.challenges().then(setList).catch(() => setList([]));
+    api
+      .challenges()
+      .then(setList)
+      .catch((e) => {
+        setFallo(true);
+        setMsg(`No se pudieron cargar tus retos: ${e.message}`);
+        setList([]);
+      });
   }, []);
   const add = async (ch) => {
     setBusy(true);
     try {
       const r = await api.addChallengeItems(ch.id, `${artist} - ${title}`);
+      setFallo(false);
       setMsg(r.added > 0 ? `Añadido a «${ch.name}»` : `Ya estaba en «${ch.name}»`);
       onAdded?.(); // recarga la pertenencia para que los botones se actualicen
       setTimeout(onClose, 1000);
     } catch (e) {
+      setFallo(true);
       setMsg(e.message);
     } finally {
       setBusy(false);
@@ -654,14 +691,21 @@ export function ChallengeContextMenu({ x, y, artist, title, onClose, containing 
           onClose();
         }}
       />
-      <div className="fixed z-50 w-56 card p-1 shadow-xl border border-ink-700 max-h-72 overflow-y-auto" style={{ left, top }}>
+      <div
+        className="fixed z-50 w-56 card p-1 shadow-xl border border-ink-700 max-h-72 overflow-y-auto"
+        style={{ left, top }}
+        role="menu"
+        aria-label={`Añadir «${title}» a un reto`}
+      >
         <div className="px-2.5 py-1.5 text-[11px] uppercase tracking-wide text-neutral-600 truncate">
           Añadir a reto · {title}
         </div>
         {list === null ? (
           <div className="px-2.5 py-2 text-sm text-neutral-500">Cargando…</div>
         ) : msg ? (
-          <div className="px-2.5 py-2 text-sm text-emerald-400">{msg}</div>
+          <div className={`px-2.5 py-2 text-sm ${fallo ? 'prueba-mal' : 'prueba-ok'}`} role={fallo ? 'alert' : 'status'}>
+            {msg}
+          </div>
         ) : list.length === 0 ? (
           <div className="px-2.5 py-2 text-sm text-neutral-500">
             No tienes retos.{' '}
@@ -747,15 +791,17 @@ export function StatCard({ label, value, sub }) {
 
 export function PageTitle({ icon: Icon, title, sub, children }) {
   return (
-    <div className="flex items-start justify-between gap-4 mb-5">
-      <div className="flex items-center gap-3">
-        {Icon && <Icon className="text-gold-400" size={22} />}
-        <div>
+    // flex-wrap: en el móvil los botones de la cabecera («Mover todos», «Refrescar») se
+    // salían por la derecha; ahora bajan a su propia línea.
+    <div className="flex items-start justify-between gap-x-4 gap-y-2 flex-wrap mb-5">
+      <div className="flex items-center gap-3 min-w-0">
+        {Icon && <Icon className="text-gold-400 shrink-0" size={22} />}
+        <div className="min-w-0">
           <h1 className="text-xl font-display">{title}</h1>
           {sub && <p className="text-sm text-neutral-500 mt-0.5">{sub}</p>}
         </div>
       </div>
-      {children && <div className="flex items-center gap-2">{children}</div>}
+      {children && <div className="flex items-center gap-2 flex-wrap">{children}</div>}
     </div>
   );
 }
@@ -778,7 +824,7 @@ export function ProgressBar({ pct, label }) {
   );
 }
 
-export function Button({ children, onClick, variant = 'default', disabled, className = '' }) {
+export function Button({ children, onClick, variant = 'default', disabled, className = '', ...resto }) {
   const base = 'text-sm px-3 py-1.5 rounded-lg border transition disabled:opacity-40 disabled:cursor-not-allowed';
   const styles = {
     default: 'border-ink-700 bg-ink-850 hover:bg-ink-800',
@@ -786,7 +832,9 @@ export function Button({ children, onClick, variant = 'default', disabled, class
     ghost: 'border-transparent hover:bg-ink-850',
   };
   return (
-    <button onClick={onClick} disabled={disabled} className={`${base} ${styles[variant]} ${className}`}>
+    // `resto` deja pasar title, aria-label, type…: antes se perdían y los botones de solo
+    // icono se quedaban sin nombre.
+    <button {...resto} onClick={onClick} disabled={disabled} className={`${base} ${styles[variant]} ${className}`}>
       {children}
     </button>
   );
@@ -856,7 +904,13 @@ export function SearchModal({ initialQuery, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Buscar y descargar"
+    >
       {/* ancho generoso a propósito: el nombre de la release ES la información que decide la
           descarga (edición, remaster, formato) y en 2xl no cabía ni la mitad. */}
       <div className="card p-4 w-full max-w-5xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -955,7 +1009,7 @@ export function DuplicateCopies({ copies, onChange, reason, pinned }) {
     setBusy(id ?? 'auto');
     try {
       await (clear ? api.preferCopyAuto(id) : api.preferCopy(id));
-      onChange?.();
+      onChange?.('mejor');
     } catch (e) {
       aviso(e.message, 'error');
     } finally {
@@ -1116,22 +1170,51 @@ export function DuplicateCopies({ copies, onChange, reason, pinned }) {
   );
 }
 
-export function DuplicateGroupPanel({ group, onClose }) {
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+// `onChanged` (opcional) se llama AL CERRAR si dentro se marcó, descartó o borró algo, para
+// que la página de debajo recargue su lista (la insignia ×N, los recuentos). El panel se
+// refresca solo: antes, «Marcar como la mejor» funcionaba pero la ★ no se movía de sitio.
+export function DuplicateGroupPanel({ group: inicial, onClose, onChanged }) {
+  const [group, setGroup] = useState(inicial);
+  const cambiado = useRef(false);
+  const cerrar = () => {
+    if (cambiado.current) onChanged?.();
+    onClose();
+  };
+  useEscape(cerrar);
+
+  const alCambiar = async (que) => {
+    cambiado.current = true;
+    // Descartar y borrar ya se ven en la propia lista (y conservan su «deshacer»); lo que
+    // hay que volver a pedir es quién es ahora la mejor copia.
+    if (que !== 'mejor') return;
+    for (const c of group.copies) {
+      try {
+        const g = await api.dupGroup(c.id);
+        if (g?.copies?.length) {
+          setGroup(g);
+          return;
+        }
+      } catch {
+        /* esa copia ya no existe: se prueba con la siguiente */
+      }
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60"
+      onClick={cerrar}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Copias de ${group.title}`}
+    >
       <div className="card p-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 mb-1">
           <h2 className="text-sm text-neutral-300 flex items-center gap-2">
             <Copy size={15} className="text-sky-400" /> {group.title}
             <span className="text-neutral-600">· {group.copies.length} copias</span>
           </h2>
-          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-200 shrink-0" aria-label="Cerrar">
+          <button onClick={cerrar} className="text-neutral-500 hover:text-neutral-200 shrink-0" aria-label="Cerrar">
             <X size={18} />
           </button>
         </div>
@@ -1142,7 +1225,7 @@ export function DuplicateGroupPanel({ group, onClose }) {
           <b className="font-normal text-red-400/90">elimina los ficheros del disco</b>: es irreversible, no va a la Papelera
           y, si esa copia está seedeando, puede romper el torrent.
         </p>
-        <DuplicateCopies copies={group.copies} reason={group.bestReason} pinned={group.pinned} />
+        <DuplicateCopies copies={group.copies} reason={group.bestReason} pinned={group.pinned} onChange={alCambiar} />
       </div>
     </div>
   );
@@ -1218,19 +1301,30 @@ export function QuickSearch() {
       setExt(null);
       return;
     }
-    const t1 = setTimeout(() => api.findLocal(term).then(setLocal).catch(() => {}), 180);
+    // `vigente` se apaga al cambiar el texto: una respuesta que ya iba de camino (la de «ra»
+    // llegando después de la de «radiohead») no pinta nada ni apaga el «buscando» de la buena.
+    let vigente = true;
+    const t1 = setTimeout(
+      () =>
+        api
+          .findLocal(term)
+          .then((r) => vigente && setLocal(r))
+          .catch(() => {}),
+      180
+    );
     setExtLoading(true);
     setExt(null);
     const t2 = setTimeout(
       () =>
         api
           .findExternal(term)
-          .then(setExt)
-          .catch(() => setExt(null))
-          .finally(() => setExtLoading(false)),
+          .then((r) => vigente && setExt(r))
+          .catch(() => vigente && setExt(null))
+          .finally(() => vigente && setExtLoading(false)),
       550
     );
     return () => {
+      vigente = false;
       clearTimeout(t1);
       clearTimeout(t2);
     };
@@ -1277,6 +1371,7 @@ export function QuickSearch() {
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && setQ('')}
           placeholder="Buscar un disco o un artista… (los tuyos y los que aún no tienes)"
+          aria-label="Buscar un disco o un artista"
           className="flex-1 bg-transparent py-2.5 outline-none text-sm"
         />
         {q && (

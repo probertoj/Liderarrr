@@ -28,15 +28,28 @@ export default function HowItWorks() {
   // La hora del refresco se configura en Ajustes, así que se lee: antes aquí ponía «03:00»
   // a pelo y mentía en cuanto alguien la cambiaba.
   const [hora, setHora] = useState(3);
+  // Lo mismo con los dos intervalos: «cada 3 minutos» y «cada hora» son los valores de
+  // fábrica, pero se cambian en Ajustes.
+  const [cadaImport, setCadaImport] = useState(3);
+  const [cadaQuiero, setCadaQuiero] = useState(60);
   useEffect(() => {
     api
       .settings()
       .then((s) => {
         const n = Number(s?.nightly_hour);
         if (Number.isFinite(n) && n >= 0 && n <= 23) setHora(Math.round(n));
+        // mismos mínimos y valores por defecto que aplica el servidor
+        setCadaImport(Math.max(1, Number(s?.auto_import_interval_min) || 3));
+        setCadaQuiero(Math.max(10, Number(s?.wanted_watch_interval_min) || 60));
       })
       .catch(() => {});
   }, []);
+  const cada = (min) => {
+    if (min === 1) return 'Cada minuto';
+    if (min === 60) return 'Cada hora';
+    if (min > 60 && min % 60 === 0) return `Cada ${min / 60} horas`;
+    return `Cada ${min} minutos`;
+  };
   return (
     <div>
       <PageTitle title="¿Cómo funciona todo esto?" sub="El recorrido de Liderarr, en cristiano" />
@@ -48,7 +61,7 @@ export default function HowItWorks() {
       </p>
 
       <h2 className="text-xs uppercase tracking-wide text-neutral-500 mb-2">Los pasos</h2>
-      <div className="grid md:grid-cols-2 gap-2 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-8">
         <Step n="1" Icon={HardDrive} title="Escaneo (Coleccionista de discos)">
           Recorre tus carpetas de música. Una carpeta = un álbum. Lee las etiquetas y vuelca artistas, discos y
           pistas. No consulta nada externo: aquí solo cuentan tus ficheros.
@@ -100,7 +113,7 @@ export default function HowItWorks() {
             <Clock size={16} />
           </div>
           <div>
-            <div className="text-sm text-neutral-200 mb-0.5">Cada 3 minutos · auto-import</div>
+            <div className="text-sm text-neutral-200 mb-0.5">{cada(cadaImport)} · auto-import</div>
             <div className="text-xs text-neutral-500 leading-relaxed">
               Revisa qBittorrent, enlaza lo que haya terminado a tu biblioteca, reescanea esas carpetas nuevas y
               hace una <strong className="text-neutral-400">identificación ligera</strong> de lo recién importado.
@@ -113,7 +126,7 @@ export default function HowItWorks() {
             <Heart size={16} />
           </div>
           <div>
-            <div className="text-sm text-neutral-200 mb-0.5">Cada hora · vigilancia de «Lo quiero»</div>
+            <div className="text-sm text-neutral-200 mb-0.5">{cada(cadaQuiero)} · vigilancia de «Lo quiero»</div>
             <div className="text-xs text-neutral-500 leading-relaxed">
               Busca en tus indexers los discos de tu lista de deseos cuya ventana ya está abierta (por defecto, desde 16 h
               antes del estreno) y agarra la mejor release en cuanto aparece. Reintenta con más calma según pasan los días,

@@ -662,6 +662,8 @@ ensureColumn('albums', 'disc_count', 'disc_count INTEGER DEFAULT 1');
 // multidiscos: marca qué álbumes son DISCOS de una misma caja, para que las vistas
 // los cuenten como un solo álbum (lo rellena discgroup.js; nullable = álbum normal).
 ensureColumn('albums', 'disc_group', 'disc_group TEXT');
+// desde cuándo la carpeta del disco no está en su sitio (missing.js); NULL = está
+ensureColumn('albums', 'missing_since', 'missing_since INTEGER');
 db.exec('CREATE INDEX IF NOT EXISTS idx_albums_discgroup ON albums(disc_group)');
 // fecha de alta en Lidarr, para «últimas peticiones» del dashboard
 ensureColumn('lidarr_albums', 'added', 'added TEXT');

@@ -18,6 +18,8 @@ import {
   SECRET_SETTING_KEYS,
   esAjusteInterno,
 } from './db.js';
+import { discosDesaparecidos, olvidarDisco, olvidarTodos, marcarDesaparecidos } from './missing.js';
+import { warmCovers, coverWarmStatus, coversPendientes } from './covers.js';
 import { runScan, scanStatus, purgeJunkFromDb } from './scanner.js';
 import { purgeVariousArtists } from './various.js';
 import { regroupDiscs, combineAlbums, uncombineAlbum, combineCandidates, boxInfo, identifyBox } from './discgroup.js';
@@ -366,6 +368,15 @@ app.get('/api/artists/:id', async (req, reply) => {
 });
 app.post('/api/artists/:id/scope', async (req) => q.setArtistScope(Number(req.params.id), req.body?.scope));
 app.get('/api/artists/names', async () => q.artistNames());
+// fichas de artista con el mismo nombre, y fundir una en otra
+app.get('/api/artists/duplicates', async () => q.duplicateArtists());
+app.post('/api/artists/merge', async (req, reply) => {
+  try {
+    return q.mergeArtists(Number(req.body?.from), Number(req.body?.into), { confirm: req.body?.confirm === true });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 app.put('/api/albums/:id/artist', async (req, reply) => {
   try {
     return q.setAlbumArtist(Number(req.params.id), req.body?.name);
@@ -1032,6 +1043,23 @@ app.post('/api/albums/:id/state', async (req, reply) => {
 });
 // papelera: listar descartados y restaurar uno (deshacer un "Descartar")
 app.get('/api/dismissed', async () => q.dismissedAlbums());
+// discos cuya carpeta ya no está: listarlos, volver a mirar y quitarlos de la app (solo filas)
+app.get('/api/missing', async () => discosDesaparecidos());
+app.post('/api/missing/check', async () => marcarDesaparecidos());
+app.post('/api/missing/forget-all', async (req, reply) => {
+  try {
+    return olvidarTodos({ confirm: req.body?.confirm === true });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/missing/:id/forget', async (req, reply) => {
+  try {
+    return olvidarDisco(Number(req.params.id), { confirm: req.body?.confirm === true });
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 app.post('/api/albums/:id/restore', async (req, reply) => {
   try {
     return restoreAlbum(Number(req.params.id));
@@ -1379,6 +1407,17 @@ app.get('/api/cover/:id', async (req, reply) => {
 
 // vuelve a intentar las carátulas que no se encontraron (útil tras identificar)
 app.post('/api/covers/retry-missing', async () => ({ retried: retryMissingCovers() }));
+// dejar listas de antemano las carátulas que faltan (por tandas, en segundo plano)
+app.get('/api/covers/warm', async () => ({ ...coverWarmStatus, pendientes: coverWarmStatus.running ? null : coversPendientes().length }));
+app.post('/api/covers/warm', async (req) => {
+  const limit = Math.min(Math.max(Number(req.body?.limit) || 500, 1), 5000);
+  warmCovers({ limit }).catch((e) => console.error('caratulas', e));
+  return { started: true, limit };
+});
+app.post('/api/covers/warm/cancel', async () => {
+  coverWarmStatus.cancel = true;
+  return { ok: true };
+});
 
 // --- fotos de artista (Deezer + manual), en paralelo a las carátulas -----------
 app.get('/api/artist/:id/photo', async (req, reply) => {

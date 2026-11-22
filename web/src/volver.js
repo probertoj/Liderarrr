@@ -8,7 +8,10 @@
 // La lista se apunta sola desde App.jsx en cada cambio de ruta: las páginas no se tocan.
 
 const LISTAS = [
+  [/^\/$/, 'Dashboard'],
   [/^\/discoteca$/, 'Discoteca'],
+  [/^\/artistas$/, 'Artistas'],
+  [/^\/resumen$/, 'Resumen'],
   [/^\/proximos$/, 'Lanzamientos'],
   [/^\/huecos$/, 'Huecos'],
   [/^\/incompletos$/, 'Álbumes incompletos'],
@@ -29,31 +32,83 @@ const LISTAS = [
   [/^\/generos$/, 'Géneros'],
 ];
 
+// La ficha de un artista y la de un género son a la vez destino («← Artista» desde un disco)
+// y fichas con su propio enlace de volver. Para ese segundo papel no valen ellas mismas: se
+// guarda aparte la última lista que NO es una ficha.
+const FICHAS = [/^\/artista\//, /^\/generos\/./];
+
 const CLAVE = 'volver_a';
+const CLAVE_LISTA = 'volver_a_lista';
 const POR_DEFECTO = { to: '/discoteca', label: 'Discoteca' };
+
+function guardar(clave, dato) {
+  try {
+    // sessionStorage y no localStorage: es por pestaña y muere con ella, que es justo lo que
+    // significa «de dónde vengo». Y sobrevive al recargar la ficha, que el módulo no.
+    sessionStorage.setItem(clave, JSON.stringify(dato));
+  } catch {
+    /* navegación privada o almacenamiento bloqueado: se usará el valor por defecto */
+  }
+}
+
+function leer(clave, porDefecto) {
+  try {
+    const crudo = sessionStorage.getItem(clave);
+    if (!crudo) return porDefecto;
+    const d = JSON.parse(crudo);
+    return d && typeof d.to === 'string' && typeof d.label === 'string' ? d : porDefecto;
+  } catch {
+    return porDefecto;
+  }
+}
 
 /** Llamado en cada cambio de ruta. Si es una lista, se recuerda CON sus filtros. */
 export function recordarLista(pathname, search) {
   const encontrada = LISTAS.find(([re]) => re.test(pathname));
   if (!encontrada) return;
   const dato = { to: pathname + (search || ''), label: encontrada[1] };
-  try {
-    // sessionStorage y no localStorage: es por pestaña y muere con ella, que es justo lo que
-    // significa «de dónde vengo». Y sobrevive al recargar la ficha, que el módulo no.
-    sessionStorage.setItem(CLAVE, JSON.stringify(dato));
-  } catch {
-    /* navegación privada o almacenamiento bloqueado: se usará el valor por defecto */
-  }
+  guardar(CLAVE, dato);
+  if (!FICHAS.some((re) => re.test(pathname))) guardar(CLAVE_LISTA, dato);
 }
 
-/** A dónde debe llevar el enlace de volver, y cómo se llama ese sitio. */
-export function deDondeVienes() {
-  try {
-    const crudo = sessionStorage.getItem(CLAVE);
-    if (!crudo) return POR_DEFECTO;
-    const d = JSON.parse(crudo);
-    return d && typeof d.to === 'string' && typeof d.label === 'string' ? d : POR_DEFECTO;
-  } catch {
-    return POR_DEFECTO;
+// --- por dónde ibas -----------------------------------------------------------
+// Las listas largas (la Discoteca pagina de 500 en 500) se remontan al volver de una ficha:
+// sin esto regresabas a los primeros 500 y arriba del todo, aunque estuvieras en el disco
+// 1.200. Se guarda en memoria, no en sessionStorage: son miles de discos y solo sirve
+// mientras dure la pestaña.
+const posiciones = new Map(); // clave → { dato, y, cuando }
+const CADUCA_MS = 15 * 60 * 1000;
+
+export function guardarPosicion(clave, dato, y) {
+  posiciones.delete(clave); // para que quede la última en el orden de inserción
+  posiciones.set(clave, { dato, y, cuando: Date.now() });
+  while (posiciones.size > 4) posiciones.delete(posiciones.keys().next().value);
+}
+
+export function posicionGuardada(clave) {
+  const p = posiciones.get(clave);
+  if (!p) return null;
+  if (Date.now() - p.cuando > CADUCA_MS) {
+    posiciones.delete(clave);
+    return null;
   }
+  return p;
+}
+
+/** Tras borrar, descartar o reclasificar un disco: lo guardado ya no es verdad. */
+export function olvidarPosiciones() {
+  posiciones.clear();
+}
+
+/** A dónde debe llevar el enlace de volver de un DISCO, y cómo se llama ese sitio. */
+export function deDondeVienes() {
+  return leer(CLAVE, POR_DEFECTO);
+}
+
+/**
+ * Lo mismo para las fichas de artista y de género: la última lista de verdad por la que
+ * pasaste (nunca otra ficha). `porDefecto` es a dónde ir si se llegó por un enlace directo.
+ */
+export function listaDeOrigen(porDefecto = POR_DEFECTO) {
+  return leer(CLAVE_LISTA, porDefecto);
 }

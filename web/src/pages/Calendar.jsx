@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarClock, Plus, Check, Loader2, ExternalLink, Search, Star, Tag, X, RefreshCw, Radio, Heart, ChevronDown, ChevronRight } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, SearchModal, QuickSearch, AddToChallengeButton, WantButton, useLidarrEnabled } from '../components.jsx';
@@ -14,6 +14,8 @@ import { aviso } from '../avisos.jsx';
 
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 const thisYearStart = () => `${new Date().getFullYear()}-01-01`;
+// Las pestañas que existen: lo que venga en ?v= y no esté aquí se ignora.
+const VISTAS = ['mes', 'upcoming', 'recent', 'novedades', 'canciones', 'descubre', 'labels', 'radar', 'quiero'];
 
 function ReleaseRow({ r, added, busy, followed, onAdd, onFollow, onSearch, lidarrOn }) {
   const done = added[r.rg_mbid] || r.in_lidarr;
@@ -258,6 +260,8 @@ function LabelManager({ labels, onChange }) {
     try {
       await api.unfollowLabel(mbid);
       await onChange();
+    } catch (e) {
+      aviso(`No se pudo dejar de seguir el sello: ${e.message}`, 'error');
     } finally {
       setBusy(null);
     }
@@ -340,10 +344,16 @@ function LabelManager({ labels, onChange }) {
               <Tag size={11} className="text-gold-400/70" />
               {l.name || l.label_mbid}
               <span className="text-neutral-600">{l.too_big ? '(demasiado grande)' : `· ${l.catalog}`}</span>
-              <button onClick={() => refresh(l.label_mbid)} disabled={busy === l.label_mbid} className="hover:text-gold-400 disabled:opacity-50" title="Actualizar catálogo">
+              <button onClick={() => refresh(l.label_mbid)} disabled={busy === l.label_mbid} aria-label={`Actualizar el catálogo de ${l.name || 'este sello'}`} className="p-1 -m-1 hover:text-gold-400 disabled:opacity-50" title="Actualizar catálogo">
                 {busy === l.label_mbid ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
               </button>
-              <button onClick={() => unfollow(l.label_mbid)} className="hover:text-red-400" title="Dejar de seguir">
+              <button
+                onClick={() => unfollow(l.label_mbid)}
+                disabled={busy === l.label_mbid}
+                className="p-1 -m-1 hover:text-red-400 disabled:opacity-50"
+                title="Dejar de seguir"
+                aria-label={`Dejar de seguir ${l.name || 'este sello'}`}
+              >
                 <X size={11} />
               </button>
             </span>
@@ -368,6 +378,7 @@ const TIER_STYLE = {
 function RadarRow({ r, onSearch, onFollowMbid, onQueue, lidarrOn }) {
   const [state, setState] = useState('idle'); // idle | resolving | added | notfound
   const [dismissed, setDismissed] = useState(false);
+  const [siguiendo, setSiguiendo] = useState(false); // acabas de seguir al artista desde aquí
   if (dismissed) return null;
 
   // Con Lidarr → resuelve el MBID y se lo manda. Sin Lidarr → descarga nativa por
@@ -405,6 +416,8 @@ function RadarRow({ r, onSearch, onFollowMbid, onQueue, lidarrOn }) {
         return;
       }
       await onFollowMbid(res.artist_mbid);
+      // Antes el botón volvía a «Seguir» como si no hubiera pasado nada, e invitaba a repetir.
+      setSiguiendo(true);
       setState('idle');
     } catch (e) {
       aviso(e.message, 'error');
@@ -413,7 +426,11 @@ function RadarRow({ r, onSearch, onFollowMbid, onQueue, lidarrOn }) {
   };
   const dismiss = async () => {
     setDismissed(true);
-    api.radarDismiss(r.id).catch(() => {});
+    api.radarDismiss(r.id).catch((e) => {
+      // no se descartó: la fila vuelve, en vez de reaparecer por sorpresa al recargar
+      setDismissed(false);
+      aviso(`No se pudo descartar «${r.title}»: ${e.message}`, 'error');
+    });
   };
 
   return (
@@ -461,15 +478,20 @@ function RadarRow({ r, onSearch, onFollowMbid, onQueue, lidarrOn }) {
         </div>
       </div>
       <div className="release-actions">
-        {!r.tracked_artist && (
-          <button
-            onClick={followArtist}
-            disabled={state === 'resolving'}
-            className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1 disabled:opacity-50"
-          >
-            <Star size={12} /> Seguir
-          </button>
-        )}
+        {!r.tracked_artist &&
+          (siguiendo ? (
+            <span className="text-xs px-1.5 py-0.5 inline-flex items-center gap-1 prueba-ok">
+              <Check size={12} /> Siguiendo
+            </span>
+          ) : (
+            <button
+              onClick={followArtist}
+              disabled={state === 'resolving'}
+              className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1 disabled:opacity-50"
+            >
+              <Star size={12} /> Seguir
+            </button>
+          ))}
         <button
           onClick={() => onSearch(`${r.artist} ${r.title}`)}
           className="text-xs px-1.5 py-0.5 rounded border border-ink-700 bg-ink-850 hover:bg-ink-800 inline-flex items-center gap-1"
@@ -601,6 +623,8 @@ function CuratorManager({ curators, onChange }) {
     try {
       await api.unfollowCurator(id);
       await onChange();
+    } catch (e) {
+      aviso(`No se pudo quitar el curador: ${e.message}`, 'error');
     } finally {
       setBusy(false);
     }
@@ -749,10 +773,22 @@ function CuratorManager({ curators, onChange }) {
                 {c.name || c.username}
               </a>
               <span className="text-neutral-600">· {c.items}</span>
-              <button onClick={() => refresh(c.id)} disabled={busy} className="hover:text-gold-400 disabled:opacity-50" title="Actualizar">
+              <button
+                onClick={() => refresh(c.id)}
+                disabled={busy}
+                className="p-1 -m-1 hover:text-gold-400 disabled:opacity-50"
+                title="Actualizar"
+                aria-label={`Actualizar ${c.name || c.username}`}
+              >
                 <RefreshCw size={11} />
               </button>
-              <button onClick={() => remove(c.id)} className="hover:text-red-400" title="Dejar de seguir">
+              <button
+                onClick={() => remove(c.id)}
+                disabled={busy}
+                className="p-1 -m-1 hover:text-red-400 disabled:opacity-50"
+                title="Dejar de seguir"
+                aria-label={`Dejar de seguir a ${c.name || c.username}`}
+              >
                 <X size={11} />
               </button>
             </span>
@@ -935,11 +971,46 @@ function WantedPanel({ onSearch }) {
 export default function Calendar() {
   // Arranca en «Mes»: es la vista panorámica (todas las fuentes en un calendario), no una
   // lista más. Las demás pestañas son cortes concretos de lo mismo.
-  const [view, setView] = useState('mes'); // mes | upcoming | recent | novedades | canciones | descubre | labels | radar | quiero
+  // La pestaña, la ventana y «todos los artistas» viven en la URL (?v=recent&since=…&all=1):
+  // así «← Lanzamientos» desde una ficha y el atrás del navegador vuelven a la MISMA pestaña,
+  // no a «Mes».
+  const [sp, setSp] = useSearchParams();
+  const deUrl = (p) => ({
+    view: VISTAS.includes(p.get('v')) ? p.get('v') : 'mes',
+    all: p.get('all') === '1',
+    since: /^\d{4}-\d{2}-\d{2}$/.test(p.get('since') || '') ? p.get('since') : thisYearStart(),
+  });
+  const [view, setView] = useState(() => deUrl(sp).view); // mes | upcoming | recent | novedades | canciones | descubre | labels | radar | quiero
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
-  const [all, setAll] = useState(false);
-  const [since, setSince] = useState(thisYearStart());
+  const [all, setAll] = useState(() => deUrl(sp).all);
+  const [since, setSince] = useState(() => deUrl(sp).since);
+  // La pestaña que hay AHORA en pantalla, para los sondeos que siguen vivos en segundo plano.
+  const vistaRef = useRef(view);
+  vistaRef.current = view;
+  const propia = useRef(false); // el próximo cambio de URL lo he hecho yo
+  useEffect(() => {
+    const next = {};
+    if (view !== 'mes') next.v = view;
+    if (all) next.all = '1';
+    if (since !== thisYearStart()) next.since = since;
+    if (new URLSearchParams(next).toString() === sp.toString()) return;
+    propia.current = true;
+    setSp(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, all, since]);
+  useEffect(() => {
+    if (propia.current) {
+      propia.current = false;
+      return;
+    }
+    // la URL cambió desde fuera (el enlace del menú, atrás/adelante): la pantalla la sigue
+    const u = deUrl(sp);
+    setView(u.view);
+    setAll(u.all);
+    setSince(u.since);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sp]);
   const [added, setAdded] = useState({});
   const [followed, setFollowed] = useState({});
   const [busy, setBusy] = useState(null);
@@ -976,7 +1047,11 @@ export default function Calendar() {
   useEffect(() => {
     setRows(null);
     setErr(null);
-    if (view === 'mes' || view === 'quiero') return; // cargan sus propias fuentes (MonthCalendar / WantedPanel)
+    if (view === 'mes' || view === 'quiero') return undefined; // cargan sus propias fuentes (MonthCalendar / WantedPanel)
+    // Todas las pestañas comparten `rows`. Sin esta guardia, una respuesta lenta («todos los
+    // artistas», Descubre) llegaba después de cambiar de pestaña y pintaba sus filas en la
+    // que estabas mirando.
+    let vigente = true;
     const load =
       view === 'recent'
         ? api.recentReleases(since, all)
@@ -991,9 +1066,12 @@ export default function Calendar() {
                 : view === 'descubre'
                   ? api.globalReleases(discoverDays, discoverAll, true)
                   : api.upcoming(all);
-    load.then(setRows).catch((e) => setErr(e.message));
+    load.then((r) => vigente && setRows(r)).catch((e) => vigente && setErr(e.message));
     if (view === 'labels') loadLabels();
     if (view === 'radar') loadCurators();
+    return () => {
+      vigente = false;
+    };
   }, [view, all, since, songDays, discoverDays, discoverAll]);
 
   const lidarrOn = useLidarrEnabled();
@@ -1047,13 +1125,16 @@ export default function Calendar() {
       setBusy(null);
     }
   };
+  // Se quita de la lista al momento; si el servidor no lo descartó se dice, porque si no la
+  // fila reaparecía sin explicación en la siguiente carga.
+  const noDescartado = (r) => (e) => aviso(`No se pudo descartar «${r.title}»: ${e.message}. Volverá a salir al recargar.`, 'error');
   const dismissExternal = async (r) => {
     setRows((p) => (p || []).filter((x) => x.id !== r.id));
-    api.dismissNewRelease(r.id).catch(() => {});
+    api.dismissNewRelease(r.id).catch(noDescartado(r));
   };
   const dismissGlobal = async (r) => {
     setRows((p) => (p || []).filter((x) => x.id !== r.id));
-    api.dismissGlobalRelease(r.id).catch(() => {});
+    api.dismissGlobalRelease(r.id).catch(noDescartado(r));
   };
   // Radar de descubrimiento: barre los similares en Deezer (decenas de artistas). En segundo
   // plano, con progreso, recargando la lista según avanza (no bloquea la UI).
@@ -1080,10 +1161,14 @@ export default function Calendar() {
         return;
       }
       if (st.total) setDiscMsg(`Buscando… ${st.done}/${st.total} artistas afines · ${st.added} novedades`);
-      try {
-        setRows(await api.globalReleases(discoverDays, discoverAll, true));
-      } catch {
-        /* recarga best-effort */
+      // El barrido sigue aunque cambies de pestaña, pero sus filas solo se pintan en la suya.
+      if (vistaRef.current === 'descubre') {
+        try {
+          const nuevas = await api.globalReleases(discoverDays, discoverAll, true);
+          if (vistaRef.current === 'descubre') setRows(nuevas);
+        } catch {
+          /* recarga best-effort */
+        }
       }
       if (!st.running) {
         clearInterval(discPoll.current);
@@ -1176,9 +1261,14 @@ export default function Calendar() {
   const [novMsg, setNovMsg] = useState(null);
   const novPoll = useRef(null);
   useEffect(() => () => clearInterval(novPoll.current), []); // limpia el sondeo al desmontar
+  // Lee la pestaña de AHORA (no la de cuando se pulsó el botón): el sondeo dura minutos y
+  // antes seguía metiendo discos de Deezer en «Próximos» o donde estuvieras.
   const reloadNovRows = async () => {
+    const donde = vistaRef.current;
+    if (donde !== 'canciones' && donde !== 'novedades') return;
     try {
-      setRows(await (view === 'canciones' ? api.newSongs(songDays, true) : api.newReleases(true)));
+      const nuevas = await (donde === 'canciones' ? api.newSongs(songDays, true) : api.newReleases(true));
+      if (vistaRef.current === donde) setRows(nuevas);
     } catch {
       /* recarga best-effort mientras barre */
     }

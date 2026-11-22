@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Stethoscope, Copy, Check, RefreshCw } from 'lucide-react';
 import { api, fmtBytes } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button, StatCard } from '../components.jsx';
+import { aviso } from '../avisos.jsx';
 
 // Diagnóstico: todo lo que antes había que leer por `docker logs`, en la interfaz.
 // El botón «Copiar» da un bloque de texto para pegar de una.
@@ -12,14 +13,29 @@ export default function Diagnostics() {
   const [showText, setShowText] = useState(false);
   const timer = useRef(null);
 
-  const load = () => api.diag().then(setD).catch((e) => setErr(e.message));
+  // «Refrescar» a mano: si falla se avisa, sin cambiar por un cuadro rojo lo que ya se veía.
+  const load = () =>
+    api
+      .diag()
+      .then((x) => {
+        setD(x);
+        setErr(null);
+      })
+      .catch((e) => aviso(e.message, 'error'));
   useEffect(() => {
     let alive = true;
     // sondeo adaptativo: rápido solo mientras hay escaneo en marcha; lento en
     // reposo, para no machacar el servidor con la consulta (pesada sobre 200k pistas)
     const tick = async () => {
-      const x = await api.diag().catch(() => null);
+      let fallo = null;
+      const x = await api.diag().catch((e) => {
+        fallo = e.message;
+        return null;
+      });
       if (!alive) return;
+      // Si la primera lectura falla no hay nada que enseñar: se dice por qué (antes se
+      // quedaba «Recopilando diagnóstico…» sin más) y se sigue reintentando.
+      setErr(x ? null : fallo);
       if (x) setD(x);
       const busy = x?.scan?.running || x?.identify?.running;
       timer.current = setTimeout(tick, busy ? 3000 : 20000);
@@ -31,7 +47,7 @@ export default function Diagnostics() {
     };
   }, []);
 
-  if (err) return <ErrorMsg>{err}</ErrorMsg>;
+  if (!d && err) return <ErrorMsg>{err} · Se vuelve a intentar solo cada 20 segundos.</ErrorMsg>;
   if (!d) return <Spinner label="Recopilando diagnóstico…" />;
 
   const ok = () => {
@@ -56,7 +72,10 @@ export default function Diagnostics() {
 
   return (
     <div>
-      <PageTitle icon={Stethoscope} title="Diagnóstico" sub={`Liderarrr v${d.version} · en marcha ${fmtUptime(d.uptimeSec)}`}>
+      <PageTitle icon={Stethoscope} title="Diagnóstico" sub={`Liderarrr v${d.version} · en marcha ${fmtUptime(d.uptimeSec)}`} />
+      {/* Los botones van en su propia fila, que envuelve: junto al título no cabían en un
+          móvil y empujaban la página hasta 399 px de ancho en una pantalla de 375. */}
+      <div className="flex flex-wrap gap-2 mb-5 -mt-2">
         <Button onClick={load}>
           <span className="inline-flex items-center gap-1.5">
             <RefreshCw size={14} /> Refrescar
@@ -67,7 +86,7 @@ export default function Diagnostics() {
             {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copiado' : 'Copiar diagnóstico'}
           </span>
         </Button>
-      </PageTitle>
+      </div>
 
       {showText && (
         <div className="card p-3 mb-4">
@@ -79,6 +98,7 @@ export default function Diagnostics() {
             onFocus={(e) => e.target.select()}
             value={asText(d)}
             rows={8}
+            aria-label="Diagnóstico en texto, para copiar"
             className="w-full bg-ink-950 border border-ink-800 rounded-lg p-2 text-[11px] font-mono text-neutral-300"
           />
         </div>
@@ -160,8 +180,8 @@ export default function Diagnostics() {
         </div>
       )}
 
-      <div className="grid md:grid-cols-3 gap-4 mb-4">
-        <div className="card p-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="card p-4 min-w-0">
           <h2 className="text-sm text-neutral-400 mb-2">Álbumes por estado</h2>
           {Object.entries(d.states).map(([k, v]) => (
             <div key={k} className="flex justify-between text-sm py-0.5">
@@ -170,7 +190,7 @@ export default function Diagnostics() {
             </div>
           ))}
         </div>
-        <div className="card p-4">
+        <div className="card p-4 min-w-0">
           <h2 className="text-sm text-neutral-400 mb-2">Formatos</h2>
           <div className="max-h-40 overflow-y-auto">
             {d.formats.map((f) => (
@@ -181,14 +201,14 @@ export default function Diagnostics() {
             ))}
           </div>
         </div>
-        <div className="card p-4">
+        <div className="card p-4 min-w-0">
           <h2 className="text-sm text-neutral-400 mb-2">Integraciones</h2>
           {Object.entries(d.settings)
             .filter(([k]) => k !== 'music_dirs')
             .map(([k, v]) => (
-              <div key={k} className="flex justify-between text-sm py-0.5">
-                <span className="text-neutral-300">{k}</span>
-                <span className={v ? 'text-emerald-400' : 'text-neutral-600'}>{v ? '✓' : '—'}</span>
+              <div key={k} className="flex justify-between gap-2 text-sm py-0.5">
+                <span className="text-neutral-300 truncate min-w-0">{k}</span>
+                <span className={v ? 'text-emerald-400 shrink-0' : 'text-neutral-600 shrink-0'} aria-label={v ? 'configurado' : 'sin configurar'}>{v ? '✓' : '—'}</span>
               </div>
             ))}
         </div>
@@ -247,9 +267,10 @@ export default function Diagnostics() {
       )}
 
       {/* eventos */}
-      <div className="card p-4">
+      <div className="card p-4 min-w-0">
         <h2 className="text-sm text-neutral-400 mb-2">Eventos recientes ({d.events.length})</h2>
-        <div className="max-h-96 overflow-y-auto font-mono text-[11px] leading-relaxed">
+        {/* break-words: una URL larga sin espacios ensanchaba el renglón más que la tarjeta */}
+        <div className="max-h-96 overflow-y-auto font-mono text-[11px] leading-relaxed break-words">
           {d.events.length === 0 && <div className="text-neutral-600">Sin eventos.</div>}
           {d.events.map((e, i) => (
             <div key={i} className={levelColor(e.level)}>

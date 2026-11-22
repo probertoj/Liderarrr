@@ -14,8 +14,13 @@ const fmtDate = (ms) =>
 // Baldosa de carátula para las tiras de "recientes".
 function CoverTile({ id, title, artist, sub }) {
   const [err, setErr] = useState(false);
+  // Una escucha de un disco que NO tienes no lleva a ningún sitio: antes era un enlace a
+  // «#», que te dejaba en el propio Dashboard como si no hubiera pasado nada. Sin ficha,
+  // no es un enlace.
+  const Caja = id ? Link : 'div';
+  const props = id ? { to: `/album/${id}`, className: 'group block min-w-0' } : { className: 'block min-w-0', title: 'No está en tu colección' };
   return (
-    <Link to={id ? `/album/${id}` : '#'} className="group block">
+    <Caja {...props}>
       <div className="aspect-square rounded-lg overflow-hidden bg-ink-850 border border-ink-800 group-hover:border-gold-400 transition-colors flex items-center justify-center">
         {id && !err ? (
           <img src={coverUrl(id)} alt="" loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover" />
@@ -25,7 +30,7 @@ function CoverTile({ id, title, artist, sub }) {
       </div>
       <div className="mt-1 text-[11px] text-neutral-300 truncate">{title}</div>
       <div className="text-[11px] text-neutral-600 truncate">{artist || sub}</div>
-    </Link>
+    </Caja>
   );
 }
 
@@ -42,10 +47,19 @@ export default function Dashboard() {
   const [upcoming, setUpcoming] = useState(null);
   const [nextListens, setNextListens] = useState(null);
   const [err, setErr] = useState(null);
+  const [sinGraficas, setSinGraficas] = useState(null);
 
   useEffect(() => {
     api.overview().then(setOv).catch((e) => setErr(e.message));
-    api.charts().then(setCharts).catch(() => {});
+    // Si las gráficas fallan, la página se pinta sin ellas y lo dice. Antes el fallo se
+    // tragaba y, como la página espera a `charts`, se quedaba «Cargando…» para siempre.
+    api
+      .charts()
+      .then(setCharts)
+      .catch((e) => {
+        setSinGraficas(e.message);
+        setCharts({ byDecade: [], byGenre: [], addedByMonth: [], topArtists: [] });
+      });
     api.recent().then(setRecent).catch(() => {});
     api.upcoming().then(setUpcoming).catch(() => {});
     api.nextChallengeListens().then(setNextListens).catch(() => {});
@@ -124,9 +138,11 @@ export default function Dashboard() {
         </Section>
       )}
 
-      {/* actividad reciente */}
-      <div className="grid lg:grid-cols-3 gap-6 mb-4">
+      {/* actividad reciente. grid-cols-1 + min-w-0: sin ellos la columna única del móvil se
+          ensanchaba con el contenido y la página medía 399 px en una pantalla de 375. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-4">
         <Section
+          className="min-w-0"
           title="Últimas añadidas"
           action={<Link to="/discoteca" className="text-xs text-gold-400 hover:underline">Ver más →</Link>}
         >
@@ -137,6 +153,7 @@ export default function Dashboard() {
         </Section>
 
         <Section
+          className="min-w-0"
           title="Últimas escuchas"
           action={<Link to="/escuchas" className="text-xs text-gold-400 hover:underline">Ver más →</Link>}
         >
@@ -155,6 +172,7 @@ export default function Dashboard() {
         </Section>
 
         <Section
+          className="min-w-0"
           title="Próximos lanzamientos"
           action={<Link to="/proximos" className="text-xs text-gold-400 hover:underline">Ver calendario →</Link>}
         >
@@ -185,7 +203,10 @@ export default function Dashboard() {
       </div>
 
       {/* gráficas */}
-      <div className="grid lg:grid-cols-2 gap-6 mb-4">
+      {sinGraficas && (
+        <p className="text-sm text-neutral-500 mb-4">No se pudieron cargar las gráficas ({sinGraficas}). El resto de la página sí está al día.</p>
+      )}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
         <Section title="Álbumes por década" className="min-w-0">
           <div className="card p-4 h-72 min-w-0">
             <ResponsiveContainer>
@@ -239,8 +260,8 @@ export default function Dashboard() {
       >
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {charts.topArtists.slice(0, 8).map((a) => (
-            <Link key={a.id} to={`/artista/${a.id}`} className="card px-4 py-3 hover:border-gold-500/40 flex items-center justify-between">
-              <span className="truncate">{a.name}</span>
+            <Link key={a.id} to={`/artista/${a.id}`} className="card px-4 py-3 hover:border-gold-500/40 flex items-center justify-between min-w-0">
+              <span className="truncate min-w-0">{a.name}</span>
               <span className="text-xs text-neutral-500 shrink-0 ml-2">{a.albums}</span>
             </Link>
           ))}

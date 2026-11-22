@@ -396,6 +396,13 @@ export async function runScan(opts = {}) {
       await scanTree(root, handleFolder);
     }
     scanStatus.phase = 'done';
+    // con el escaneo entero y sin error, se mira qué discos de la base ya no tienen carpeta
+    try {
+      const { marcarDesaparecidos } = await import('./missing.js');
+      marcarDesaparecidos();
+    } catch (e) {
+      console.warn('[desaparecidos] no se pudo comprobar:', String(e.message || e));
+    }
     console.log(`[scan] fin: ${scanStatus.foldersFound} carpetas · ${scanStatus.albumsDone} nuevas · ${scanStatus.skipped} sin cambios · ${scanStatus.errors} errores`);
   } catch (err) {
     scanStatus.phase = 'error';

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Settings as SettingsIcon, Check, X, Loader2, Download, Upload, FolderSearch, RefreshCw, AlertTriangle, HardDrive, RotateCcw, Trash2 } from 'lucide-react';
 import { api } from '../api.js';
-import { PageTitle, Spinner, Button } from '../components.jsx';
+import { PageTitle, Spinner, Button, ErrorMsg } from '../components.jsx';
 import { aviso, confirmar } from '../avisos.jsx';
 
 // Panel de escaneo: progreso en vivo del recorrido de tus carpetas. Deja ver si
@@ -125,10 +125,15 @@ function SpotifyLibrarySection({ onSave }) {
   const [busy, setBusy] = useState(null); // 'auth' | 'connect' | 'sync' | 'disconnect'
   const [msg, setMsg] = useState(null);
   const [err, setErr] = useState(null);
+  const vivo = useRef(true);
 
   const load = () => api.spotifyUserStatus().then(setSt).catch(() => {});
   useEffect(() => {
+    vivo.current = true;
     load();
+    return () => {
+      vivo.current = false;
+    };
   }, []);
 
   const getAuth = async () => {
@@ -175,22 +180,27 @@ function SpotifyLibrarySection({ onSave }) {
         await new Promise((r) => setTimeout(r, 1500));
         // eslint-disable-next-line no-await-in-loop
         const s = await api.spotifyLibraryStatus().catch(() => null);
+        // si te has ido de Ajustes, el sondeo se para: antes seguía preguntando sin nadie mirando
+        if (!vivo.current) return;
         if (!s || !s.running) break;
         setMsg(`Sincronizando… ${s.fetched}${s.total ? `/${s.total}` : ''} álbumes`);
       }
       setMsg(null);
       await load();
     } catch (e) {
-      setErr(e.message);
+      if (vivo.current) setErr(e.message);
     } finally {
-      setBusy(null);
+      if (vivo.current) setBusy(null);
     }
   };
   const disconnect = async () => {
     setBusy('disconnect');
+    setErr(null);
     try {
       await api.spotifyDisconnect();
       await load();
+    } catch (e) {
+      setErr(`No se pudo desconectar: ${e.message}`);
     } finally {
       setBusy(null);
     }
@@ -201,7 +211,7 @@ function SpotifyLibrarySection({ onSave }) {
   return (
     <section className="card p-5 mb-4">
       <h2 className="font-display text-lg mb-1">
-        Biblioteca de Spotify <span className="text-xs text-neutral-500">(opcional · 1.0)</span>
+        Biblioteca de Spotify <span className="text-xs text-neutral-500">(opcional)</span>
       </h2>
       <p className="text-xs text-neutral-500 mb-3">
         Conecta tu cuenta para cruzar tus <b>álbumes guardados</b> en Spotify con tu colección local (la brecha
@@ -289,7 +299,19 @@ const ExternalLinkIcon = () => (
   </svg>
 );
 
-function TestButton({ service, label, beforeTest }) {
+// Cuando una prueba dice que no pero no dice por qué (AcoustID devuelve solo banderas), se
+// arma el motivo con lo que sí manda, en vez de enseñar un «Error» pelado.
+function motivoDePrueba(r) {
+  if (r.error || r.message) return r.error || r.message;
+  const faltan = [];
+  if (r.key === false) faltan.push('falta la API key');
+  if (r.fpcalc === false) faltan.push('no se encuentra fpcalc (Chromaprint) en el contenedor');
+  return faltan.length ? `No está listo: ${faltan.join(' y ')}.` : 'La prueba ha fallado y el servidor no ha dicho por qué.';
+}
+
+// `texto` sustituye a «Probar {label}» cuando el botón no prueba un servicio sino que hace
+// algo (el de notificaciones decía «Probar Enviar prueba»).
+function TestButton({ service, label, texto, beforeTest }) {
   const [state, setState] = useState(null); // null | 'run' | ok | err
   const [msg, setMsg] = useState('');
   // Renglones extra que una prueba quiera enseñar (hoy, los indexers de Prowlarr uno a uno).
@@ -298,6 +320,7 @@ function TestButton({ service, label, beforeTest }) {
     <div>
     <div className="flex items-center gap-2">
       <Button
+        disabled={state === 'run'}
         onClick={async () => {
           setState('run');
           setMsg('');
@@ -309,7 +332,7 @@ function TestButton({ service, label, beforeTest }) {
             const r = await api.test(service);
             setState(r.ok ? 'ok' : 'err');
             setDetalles(Array.isArray(r.detalles) ? r.detalles : []);
-            setMsg(r.ok ? Object.values(r).filter((v) => typeof v === 'string')[0] || 'OK' : r.error || 'Error');
+            setMsg(r.ok ? Object.values(r).filter((v) => typeof v === 'string')[0] || 'OK' : motivoDePrueba(r));
           } catch (e) {
             setState('err');
             setMsg(e.message);
@@ -318,12 +341,16 @@ function TestButton({ service, label, beforeTest }) {
       >
         <span className="inline-flex items-center gap-1.5">
           {state === 'run' && <Loader2 size={14} className="animate-spin" />}
-          {state === 'ok' && <Check size={14} className="text-emerald-400" />}
-          {state === 'err' && <X size={14} className="text-red-400" />}
-          Probar {label}
+          {state === 'ok' && <Check size={14} className="prueba-ok" />}
+          {state === 'err' && <X size={14} className="prueba-mal" />}
+          {texto || `Probar ${label}`}
         </span>
       </Button>
-      {msg && <span className={`text-xs ${state === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>{msg}</span>}
+      {msg && (
+        <span className={`text-xs ${state === 'ok' ? 'prueba-ok' : 'prueba-mal'}`} role={state === 'err' ? 'alert' : 'status'}>
+          {msg}
+        </span>
+      )}
     </div>
       {detalles.length > 0 && (
         <ul className="mt-2 space-y-1">
@@ -366,6 +393,8 @@ function BackupList() {
     setBusy(false);
   };
 
+  const [restaurando, setRestaurando] = useState(null);
+
   const borrar = async (name) => {
     if (!(await confirmar(`¿Borrar la copia «${name}»?`, { aceptar: 'Borrar', peligro: true }))) return;
     try {
@@ -385,12 +414,18 @@ function BackupList() {
       ))
     )
       return;
+    // Mientras el servidor cambia la base no se puede volver a pulsar nada de esta lista,
+    // y se dice qué está pasando: antes eran 4,5 segundos de pantalla quieta.
+    setBusy(true);
+    setRestaurando(name);
+    setErr(null);
     try {
       await api.backupRestore(name);
-      setErr(null);
       setTimeout(() => window.location.reload(), 4500);
     } catch (e) {
       setErr(e.message);
+      setRestaurando(null);
+      setBusy(false);
     }
   };
 
@@ -429,6 +464,12 @@ function BackupList() {
         </p>
       )}
 
+      {restaurando && (
+        <p className="text-xs prueba-ok mb-2" role="status">
+          Base de datos restaurada desde «{restaurando}». Reiniciando… la app volverá en unos segundos.
+        </p>
+      )}
+
       {data.items.length === 0 ? (
         <p className="text-xs text-neutral-600">
           Todavía no hay ninguna. La primera se hará sola esta madrugada, o dale a «Copiar ahora».
@@ -456,15 +497,19 @@ function BackupList() {
                 </a>
                 <button
                   onClick={() => restaurar(b.name)}
+                  disabled={busy}
                   title="Volver a esta copia"
-                  className="p-1.5 rounded-lg border border-ink-700 hover:bg-ink-800"
+                  aria-label={`Volver a la copia ${b.name}`}
+                  className="p-1.5 rounded-lg border border-ink-700 hover:bg-ink-800 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <RotateCcw size={14} />
+                  {restaurando === b.name ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
                 </button>
                 <button
                   onClick={() => borrar(b.name)}
+                  disabled={busy}
                   title="Borrar"
-                  className="p-1.5 rounded-lg border border-ink-700 hover:bg-ink-800 text-neutral-500 hover:text-red-400"
+                  aria-label={`Borrar la copia ${b.name}`}
+                  className="p-1.5 rounded-lg border border-ink-700 hover:bg-ink-800 text-neutral-500 hover:text-red-400 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -567,21 +612,46 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [profiles, setProfiles] = useState(null);
+  const [loadErr, setLoadErr] = useState(null);
+  const [ocupado, setOcupado] = useState(null); // qué botón de acción está trabajando
 
-  useEffect(() => {
-    api.settings().then((v) => {
-      setS(v);
-      setInitial(v);
-    });
-  }, []);
+  const cargar = () => {
+    setLoadErr(null);
+    api
+      .settings()
+      .then((v) => {
+        setS(v);
+        setInitial(v);
+      })
+      .catch((e) => setLoadErr(e.message));
+  };
+  useEffect(cargar, []);
 
   const set = (k) => (e) => setS((prev) => ({ ...prev, [k]: e.target.value }));
   const dirty = s && initial && JSON.stringify(s) !== JSON.stringify(initial);
 
-  const save = async () => {
+  // Con cambios sin guardar, cerrar o recargar la pestaña pregunta antes.
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const avisar = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', avisar);
+    return () => window.removeEventListener('beforeunload', avisar);
+  }, [dirty]);
+
+  // Guarda SOLO lo que has cambiado. Antes se devolvía el objeto entero tal como se cargó,
+  // y ahí van también marcas internas del servidor (cuándo corrió el refresco nocturno, la
+  // cola de Lidarr, el token de Spotify, la última escucha importada): una pestaña de Ajustes
+  // abierta desde ayer las rebobinaba al guardar. Lanza si falla, para quien necesite saberlo.
+  const guardar = async () => {
+    const cambios = {};
+    for (const [k, v] of Object.entries(s)) if (v !== initial[k]) cambios[k] = v;
+    if (!Object.keys(cambios).length) return;
     setSaving(true);
     try {
-      await api.saveSettings(s);
+      await api.saveSettings(cambios);
       setInitial(s); // ya guardado: deja de estar "sucio"
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -590,22 +660,52 @@ export default function Settings() {
     }
   };
 
-  const loadProfiles = async () => {
-    await save();
+  // El de los botones «Guardar»: si falla, lo dice (antes no pasaba nada en pantalla).
+  const save = async () => {
     try {
-      setProfiles(await api.lidarrProfiles());
+      await guardar();
+      return true;
     } catch (e) {
-      aviso(e.message, 'error');
+      aviso(`No se pudo guardar: ${e.message}`, 'error');
+      return false;
     }
   };
 
+  // Acciones que primero guardan y luego hacen algo: si el guardado falla no siguen (irían
+  // contra la configuración vieja), y el botón queda desactivado mientras trabajan.
+  const trasGuardar = async (clave, fn) => {
+    if (ocupado) return;
+    setOcupado(clave);
+    try {
+      if (await save()) await fn();
+    } catch (e) {
+      aviso(e.message, 'error');
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  const loadProfiles = () => trasGuardar('perfiles', async () => setProfiles(await api.lidarrProfiles()));
+
+  if (loadErr)
+    return (
+      <div className="max-w-2xl">
+        <PageTitle icon={SettingsIcon} title="Ajustes" sub="Configura las fuentes de datos" />
+        <ErrorMsg>
+          No se pudieron cargar los ajustes: {loadErr}{' '}
+          <button onClick={cargar} className="underline">
+            Reintentar
+          </button>
+        </ErrorMsg>
+      </div>
+    );
   if (!s) return <Spinner />;
 
   return (
     <div className="max-w-2xl">
       <PageTitle icon={SettingsIcon} title="Ajustes" sub="Configura las fuentes de datos">
-        <Button variant="gold" onClick={save}>
-          {saved ? '✓ Guardado' : 'Guardar'}
+        <Button variant="gold" onClick={save} disabled={saving}>
+          {saving ? 'Guardando…' : saved ? '✓ Guardado' : 'Guardar'}
         </Button>
       </PageTitle>
 
@@ -640,9 +740,18 @@ export default function Settings() {
             identificar la biblioteca, reintenta las que faltaban.
           </span>
           <Button
+            disabled={ocupado === 'caratulas'}
             onClick={async () => {
-              const r = await api.retryCovers();
-              aviso(`${r.retried} carátulas se reintentarán al volver a verlas.`, 'ok');
+              if (ocupado) return;
+              setOcupado('caratulas');
+              try {
+                const r = await api.retryCovers();
+                aviso(`${r.retried} carátulas se reintentarán al volver a verlas.`, 'ok');
+              } catch (e) {
+                aviso(`No se pudieron reintentar las carátulas: ${e.message}`, 'error');
+              } finally {
+                setOcupado(null);
+              }
             }}
           >
             Reintentar carátulas
@@ -727,16 +836,16 @@ export default function Settings() {
         </HowTo>
 
         <div className="flex flex-wrap gap-2 mt-3">
-          <TestButton service="musicbrainz" label="MusicBrainz" beforeTest={save} />
-          <TestButton service="acoustid" label="AcoustID" beforeTest={save} />
-          <TestButton service="discogs" label="Discogs" beforeTest={save} />
-          <TestButton service="lastfm" label="Last.fm" beforeTest={save} />
-          <TestButton service="listenbrainz" label="ListenBrainz" beforeTest={save} />
-          <TestButton service="spotify" label="Spotify" beforeTest={save} />
+          <TestButton service="musicbrainz" label="MusicBrainz" beforeTest={guardar} />
+          <TestButton service="acoustid" label="AcoustID" beforeTest={guardar} />
+          <TestButton service="discogs" label="Discogs" beforeTest={guardar} />
+          <TestButton service="lastfm" label="Last.fm" beforeTest={guardar} />
+          <TestButton service="listenbrainz" label="ListenBrainz" beforeTest={guardar} />
+          <TestButton service="spotify" label="Spotify" beforeTest={guardar} />
         </div>
       </section>
 
-      <SpotifyLibrarySection onSave={save} />
+      <SpotifyLibrarySection onSave={guardar} />
 
       {/* Refresco nocturno */}
       <section className="card p-5 mb-4">
@@ -787,7 +896,7 @@ export default function Settings() {
           </Steps>
         </HowTo>
         <div className="flex flex-wrap gap-2 mt-3">
-          <TestButton service="notify" label="Enviar prueba" beforeTest={save} />
+          <TestButton service="notify" label="notificaciones" texto="Enviar prueba" beforeTest={guardar} />
         </div>
       </section>
 
@@ -811,8 +920,10 @@ export default function Settings() {
           </Steps>
         </HowTo>
         <div className="flex gap-2 mb-3">
-          <TestButton service="lidarr" label="Lidarr" beforeTest={save} />
-          <Button onClick={loadProfiles}>Cargar perfiles</Button>
+          <TestButton service="lidarr" label="Lidarr" beforeTest={guardar} />
+          <Button onClick={loadProfiles} disabled={ocupado === 'perfiles'}>
+            {ocupado === 'perfiles' ? 'Cargando…' : 'Cargar perfiles'}
+          </Button>
         </div>
         {profiles && (
           <div className="grid sm:grid-cols-3 gap-2">
@@ -869,7 +980,7 @@ export default function Settings() {
           </p>
         </HowTo>
         <div className="flex gap-2">
-          <TestButton service="prowlarr" label="Prowlarr" beforeTest={save} />
+          <TestButton service="prowlarr" label="Prowlarr" beforeTest={guardar} />
         </div>
         <p className="text-xs text-neutral-600 mt-2">
           Para descargar de punta a punta, Prowlarr necesita un cliente de descarga en Settings → Download Clients.
@@ -910,7 +1021,7 @@ export default function Settings() {
           </Steps>
           <p className="mt-1">Liderarr busca en el indexer agregado «all» (todos tus indexers de Jackett a la vez).</p>
         </HowTo>
-        <TestButton service="jackett" label="Jackett" beforeTest={save} />
+        <TestButton service="jackett" label="Jackett" beforeTest={guardar} />
       </section>
 
       {/* 3e · Prioridad de trackers — desempata la descarga de un clic y el auto-grab */}
@@ -968,13 +1079,13 @@ export default function Settings() {
           </Steps>
           <p className="mt-1">Usuario y contraseña son los de la WebUI de qBittorrent, no los del NAS.</p>
         </HowTo>
-        <TestButton service="qbittorrent" label="qBittorrent" beforeTest={save} />
+        <TestButton service="qbittorrent" label="qBittorrent" beforeTest={guardar} />
       </section>
 
-      {/* 3c. Importar descargas — hardlink torrents -> biblioteca */}
+      {/* 3g. Importar descargas — hardlink torrents -> biblioteca (era un segundo «3c») */}
       <section className="card p-5 mb-4">
         <h2 className="font-display text-lg mb-1">
-          3c · Importar descargas <span className="text-xs text-neutral-500">(opcional)</span>
+          3g · Importar descargas <span className="text-xs text-neutral-500">(opcional)</span>
         </h2>
         <p className="text-xs text-neutral-500 mb-3">
           Cierra el círculo: lo que bajas se enlaza (hardlink) a tu biblioteca organizada, como hace Lidarr pero sin su
@@ -1123,17 +1234,15 @@ export default function Settings() {
         </div>
         <div className="mt-2">
           <Button
-            onClick={async () => {
-              await save();
-              try {
+            disabled={ocupado === 'simLidarr'}
+            onClick={() =>
+              trasGuardar('simLidarr', async () => {
                 const r = await api.autoLidarrRun(true);
-                aviso(`Simulación: ${r.considered} candidatos.\n\n${r.log.slice(0, 15).join('\n') || '(ninguno)'}`, 'info');
-              } catch (e) {
-                aviso(e.message, 'error');
-              }
-            }}
+                aviso(`Simulación: ${r.considered} candidatos.\n\n${(r.log || []).slice(0, 15).join('\n') || '(ninguno)'}`, 'info');
+              })
+            }
           >
-            Simular ahora (sin encargar)
+            {ocupado === 'simLidarr' ? 'Simulando…' : 'Simular ahora (sin encargar)'}
           </Button>
         </div>
       </section>
@@ -1208,8 +1317,17 @@ export default function Settings() {
           <Field label="Semillas mínimas" hint="Descarta releases con menos seeders (evita torrents muertos).">
             <input type="number" value={s.auto_grab_min_seeders || '1'} onChange={set('auto_grab_min_seeders')} className={input} />
           </Field>
-          <Field label="Máximo por tanda" hint="Tope de descargas que agarra en cada pasada.">
+          <Field
+            label="Máximo por tanda"
+            hint="Discos que BUSCA en cada pasada (y por tanto, como mucho, los que descarga). Lo que no dio resultado no se vuelve a buscar hasta pasados 3 días."
+          >
             <input type="number" value={s.auto_grab_limit || '20'} onChange={set('auto_grab_limit')} className={input} />
+          </Field>
+          <Field
+            label="Un pedido caduca a los… (días)"
+            hint="Si una descarga pedida no llega en este plazo, deja de contar como «en camino» y el disco se puede volver a pedir. 0 = no caducar nunca."
+          >
+            <input type="number" min="0" value={s.downloads_expire_days ?? '14'} onChange={set('downloads_expire_days')} className={input} />
           </Field>
         </div>
         <label className="flex items-center gap-2 text-sm mt-3 cursor-pointer">
@@ -1226,17 +1344,15 @@ export default function Settings() {
         </label>
         <div className="mt-2">
           <Button
-            onClick={async () => {
-              await save();
-              try {
+            disabled={ocupado === 'simGrab'}
+            onClick={() =>
+              trasGuardar('simGrab', async () => {
                 const r = await api.autograbRun(true);
                 aviso(`Simulación: ${r.considered} candidatos.\n\n${(r.log || []).slice(0, 15).join('\n') || '(ninguno)'}`, 'info');
-              } catch (e) {
-                aviso(e.message, 'error');
-              }
-            }}
+              })
+            }
           >
-            Simular ahora (sin agarrar)
+            {ocupado === 'simGrab' ? 'Simulando…' : 'Simular ahora (sin agarrar)'}
           </Button>
         </div>
       </section>

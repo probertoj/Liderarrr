@@ -2,6 +2,7 @@ import { db, getSetting, setSetting } from './db.js';
 import { matchKey } from './matchkey.js';
 import { searchAndGrabBest } from './autograb.js';
 import { sendNotification } from './notify.js';
+import { caducaDias } from './downloads.js';
 
 // «LO QUIERO»: lista de deseos VIGILADA. Marcas un disco donde lo veas (búsqueda,
 // calendario, radar, brecha de streaming…) y Liderarr lo busca por ti en tus indexers una
@@ -190,6 +191,18 @@ const markTry = db.prepare(
 const markGrabbed = db.prepare(
   "UPDATE wanted_albums SET status = 'grabbed', release_title = @release, last_try_at = @now, last_reason = NULL, updated_at = @now WHERE id = @id"
 );
+
+// Un deseo «pedido» cuyo disco no llegó en el plazo vuelve a la cola de búsqueda. Antes
+// se quedaba en «pedido» para siempre: nada lo devolvía a «buscando».
+export function reabrirPedidosViejos(ahora = Date.now()) {
+  const dias = caducaDias();
+  if (!dias) return 0;
+  return db
+    .prepare(
+      "UPDATE wanted_albums SET status = 'watching', last_reason = 'el pedido anterior no llegó: se vuelve a buscar', updated_at = ? WHERE status = 'grabbed' AND updated_at < ?"
+    )
+    .run(ahora, ahora - dias * 86400000).changes;
+}
 
 // Cierra los deseos cuyo disco YA está en tu biblioteca. Se llama también desde el
 // refresco nocturno: es la fuente de verdad real (lo tienes o no lo tienes).

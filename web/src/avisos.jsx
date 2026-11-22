@@ -111,17 +111,30 @@ function Pila({ avisos }) {
 
 function Pregunta({ pregunta }) {
   const botonRef = useRef(null);
+  const cancelarRef = useRef(null);
 
   useEffect(() => {
     if (!pregunta) return;
-    botonRef.current?.focus();
+    // Lo que no tiene vuelta atrás arranca con el foco en «Cancelar»: un Enter de más no
+    // puede borrar un disco. Lo demás, en el botón que hace lo que has pedido.
+    (pregunta.peligro ? cancelarRef : botonRef).current?.focus();
     const alPulsar = (e) => {
-      if (e.key === 'Escape') responder(false);
-      // Enter confirma solo si el foco sigue en el botón: evita aceptar sin querer.
-      if (e.key === 'Enter' && document.activeElement === botonRef.current) responder(true);
+      if (e.key === 'Escape') {
+        // En captura y sin dejarlo seguir: el Escape cierra ESTA pregunta, no también el
+        // panel que haya debajo (el de copias duplicadas escucha la misma tecla).
+        e.stopPropagation();
+        responder(false);
+        return;
+      }
+      // Enter confirma solo si el foco está en el botón de aceptar: evita aceptar sin querer.
+      // (Con el foco en «Cancelar», el propio botón recibe el Enter y cancela.)
+      if (e.key === 'Enter' && document.activeElement === botonRef.current) {
+        e.preventDefault();
+        responder(true);
+      }
     };
-    window.addEventListener('keydown', alPulsar);
-    return () => window.removeEventListener('keydown', alPulsar);
+    window.addEventListener('keydown', alPulsar, true);
+    return () => window.removeEventListener('keydown', alPulsar, true);
   }, [pregunta]);
 
   if (!pregunta) return null;
@@ -136,6 +149,7 @@ function Pregunta({ pregunta }) {
         <div className="text-sm leading-relaxed whitespace-pre-line text-neutral-200">{pregunta.texto}</div>
         <div className="flex items-center justify-end gap-2 mt-4">
           <button
+            ref={cancelarRef}
             onClick={() => responder(false)}
             className="text-sm px-3 py-1.5 rounded-lg border border-ink-700 bg-ink-850 hover:bg-ink-800 transition"
           >

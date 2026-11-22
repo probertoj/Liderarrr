@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Star, RefreshCw, Plus, Check, CalendarClock, Network, Loader2, ExternalLink, ChevronDown, ChevronRight, Link2, Search, X, Image as ImageIcon, Upload } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
-import { AlbumCard, ArtistPhoto, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, WantButton, ReleaseYear, GenreChips, useLidarrEnabled } from '../components.jsx';
-import { aviso } from '../avisos.jsx';
+import { AlbumCard, ArtistPhoto, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, WantButton, ReleaseYear, GenreChips, useLidarrEnabled, useEscape } from '../components.jsx';
+import { aviso, confirmar } from '../avisos.jsx';
+import { listaDeOrigen } from '../volver.js';
 
 export default function ArtistDetail() {
   const { id } = useParams();
@@ -38,6 +39,8 @@ export default function ArtistDetail() {
       if (following) await api.unfollow(id, 'artist');
       else await api.follow(id, 'artist');
       await load();
+    } catch (e) {
+      aviso(`No se pudo ${following ? 'dejar de seguir' : 'seguir'} al artista: ${e.message}`, 'error');
     } finally {
       setBusy(false);
     }
@@ -49,7 +52,9 @@ export default function ArtistDetail() {
       await api.refreshArtistDisco(id);
       await load();
     } catch (e) {
-      setErr(e.message);
+      // Un aviso, no `setErr`: un timeout de MusicBrainz cambiaba la ficha entera por una
+      // caja roja y solo se salía recargando.
+      aviso(`No se pudo actualizar la discografía: ${e.message}`, 'error');
     } finally {
       setBusy(false);
     }
@@ -63,10 +68,15 @@ export default function ArtistDetail() {
     try {
       await api.setArtistScope(id, cur === 'all' ? 'albums' : 'all');
       await load();
+    } catch (e) {
+      aviso(`No se pudo cambiar el completismo: ${e.message}`, 'error');
     } finally {
       setBusy(false);
     }
   };
+
+  // De dónde venías (Seguidos, Huecos, la Discoteca, un género…), no siempre «Artistas».
+  const volver = listaDeOrigen({ to: '/artistas', label: 'Artistas' });
 
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!artist) return <Spinner />;
@@ -106,8 +116,8 @@ export default function ArtistDetail() {
 
   return (
     <div>
-      <Link to="/artistas" className="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-gold-400 mb-4">
-        <ArrowLeft size={15} /> Artistas
+      <Link to={volver.to} state={{ volver: true }} className="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-gold-400 mb-4">
+        <ArrowLeft size={15} /> {volver.label}
       </Link>
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -344,7 +354,7 @@ export default function ArtistDetail() {
       )}
 
       {openKey && groupsByKey[openKey] && (
-        <DuplicateGroupPanel group={groupsByKey[openKey]} onClose={() => setOpenKey(null)} />
+        <DuplicateGroupPanel group={groupsByKey[openKey]} onClose={() => setOpenKey(null)} onChanged={load} />
       )}
 
       {!noMbid && <Relations artistId={id} />}
@@ -365,6 +375,7 @@ function PhotoPickerModal({ artist, onClose, onApplied }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
   const [applying, setApplying] = useState(null);
+  useEscape(onClose);
 
   const search = async () => {
     setLoading(true);
@@ -419,7 +430,12 @@ function PhotoPickerModal({ artist, onClose, onApplied }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="card w-full max-w-2xl mt-10 p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm text-neutral-300 flex items-center gap-2">
@@ -488,6 +504,7 @@ function MbidLinkerModal({ artist, onClose, onLinked }) {
   const [saving, setSaving] = useState(null);
   const [merged, setMerged] = useState(null); // otra ficha del mismo artista, absorbida al enlazar
   const [raw, setRaw] = useState('');
+  useEscape(onClose);
 
   const run = async () => {
     if (!q.trim()) return;
@@ -508,10 +525,37 @@ function MbidLinkerModal({ artist, onClose, onLinked }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const link = async (mbid) => {
+  const link = async (mbid, nombreMb) => {
+    if (saving) return; // un enlace cada vez: antes cabían dos «Es este» a la vez
     setSaving(mbid);
     setErr(null);
     try {
+      // Si ya tienes OTRA ficha con ese MBID, enlazar las funde y borra la otra. Eso antes se
+      // contaba después de hecho. Se busca por el nombre de MusicBrainz y por el de esta ficha;
+      // si la otra se llama de otra manera no se encuentra aquí, y el servidor lo dirá al acabar.
+      let otra = null;
+      try {
+        const vistas = new Map();
+        for (const texto of new Set([nombreMb, artist.name].filter(Boolean))) {
+          // eslint-disable-next-line no-await-in-loop
+          const lista = await api.artists({ q: texto, sort: 'albums', limit: 50 });
+          for (const a of Array.isArray(lista) ? lista : []) vistas.set(a.id, a);
+        }
+        otra = [...vistas.values()].find((a) => a.mbid === mbid && String(a.id) !== String(artist.id)) || null;
+      } catch {
+        /* no se pudo mirar: se sigue, y si hay fusión se avisa al terminar */
+      }
+      if (otra) {
+        const ok = await confirmar(
+          `Ya tienes otra ficha con ese MBID: «${otra.name}»${otra.albums ? ` (${otra.albums} ${otra.albums === 1 ? 'disco' : 'discos'})` : ''}.\n\n` +
+            `Si enlazas, se FUNDE en esta: sus discos, créditos y seguimientos pasan a «${artist.name}» y la otra ficha desaparece. No se puede deshacer.`,
+          { aceptar: 'Enlazar y fundir', peligro: true }
+        );
+        if (!ok) {
+          setSaving(null);
+          return;
+        }
+      }
       const res = await api.setArtistMbid(artist.id, mbid);
       // si había otra ficha con ese MBID se han fundido: dilo antes de cerrar, que es un
       // cambio en la colección (una ficha menos) y no se ve solo con recargar.
@@ -530,7 +574,12 @@ function MbidLinkerModal({ artist, onClose, onLinked }) {
   const rawValid = MBID_RE.test(raw.trim());
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="card w-full max-w-2xl mt-10 p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm text-neutral-300 flex items-center gap-2">
@@ -599,7 +648,7 @@ function MbidLinkerModal({ artist, onClose, onLinked }) {
                       <Check size={14} /> actual
                     </span>
                   ) : (
-                    <Button variant="gold" disabled={saving === r.mbid} onClick={() => link(r.mbid)}>
+                    <Button variant="gold" disabled={!!saving} onClick={() => link(r.mbid, r.name)}>
                       <span className="inline-flex items-center gap-1.5">
                         <Check size={14} /> {saving === r.mbid ? '…' : 'Es este'}
                       </span>
@@ -620,7 +669,7 @@ function MbidLinkerModal({ artist, onClose, onLinked }) {
               onChange={(e) => setRaw(e.target.value)}
               placeholder="00000000-0000-0000-0000-000000000000"
             />
-            <Button disabled={!rawValid || saving === raw.trim().toLowerCase()} onClick={() => link(raw.trim().toLowerCase())}>
+            <Button disabled={!rawValid || !!saving} onClick={() => link(raw.trim().toLowerCase())}>
               Enlazar
             </Button>
           </div>
@@ -826,11 +875,16 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
         {items.map((m) => {
           const done = added[m.rg_mbid] || m.in_lidarr || m.requested;
           return (
-            <div key={m.rg_mbid} className="card px-3 py-2 flex items-center gap-2 text-sm">
-              <ReleaseYear date={m.first_release} />
-              <span className="truncate flex-1 min-w-0" title={m.title}>
-                {m.title}
-              </span>
+            // release-row: por debajo de 640 px el título va arriba y los botones debajo.
+            // Con todo en una fila, los botones (que no encogen) dejaban el título en 0 px.
+            <div key={m.rg_mbid} className="card px-3 py-2 release-row text-sm">
+              <div className="release-main">
+                <ReleaseYear date={m.first_release} />
+                <span className="truncate flex-1 min-w-0" title={m.title}>
+                  {m.title}
+                </span>
+              </div>
+              <div className="release-actions">
               <a
                 href={`https://musicbrainz.org/release-group/${m.rg_mbid}`}
                 target="_blank"
@@ -869,6 +923,7 @@ function MissingList({ items, artistMbid, artistName, noun = 'álbumes de estudi
                   {busy === m.rg_mbid ? (lidarrOn ? 'Enviando…' : 'Descargando…') : lidarrOn ? 'Lidarr' : 'Descargar'}
                 </button>
               )}
+              </div>
             </div>
           );
         })}

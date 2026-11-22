@@ -3,7 +3,8 @@ import path from 'node:path';
 import { db, getSetting } from './db.js';
 import { qbCompletedTorrents, qbConfig } from './qbittorrent.js';
 import { importFolder, importFile, importConfig, isIgnoredImport, audioFiles } from './importer.js';
-import { matchRequest, setDownloadStatus, reconcileAgainstLibrary, pruneDownloads } from './downloads.js';
+import { matchRequest, setDownloadStatus, reconcileAgainstLibrary, pruneDownloads, expireStaleDownloads } from './downloads.js';
+import { reabrirPedidosViejos } from './wanted.js';
 import { runScan } from './scanner.js';
 import { runIdentify } from './identify.js';
 import { norm, within, pathMappings, remapPath } from './pathmap.js';
@@ -70,6 +71,15 @@ export async function runAutoImport() {
       if (closed) console.log(`[autoimport] ${closed} pedido(s) cerrados por cruce con la biblioteca`);
     } catch (e) {
       autoImportStatus.errors.push(`reconcile: ${String(e.message || e)}`);
+    }
+    // lo que lleva demasiado «pedido» sin llegar deja de bloquear, y su deseo vuelve a buscarse
+    try {
+      const caducados = expireStaleDownloads();
+      const reabiertos = reabrirPedidosViejos();
+      if (caducados || reabiertos)
+        console.log(`[autoimport] ${caducados} pedido(s) caducados sin llegar · ${reabiertos} deseo(s) de vuelta a la búsqueda`);
+    } catch (e) {
+      autoImportStatus.errors.push(`caducar: ${String(e.message || e)}`);
     }
     // poda la cola: fuera lo importado viejo y la basura, para que no crezca sin fin
     try {

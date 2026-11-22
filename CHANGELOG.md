@@ -7,6 +7,65 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.8.0] - 2026-11-22
+
+**La otra mitad del repaso: la interfaz.** Se recorrieron las 25 páginas sobre una copia de una
+base real, en tema claro y en móvil, midiendo contraste y desbordes, y se leyó el código de la
+web buscando lo que falla en silencio. Y de mirar esa base salen cuatro tareas nuevas.
+
+### Añadido
+- **Carátulas de antemano.** Tres de cada cuatro discos no tienen imagen en su carpeta: la
+  carátula se saca del audio o se busca fuera la primera vez que abres el disco, y esa primera
+  vez se veía el hueco. Ahora se van dejando listas cada noche (hasta 1.500) y hay un botón en
+  *Calidad y disco* para adelantar una tanda.
+- **Carpetas que ya no están.** Si mueves o renombras una carpeta con otra herramienta, el
+  disco viejo se quedaba en la app para siempre, contando como tuyo. Tras cada escaneo se
+  marcan y aparecen en *Calidad y disco*, donde puedes quitarlos (solo la ficha: no se borra
+  ningún fichero). No se quita nada solo, y si de golpe falta mucho se entiende que es el
+  volumen y no se marca nada.
+- **Fichas de artista repetidas.** *Artistas* avisa cuando un nombre tiene dos fichas con los
+  discos repartidos, y las funde en una con un clic.
+- **Los pedidos caducan.** Una descarga pedida que no llega en 14 días (configurable) deja de
+  contar como «en camino»: antes bloqueaba para siempre volver a pedir ese disco. El deseo de
+  «Lo quiero» correspondiente vuelve a buscarse.
+- **La app recuerda dónde estabas.** La Discoteca vuelve a la misma altura y con las mismas
+  páginas cargadas; Lanzamientos, Géneros, Sellos, Retos y Artistas guardan pestaña y filtros
+  en la dirección. El enlace de volver de las fichas de artista y de género ya no es fijo.
+
+### Tema claro y móvil
+- **El tema claro se lee.** Los textos ámbar, dorados, verdes, azules y rojos estaban pensados
+  para fondo oscuro y sobre blanco quedaban entre 1,6:1 y 2,8:1. Ahora pasan todos de 4,5:1.
+  De paso se descubrió que el dorado de botones y pestañas activas (112 usos) no generaba
+  ningún estilo: ahora sí es dorado, también en oscuro.
+- En oscuro, los grises de los textos secundarios suben lo justo para pasar de 4,5:1.
+- **En el móvil ya no se sale nada:** Artistas, Calidad, Huecos, Sin identificar, Retos,
+  Seguidos y Correcciones desbordaban la pantalla a 375 px.
+- **Las listas largas van por tandas.** Artistas pintaba 5.000 fichas de golpe (y decía «5000»
+  cuando hay más), Sin identificar 2.898 (6,5 segundos hasta poder tocar nada). Ahora cargan
+  al bajar y dicen «300 de 5.149».
+
+### Arreglado
+- **En los diálogos de borrar, el foco empieza en «Cancelar»:** antes Enter confirmaba.
+- «Mover» una carpeta desde Correcciones no preguntaba; un «Mover todos» a medias salía en verde.
+- **Ajustes guarda solo lo que cambias**, avisa si el guardado falla y ya no se queda girando
+  si no puede cargar.
+- **Lanzamientos:** una respuesta lenta o un sondeo en segundo plano podían pisar la lista de
+  la pestaña en la que estabas. Igual con los selectores de periodo de Escuchas y Resumen y
+  los filtros de Géneros.
+- El panel de copias de un disco (×N) no se enteraba de «Marcar como la mejor».
+- Enlazar un MBID que ya tenía otra ficha fundía las dos sin avisar: ahora pregunta antes.
+- Las letras de una pista podían aparecer bajo otra si pulsabas dos seguidas.
+- Géneros solo enseñaba 120 discos por género; ahora hay «Ver más».
+- Muchos botones callaban al fallar (seguir, descartar, marcar rareza…): ahora lo dicen. Y un
+  fallo ya no sustituye la página entera por un cuadro rojo.
+- «Descargar todos» pregunta antes de lanzar las búsquedas, no se puede disparar dos veces y
+  al acabar dice qué no encontró.
+- Los diálogos se cierran con Escape; los botones invisibles ya no se pulsan sin querer en
+  pantallas táctiles.
+- Al escribir etiquetas, la ficha avisa de cuántos ficheros se van a separar de la descarga.
+
+---
+
 ## [1.7.4] - 2026-11-22
 
 **Repaso a fondo del servidor.** Salió de pasar la app entera por una copia de una base real

@@ -3,8 +3,10 @@ import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Shapes, ArrowLeft, Search, Sparkles, ExternalLink, Download, Check, Loader2, EyeOff, Eye, X } from 'lucide-react';
 import { api } from '../api.js';
 import { aviso } from '../avisos.jsx';
+import { listaDeOrigen } from '../volver.js';
 import {
   PageTitle,
+  Button,
   Spinner,
   ErrorMsg,
   AlbumCard,
@@ -114,7 +116,11 @@ export default function Genres() {
                   esconder(g.slug, true);
                 }}
                 title={`Esconder ${g.name} de esta portada`}
-                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-neutral-200 transition-opacity"
+                aria-label={`Esconder ${g.name} de esta portada`}
+                // Con ratón aparece al pasar por encima (e invisible = intocable). En pantallas
+                // táctiles no hay «pasar por encima»: antes el ojo era invisible pero seguía
+                // ahí, y un toque en la esquina escondía el género sin querer. Ahora se ve.
+                className="absolute top-2 right-2 p-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto [@media(hover:none)]:opacity-70 [@media(hover:none)]:pointer-events-auto text-neutral-500 hover:text-neutral-200 transition-opacity"
               >
                 <EyeOff size={14} />
               </button>
@@ -249,11 +255,23 @@ function ColocarEtiqueta({ tag, tax, onColocar, onCerrar }) {
 export function GenreDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  // el subgénero puede venir en la URL: es como entran los chips de la ficha de disco/artista
-  const [params] = useSearchParams();
+  // El subgénero puede venir en la URL: es como entran los chips de la ficha de disco/artista.
+  // El orden y la década también se guardan ahí, para que «← Género» desde un disco y el
+  // atrás del navegador vuelvan al mismo recorte y no al género entero.
+  const [params, setParams] = useSearchParams();
   const [sub, setSub] = useState(params.get('sub'));
-  const [sort, setSort] = useState('recientes');
-  const [decade, setDecade] = useState(null);
+  const [sort, setSort] = useState(params.get('sort') || 'recientes');
+  const [decade, setDecade] = useState(() => (/^\d{4}$/.test(params.get('decade') || '') ? Number(params.get('decade')) : null));
+  const [cargandoMas, setCargandoMas] = useState(false);
+  const volver = listaDeOrigen({ to: '/generos', label: 'Géneros' });
+  useEffect(() => {
+    const next = {};
+    if (sub) next.sub = sub;
+    if (sort && sort !== 'recientes') next.sort = sort;
+    if (decade) next.decade = String(decade);
+    if (new URLSearchParams(next).toString() !== params.toString()) setParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sub, sort, decade]);
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [recs, setRecs] = useState(null);
@@ -265,8 +283,39 @@ export function GenreDetail() {
   useEffect(() => {
     setData(null);
     setRecs(null); // al cambiar de recorte, las recomendaciones anteriores ya no valen
-    api.genre(slug, { sub, sort, decade }).then(setData).catch((e) => setErr(e.message));
+    // Guardia: pulsando dos chips seguidos, la respuesta del primero podía llegar la última
+    // y dejar la cabecera en un subgénero y la parrilla en otro.
+    let vigente = true;
+    api
+      .genre(slug, { sub, sort, decade })
+      .then((d) => vigente && setData(d))
+      .catch((e) => vigente && setErr(e.message));
+    return () => {
+      vigente = false;
+    };
   }, [slug, sub, sort, decade]);
+
+  // El servidor da los discos de 120 en 120. Antes la página no pedía nunca más: en un
+  // género con más de 120 discos, el resto no se podía ver desde aquí.
+  const cargarMas = async () => {
+    if (!data || cargandoMas) return;
+    setCargandoMas(true);
+    try {
+      const d = await api.genre(slug, { sub, sort, decade, offset: data.albums.length });
+      setData((prev) => {
+        // si entre tanto cambiaste de subgénero u orden, esta tanda ya no es de esta lista
+        if (!prev || prev !== data) return prev;
+        const vistos = new Set(prev.albums.map((a) => a.id));
+        const nuevos = (d.albums || []).filter((a) => !vistos.has(a.id));
+        // si no llega nada nuevo, se da por terminada para no dejar un botón que no hace nada
+        return { ...prev, albums: [...prev.albums, ...nuevos], total: nuevos.length ? d.total ?? prev.total : prev.albums.length };
+      });
+    } catch (e) {
+      aviso(`No se pudieron cargar más discos: ${e.message}`, 'error');
+    } finally {
+      setCargandoMas(false);
+    }
+  };
 
   const verRecomendaciones = async () => {
     setRecsLoading(true);
@@ -274,7 +323,8 @@ export function GenreDetail() {
       setRecs(await api.genreRecommendations(slug, sub));
       api.vetoedRecommendations().then((v) => setVetados(v.items)).catch(() => {});
     } catch (e) {
-      setErr(e.message);
+      // aviso y no `setErr`: un fallo de las recomendaciones tumbaba la página entera
+      aviso(`No se pudieron cargar las recomendaciones: ${e.message}`, 'error');
     } finally {
       setRecsLoading(false);
     }
@@ -296,7 +346,7 @@ export function GenreDetail() {
         agotado: nuevos.length === 0 && !sig.hasMore,
       });
     } catch (e) {
-      setErr(e.message);
+      aviso(`No se pudieron cargar más recomendaciones: ${e.message}`, 'error');
     } finally {
       setRecsMas(false);
     }
@@ -307,8 +357,8 @@ export function GenreDetail() {
 
   return (
     <div>
-      <button onClick={() => navigate('/generos')} className="text-sm text-neutral-500 hover:text-gold-400 inline-flex items-center gap-1 mb-3">
-        <ArrowLeft size={14} /> Géneros
+      <button onClick={() => navigate(volver.to, { state: { volver: true } })} className="text-sm text-neutral-500 hover:text-gold-400 inline-flex items-center gap-1 mb-3">
+        <ArrowLeft size={14} /> {volver.label}
       </button>
 
       <PageTitle
@@ -438,9 +488,13 @@ export function GenreDetail() {
                     <button
                       key={v.match_key}
                       onClick={async () => {
-                        await api.unvetoRecommendation(v.match_key);
-                        const r = await api.vetoedRecommendations();
-                        setVetados(r.items);
+                        try {
+                          await api.unvetoRecommendation(v.match_key);
+                          const r = await api.vetoedRecommendations();
+                          setVetados(r.items);
+                        } catch (e) {
+                          aviso(`No se pudo deshacer: ${e.message}`, 'error');
+                        }
                       }}
                       title="Volver a permitir esta recomendación"
                       className="text-xs px-2 py-0.5 rounded-full border border-ink-800 bg-ink-850 text-neutral-500 hover:text-neutral-200 hover:border-gold-500/40"
@@ -525,9 +579,17 @@ export function GenreDetail() {
         ))}
       </div>
       {data.total > data.albums.length && (
-        <p className="text-xs text-neutral-600 mt-3">
-          Mostrando {data.albums.length} de {data.total.toLocaleString('es')}. Afina con un subgénero para ver el resto.
-        </p>
+        <div className="mt-4 flex items-center gap-3 flex-wrap">
+          <Button onClick={cargarMas} disabled={cargandoMas}>
+            <span className="inline-flex items-center gap-1.5">
+              {cargandoMas && <Loader2 size={14} className="animate-spin" />}
+              {cargandoMas ? 'Cargando…' : `Ver más (quedan ${(data.total - data.albums.length).toLocaleString('es')})`}
+            </span>
+          </Button>
+          <span className="text-xs text-neutral-600">
+            Mostrando {data.albums.length.toLocaleString('es')} de {data.total.toLocaleString('es')}.
+          </span>
+        </div>
       )}
 
       {search != null && <SearchModal initialQuery={search} onClose={() => setSearch(null)} />}

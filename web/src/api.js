@@ -47,6 +47,18 @@ export const api = {
   scan: (force) => req('/scan', { method: 'POST', body: { force } }),
   scanStatus: () => req('/scan/status'),
   retryCovers: () => req('/covers/retry-missing', { method: 'POST' }),
+  // carátulas de antemano (por tandas, en segundo plano)
+  coversWarm: () => req('/covers/warm'),
+  coversWarmStart: (limit) => req('/covers/warm', { method: 'POST', body: { limit } }),
+  coversWarmCancel: () => req('/covers/warm/cancel', { method: 'POST' }),
+  // discos cuya carpeta ya no está
+  missing: () => req('/missing'),
+  missingCheck: () => req('/missing/check', { method: 'POST' }),
+  missingForget: (id) => req(`/missing/${id}/forget`, { method: 'POST', body: { confirm: true } }),
+  missingForgetAll: () => req('/missing/forget-all', { method: 'POST', body: { confirm: true } }),
+  // fichas de artista con el mismo nombre
+  artistDuplicates: () => req('/artists/duplicates'),
+  artistMerge: (from, into) => req('/artists/merge', { method: 'POST', body: { from, into, confirm: true } }),
   identify: (force) => req('/identify', { method: 'POST', body: { force } }),
   identifyStatus: () => req('/identify/status'),
   refresh: (trigger) => req('/refresh', { method: 'POST', body: { trigger } }),
@@ -291,7 +303,8 @@ export const api = {
   coverCandidates: (id, q) => req(`/cover/${id}/candidates${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   applyCover: (id, body) => req(`/cover/${id}/apply`, { method: 'POST', body }),
   corrections: () => req('/corrections'),
-  refileAllCorrections: () => req('/corrections/refile-all', { method: 'POST' }),
+  // `confirm: true` como el de un solo disco: mueve carpetas, así que va con confirmación expresa
+  refileAllCorrections: () => req('/corrections/refile-all', { method: 'POST', body: { confirm: true } }),
   tagPreview: (id) => req(`/albums/${id}/tag-preview`),
   writeTags: (id) => req(`/albums/${id}/write-tags`, { method: 'POST' }),
 };
@@ -301,19 +314,28 @@ export const artistPhotoUrl = (id) => `/api/artist/${id}/photo`;
 
 // Sondea la cola de envío a Lidarr (que corre en segundo plano) hasta que termina,
 // llamando a onUpdate(status) en cada paso. Devuelve una función para cancelar.
+// Un solo sondeo por destino: casi nadie guardaba la función de cancelar, así que cada clic
+// en «Enviar a Lidarr» arrancaba OTRO bucle de 2,5 s sobre el mismo estado. Ahora el sondeo
+// nuevo para al anterior que escribía en el mismo sitio.
+const sondeosDeCola = new Map();
 export function pollLidarrQueue(onUpdate) {
+  sondeosDeCola.get(onUpdate)?.();
   let alive = true;
+  const parar = () => {
+    alive = false;
+    if (sondeosDeCola.get(onUpdate) === parar) sondeosDeCola.delete(onUpdate);
+  };
+  sondeosDeCola.set(onUpdate, parar);
   const tick = async () => {
     if (!alive) return;
     const s = await api.lidarrAddStatus().catch(() => null);
     if (!alive) return;
     if (s) onUpdate(s);
     if (s?.running) setTimeout(tick, 2500);
+    else parar();
   };
   tick();
-  return () => {
-    alive = false;
-  };
+  return parar;
 }
 
 export function fmtBytes(n) {

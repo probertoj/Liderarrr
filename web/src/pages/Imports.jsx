@@ -29,9 +29,16 @@ function fmtAgo(ts) {
 function AutoImportPanel() {
   const [dl, setDl] = useState(null);
   const [busy, setBusy] = useState(false);
+  // Cada cuánto corre solo: se configura en Ajustes, así que se lee de allí. Antes aquí
+  // ponía «cada 3 minutos» a pelo y mentía en cuanto alguien lo cambiaba.
+  const [cada, setCada] = useState(null);
   const load = () => api.downloads().then(setDl).catch(() => {});
   useEffect(() => {
     load();
+    api
+      .settings()
+      .then((s) => setCada(Math.max(1, Number(s?.auto_import_interval_min) || 3)))
+      .catch(() => {});
   }, []);
   const runNow = async () => {
     setBusy(true);
@@ -49,12 +56,15 @@ function AutoImportPanel() {
     try {
       await api.clearImportedDownloads();
       await load();
+    } catch (e) {
+      aviso(e.message, 'error'); // antes, si fallaba, el botón no hacía nada y no se sabía por qué
     } finally {
       setBusy(false);
     }
   };
   if (!dl) return null;
-  const STATE = { requested: 'pedido', importing: 'importando', imported: 'importado', error: 'error' };
+  // «caducado»: llevaba semanas pedido y no llegó; deja de impedir que se vuelva a pedir
+  const STATE = { requested: 'pedido', importing: 'importando', imported: 'importado', error: 'error', expired: 'caducado (no llegó)' };
   const st = dl.status || {};
   const hasClosed = dl.items?.some((d) => d.status === 'imported' || d.status === 'error');
   return (
@@ -86,7 +96,7 @@ function AutoImportPanel() {
       </div>
       <p className="text-xs text-neutral-600 mt-1">
         Al terminar una descarga en qBittorrent, se enlaza a tu biblioteca organizada.
-        {dl.enabled ? ' Se ejecuta solo cada 3 minutos.' : ' Actívalo en Ajustes → Importar descargas.'}
+        {dl.enabled ? (cada ? ` Se ejecuta solo cada ${cada === 1 ? 'minuto' : `${cada} minutos`}.` : ' Se ejecuta solo cada pocos minutos.') : ' Actívalo en Ajustes → Importar descargas.'}
       </p>
 
       {/* diagnóstico de la última pasada: revela POR QUÉ el automático (no) importa */}
@@ -178,6 +188,10 @@ function SubfolderImporter({ dir }) {
   const [done, setDone] = useState({});
   const [busy, setBusy] = useState(null);
   const [bulk, setBulk] = useState(false);
+  // Fallo POR SUBCARPETA. Antes iban todos al mismo `err`, que es el que sustituye la
+  // lista entera: una subcarpeta que fallaba escondía las demás —con lo ya editado y lo
+  // ya importado— mientras «Importar todos» seguía trabajando por detrás.
+  const [fallos, setFallos] = useState({});
 
   useEffect(() => {
     api
@@ -191,7 +205,11 @@ function SubfolderImporter({ dir }) {
 
   const importOne = async (s) => {
     setBusy(s.source_dir);
-    setErr(null);
+    setFallos((p) => {
+      const n = { ...p };
+      delete n[s.source_dir];
+      return n;
+    });
     try {
       const r = await api.importRun(s.source_dir, {
         artist: field(s.source_dir, 'artist', s.artist),
@@ -200,7 +218,7 @@ function SubfolderImporter({ dir }) {
       });
       setDone((p) => ({ ...p, [s.source_dir]: r.dest }));
     } catch (e) {
-      setErr(e.message);
+      setFallos((p) => ({ ...p, [s.source_dir]: e.message }));
     } finally {
       setBusy(null);
     }
@@ -279,12 +297,15 @@ function SubfolderImporter({ dir }) {
                   placeholder="Año"
                 />
               </label>
-              <Button variant="gold" disabled={busy === s.source_dir} onClick={() => importOne(s)}>
+              <Button variant="gold" disabled={busy != null} onClick={() => importOne(s)}>
                 <span className="inline-flex items-center gap-1.5">
                   <Link2 size={14} /> {busy === s.source_dir ? 'Enlazando…' : 'Importar'}
                 </span>
               </Button>
             </div>
+          )}
+          {fallos[s.source_dir] && !done[s.source_dir] && (
+            <p className="text-xs text-red-400 mt-1.5">No se pudo importar: {fallos[s.source_dir]}</p>
           )}
         </div>
       ))}
@@ -309,7 +330,8 @@ export default function Imports() {
     setHidden((p) => ({ ...p, [it.source_dir]: true }));
     try {
       await api.importIgnore(it.source_dir);
-    } catch {
+    } catch (e) {
+      aviso(`No se pudo ocultar: ${e.message}`, 'error');
       setHidden((p) => {
         const n = { ...p };
         delete n[it.source_dir];
@@ -323,7 +345,10 @@ export default function Imports() {
       delete n[it.source_dir];
       return n;
     });
-    api.importUnignore(it.source_dir).catch(() => {});
+    api.importUnignore(it.source_dir).catch((e) => {
+      aviso(`No se pudo deshacer: ${e.message}`, 'error');
+      setHidden((p) => ({ ...p, [it.source_dir]: true }));
+    });
   };
 
   const load = () => {
@@ -400,7 +425,9 @@ export default function Imports() {
         icon={DownloadCloud}
         title="Importar descargas"
         sub={data.items?.length ? `${data.items.length} sin importar` : ''}
-      >
+      />
+      {/* en su propia fila, que envuelve: junto al título los dos botones se salían de un móvil */}
+      <div className="flex flex-wrap gap-2 mb-4 -mt-2">
         {importable.length > 0 && (
           <Button variant="gold" onClick={importAll} disabled={bulkBusy}>
             <span className="inline-flex items-center gap-1.5">
@@ -408,12 +435,12 @@ export default function Imports() {
             </span>
           </Button>
         )}
-        <Button onClick={load}>
+        <Button onClick={load} disabled={bulkBusy}>
           <span className="inline-flex items-center gap-1.5">
             <RefreshCw size={14} /> Refrescar
           </span>
         </Button>
-      </PageTitle>
+      </div>
       <p className="text-sm text-neutral-500 mb-4">
         Enlaza (hardlink) las descargas a tu biblioteca organizada, como hace Lidarr pero sin su veto. No borra ni copia
         el origen: sigues sembrando. Tras importar, el álbum aparece en el próximo escaneo.

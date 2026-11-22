@@ -105,7 +105,7 @@ export function downloadsList(limit = 100) {
 // Limpieza MANUAL: borra ya del registro los pedidos cerrados (imported/error), sin
 // esperar a la poda automática. Para el botón «Limpiar importadas». Devuelve cuántos.
 export function clearImported() {
-  return db.prepare("DELETE FROM downloads WHERE status IN ('imported','error')").run().changes;
+  return db.prepare("DELETE FROM downloads WHERE status IN ('imported','error','expired')").run().changes;
 }
 
 // Poda la cola: borra los pedidos ya cerrados (imported/error) más viejos que el plazo, y
@@ -115,7 +115,7 @@ export function clearImported() {
 export function pruneDownloads() {
   const cutoff = Date.now() - keepDays() * 86400000;
   const closed = db
-    .prepare("DELETE FROM downloads WHERE status IN ('imported','error') AND COALESCE(updated_at, requested_at) < ?")
+    .prepare("DELETE FROM downloads WHERE status IN ('imported','error','expired') AND COALESCE(updated_at, requested_at) < ?")
     .run(cutoff).changes;
   const junk = db
     .prepare(
@@ -123,6 +123,25 @@ export function pruneDownloads() {
     )
     .run().changes;
   return { closed, junk };
+}
+
+// Un pedido que lleva semanas «pedido» no va a llegar: el cliente no lo tenía, el torrent
+// murió o lo quitaste. Se quedaba así para siempre, y como un pedido en curso impide
+// volver a pedir ese disco, la auto-descarga lo daba por resuelto para siempre. Pasado el
+// plazo se marca «caducado» y deja de bloquear. Si el torrent acaba llegando, se importa
+// igual (el cruce con qBittorrent mira todo lo que no esté ya importado).
+export function caducaDias() {
+  const crudo = getSetting('downloads_expire_days');
+  if (crudo == null || crudo === '') return 14;
+  const n = Number(crudo);
+  return Number.isFinite(n) && n >= 0 ? n : 14; // 0 = no caducar nunca
+}
+export function expireStaleDownloads(ahora = Date.now()) {
+  const dias = caducaDias();
+  if (!dias) return 0;
+  return db
+    .prepare("UPDATE downloads SET status = 'expired', updated_at = ? WHERE status = 'requested' AND requested_at < ?")
+    .run(ahora, ahora - dias * 86400000).changes;
 }
 
 // rg_mbids con pedido en curso (requested/importing) para pintar "pedido/descargando"

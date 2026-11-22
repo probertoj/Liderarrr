@@ -32,7 +32,7 @@ function StreamingRow({ r, added, busy, onDownload }) {
             {r.album_type && r.album_type !== 'album' && (
               <span className="uppercase text-[10px] px-1.5 py-0.5 rounded-full border border-ink-700">{r.album_type}</span>
             )}
-            {r.added_at && <span className="text-neutral-700">guardado {r.added_at.slice(0, 10)}</span>}
+            {r.added_at && <span>guardado {r.added_at.slice(0, 10)}</span>}
           </div>
         </div>
       </div>
@@ -135,11 +135,16 @@ export default function Streaming() {
   }, [side, q, onlyAlbums]);
 
   const loadStatus = () => api.spotifyUserStatus().then(setStatus).catch((e) => setErr(e.message));
-  const loadGap = () =>
-    api
+  // Si el cruce falla hay que decirlo: antes el fallo se tragaba y la página se quedaba en
+  // «Cruzando tu colección con Spotify…» para siempre.
+  const [gapErr, setGapErr] = useState(null);
+  const loadGap = () => {
+    setGapErr(null);
+    return api
       .spotifyGap()
       .then(setGap)
-      .catch(() => {});
+      .catch((e) => setGapErr(e.message));
+  };
   useEffect(() => {
     loadStatus();
   }, []);
@@ -327,12 +332,18 @@ export default function Streaming() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Filtrar por artista o álbum…"
+            aria-label="Filtrar por artista o álbum"
             className="w-full sm:w-64 bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
           />
         )}
       </div>
 
-      {!gap ? (
+      {!gap && gapErr ? (
+        <div className="card p-6 text-center text-sm text-neutral-400">
+          <p className="mb-3">No se pudo cruzar tu colección con Spotify: {gapErr}</p>
+          <Button onClick={loadGap}>Reintentar</Button>
+        </div>
+      ) : !gap ? (
         <Spinner label="Cruzando tu colección con Spotify…" />
       ) : filtered.length === 0 ? (
         <div className="card p-6 text-center text-neutral-400">

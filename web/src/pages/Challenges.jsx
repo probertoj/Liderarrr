@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Trophy, Plus, Trash2, ArrowLeft, Check, Send, Search, Download, X, ListMusic, Headphones } from 'lucide-react';
 import { api, coverUrl } from '../api.js';
 import { PageTitle, Section, Spinner, ErrorMsg, Button, SearchModal, QuickSearch, useLidarrEnabled } from '../components.jsx';
 import { aviso, confirmar } from '../avisos.jsx';
+import { useTandas, VerMas } from '../tandas.jsx';
 
 // Retos: listas de álbumes "que hay que tener/oír". Anillos concéntricos de lo
 // que tienes vs lo que has escuchado, y envío en bloque a Lidarr de lo que falta.
 export default function Challenges() {
   const [list, setList] = useState(null);
   const [nextListens, setNextListens] = useState(null);
-  const [openId, setOpenId] = useState(null);
+  // El reto abierto va en la URL (?reto=12). Antes era estado suelto: ibas por el disco
+  // 600 de una lista de 1001, abrías uno, volvías… y estabas en la lista de retos.
+  const [sp, setSp] = useSearchParams();
+  const openId = Number(sp.get('reto')) || null;
+  const setOpenId = (id) => setSp(id ? { reto: String(id) } : {});
   const [err, setErr] = useState(null);
   const [adding, setAdding] = useState(false);
 
@@ -22,9 +27,9 @@ export default function Challenges() {
     load();
   }, []);
 
+  if (openId) return <Detail id={openId} onBack={() => { setOpenId(null); load(); }} />;
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!list) return <Spinner />;
-  if (openId) return <Detail id={openId} onBack={() => { setOpenId(null); load(); }} />;
 
   return (
     <div>
@@ -46,7 +51,7 @@ export default function Challenges() {
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
               {nextListens.map((n) => (
                 <Link key={n.challenge_id} to={`/album/${n.owned_album_id}`} className="group block" title={`De «${n.challenge}»`}>
-                  <div className="text-[10px] text-gold-500/80 truncate mb-1">{n.challenge}</div>
+                  <div className="text-[10px] text-gold-400 truncate mb-1">{n.challenge}</div>
                   <div className="aspect-square rounded-lg overflow-hidden bg-ink-850 border border-ink-800 group-hover:border-gold-400 transition-colors flex items-center justify-center relative">
                     <img src={coverUrl(n.owned_album_id)} alt="" loading="lazy" className="w-full h-full object-cover" />
                     <span className="absolute bottom-1 right-1 bg-ink-900/80 rounded-full p-1">
@@ -69,12 +74,12 @@ export default function Challenges() {
         </div>
       )}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {list.map((c) => (
           <button
             key={c.id}
             onClick={() => setOpenId(c.id)}
-            className="card p-4 text-left hover:border-gold-500/40 flex items-center gap-4"
+            className="card p-4 text-left hover:border-gold-500/40 flex items-center gap-4 min-w-0"
           >
             <Ring pct={c.pct} />
             <div className="min-w-0">
@@ -97,7 +102,7 @@ function Ring({ pct, listenedPct, size = 52 }) {
   const c2 = 2 * Math.PI * r2;
   return (
     <svg width={size} height={size} className="shrink-0 -rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#2c2c39" strokeWidth="4" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-ink-700)" strokeWidth="4" />
       <circle
         cx={size / 2}
         cy={size / 2}
@@ -199,6 +204,7 @@ function AddForm({ onDone }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Nombre del reto (opcional; si importas por URL se coge el de la lista)"
+        aria-label="Nombre del reto"
         className="w-full bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
       />
 
@@ -210,7 +216,8 @@ function AddForm({ onDone }) {
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && importUrl()}
             placeholder="Pega la URL de la lista (AOTY, record.club, Rosy Overdrive, Hip Hop Golden Age…)"
-            className="flex-1 bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
+            aria-label="URL de la lista"
+            className="flex-1 min-w-0 bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm"
           />
           <Button onClick={importUrl} disabled={busy}>
             {busy ? 'Importando…' : 'Importar'}
@@ -240,6 +247,7 @@ function AddForm({ onDone }) {
           onChange={(e) => setText(e.target.value)}
           rows={7}
           placeholder={'Radiohead - OK Computer (1997)\nThe Beatles - Revolver\nMiles Davis — Kind of Blue'}
+          aria-label="Lista de discos, uno por línea"
           className="w-full bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm font-mono"
         />
         <div className="flex items-center justify-between mt-2 gap-2 flex-wrap">
@@ -259,7 +267,20 @@ function Detail({ id, onBack }) {
   const [c, setC] = useState(null);
   const [err, setErr] = useState(null);
   const [sending, setSending] = useState(false);
-  const [filter, setFilter] = useState('all'); // all | missing | unheard
+  // El filtro también va en la URL (?ver=missing), para volver al mismo sitio desde un disco.
+  const [sp, setSp] = useSearchParams();
+  const filter = ['missing', 'unheard'].includes(sp.get('ver')) ? sp.get('ver') : 'all'; // all | missing | unheard
+  const setFilter = (f) => setSp(f === 'all' ? { reto: String(id) } : { reto: String(id), ver: f }, { replace: true });
+  // «Descargar faltantes» puede ser una tanda de cientos de búsquedas: tiene que poder
+  // pararse, y pararse sola si te vas de la página.
+  const vivo = useRef(true);
+  const parar = useRef(false);
+  useEffect(() => {
+    vivo.current = true;
+    return () => {
+      vivo.current = false;
+    };
+  }, []);
   const [search, setSearch] = useState(null); // query del modal de búsqueda manual
   const [queued, setQueued] = useState({}); // position -> 'sending' | 'ok' | 'fail'
   const [addOpen, setAddOpen] = useState(false);
@@ -267,9 +288,13 @@ function Detail({ id, onBack }) {
   const [addBusy, setAddBusy] = useState(false);
   const lidarrOn = useLidarrEnabled();
 
-  const load = () => api.challenge(id).then(setC).catch((e) => setErr(e.message));
+  const pedir = () => api.challenge(id).then((d) => vivo.current && setC(d));
+  // Recarga tras una acción: si falla se avisa y la lista se queda; no se cambia la página
+  // entera por un cuadro rojo.
+  const load = () => pedir().catch((e) => aviso(e.message, 'error'));
   useEffect(() => {
-    load();
+    pedir().catch((e) => vivo.current && setErr(e.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const sendMissing = async () => {
@@ -288,21 +313,41 @@ function Detail({ id, onBack }) {
     }
     // Nativo (sin Lidarr): agarra la mejor de cada faltante, secuencial (indexers en vivo).
     const missing = (c?.items || []).filter((i) => !i.owned);
-    if (!missing.length || !(await confirmar(`¿Buscar y descargar los ${missing.length} que te faltan? Puede tardar.`, { aceptar: 'Descargar' })))
+    if (!missing.length) return aviso('No te falta ninguno.', 'info');
+    if (
+      !(await confirmar(
+        `¿Buscar y descargar los ${missing.length} que te faltan?\n\nSon ${missing.length} búsquedas en tus trackers, una detrás de otra y con el freno puesto: puede tardar mucho. Puedes pararlo con el mismo botón.`,
+        { aceptar: 'Descargar faltantes' }
+      ))
+    )
       return;
+    parar.current = false;
     setSending(true);
+    let pedidos = 0;
+    let intentados = 0;
     try {
       for (const it of missing) {
+        // parado a mano, o te has ido: no se lanzan más búsquedas
+        if (parar.current || !vivo.current) break;
+        intentados++;
         setQueued((p) => ({ ...p, [it.position]: 'sending' }));
         try {
           const r = await api.grabBest(`${it.artist} ${it.album}`, { artist: it.artist, album: it.album });
-          setQueued((p) => ({ ...p, [it.position]: r.grabbed ? 'ok' : 'fail' }));
+          if (r.grabbed) pedidos++;
+          if (vivo.current) setQueued((p) => ({ ...p, [it.position]: r.grabbed ? 'ok' : 'fail' }));
         } catch {
-          setQueued((p) => ({ ...p, [it.position]: 'fail' }));
+          if (vivo.current) setQueued((p) => ({ ...p, [it.position]: 'fail' }));
         }
       }
     } finally {
-      setSending(false);
+      if (vivo.current) {
+        setSending(false);
+        const resto = missing.length - intentados;
+        aviso(
+          `Pedidos ${pedidos} de ${intentados} buscados.` + (resto > 0 ? ` Parado: quedan ${resto} sin buscar.` : '') + (intentados > pedidos ? ' Los que no salieron siguen marcados con «Descargar».' : ''),
+          pedidos ? 'ok' : 'info'
+        );
+      }
     }
   };
 
@@ -323,9 +368,13 @@ function Detail({ id, onBack }) {
   };
 
   const remove = async () => {
-    if (!(await confirmar('¿Borrar este reto?', { aceptar: 'Borrar', peligro: true }))) return;
-    await api.deleteChallenge(id);
-    onBack();
+    if (!(await confirmar(`¿Borrar el reto «${c?.name || ''}»?\n\nSe borra la lista; tus discos no se tocan.`, { aceptar: 'Borrar el reto', peligro: true }))) return;
+    try {
+      await api.deleteChallenge(id);
+      onBack();
+    } catch (e) {
+      aviso(e.message, 'error');
+    }
   };
 
   // Retos editables: añadir discos (texto «Artista - Álbum») y quitar uno.
@@ -344,14 +393,20 @@ function Detail({ id, onBack }) {
     }
   };
   const del = async (position) => {
-    await api.removeChallengeItem(id, position);
-    await load();
+    try {
+      await api.removeChallengeItem(id, position);
+      await load();
+    } catch (e) {
+      aviso(e.message, 'error');
+    }
   };
+
+  const items = c ? c.items.filter((i) => (filter === 'missing' ? !i.owned : filter === 'unheard' ? !i.listened : true)) : null;
+  // Una lista de 1001 discos son 1001 filas con sus botones: de 200 en 200.
+  const tandas = useTandas(items, { tamano: 200, clave: filter });
 
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!c) return <Spinner />;
-
-  const items = c.items.filter((i) => (filter === 'missing' ? !i.owned : filter === 'unheard' ? !i.listened : true));
 
   return (
     <div>
@@ -360,27 +415,35 @@ function Detail({ id, onBack }) {
       </button>
 
       <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 min-w-0">
           <Ring pct={c.pct} listenedPct={c.listenedPct} size={72} />
-          <div>
-            <h1 className="text-xl font-display">{c.name}</h1>
+          <div className="min-w-0">
+            <h1 className="text-xl font-display break-words">{c.name}</h1>
             <p className="text-sm text-neutral-400">
               <span className="text-gold-400">{c.owned}</span> tienes · <span className="text-emerald-400">{c.listened}</span> escuchados · de {c.item_count}
             </p>
             <p className="text-xs text-neutral-600">{c.pct}% en disco · {c.listenedPct}% oído</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button onClick={() => setAddOpen((v) => !v)}>
             <span className="inline-flex items-center gap-1.5">
               <Plus size={14} /> Añadir discos
             </span>
           </Button>
-          <Button variant="gold" onClick={sendMissing} disabled={sending}>
-            <span className="inline-flex items-center gap-1.5">
-              <Send size={14} /> {sending ? (lidarrOn ? 'Enviando…' : 'Descargando…') : lidarrOn ? 'Faltantes a Lidarr' : 'Descargar faltantes'}
-            </span>
-          </Button>
+          {sending && !lidarrOn ? (
+            <Button variant="gold" onClick={() => (parar.current = true)} title="Deja de lanzar búsquedas; lo ya pedido sigue su curso">
+              <span className="inline-flex items-center gap-1.5">
+                <X size={14} /> Parar la descarga
+              </span>
+            </Button>
+          ) : (
+            <Button variant="gold" onClick={sendMissing} disabled={sending}>
+              <span className="inline-flex items-center gap-1.5">
+                <Send size={14} /> {sending ? 'Enviando…' : lidarrOn ? 'Faltantes a Lidarr' : 'Descargar faltantes'}
+              </span>
+            </Button>
+          )}
           {c.owned > 0 && (
             <a
               href={`/api/challenges/${id}/m3u`}
@@ -390,7 +453,7 @@ function Detail({ id, onBack }) {
               <ListMusic size={14} /> M3U
             </a>
           )}
-          <Button variant="ghost" onClick={remove}>
+          <Button variant="ghost" onClick={remove} title="Borrar este reto" aria-label="Borrar este reto">
             <Trash2 size={14} />
           </Button>
         </div>
@@ -406,6 +469,7 @@ function Detail({ id, onBack }) {
             onChange={(e) => setAddText(e.target.value)}
             rows={4}
             placeholder={'The Cure - Disintegration\nBig Thief - Dragon New Warm Mountain I Believe in You (2022)'}
+            aria-label="Discos que añadir, uno por línea"
             className="w-full bg-ink-850 border border-ink-800 rounded px-2.5 py-1.5 text-sm font-mono"
           />
           <div className="flex justify-end">
@@ -416,7 +480,7 @@ function Detail({ id, onBack }) {
         </div>
       )}
 
-      <div className="flex gap-2 mb-3 text-sm">
+      <div className="flex flex-wrap gap-2 mb-3 text-sm">
         {['all', 'missing', 'unheard'].map((f) => (
           <button
             key={f}
@@ -428,10 +492,12 @@ function Detail({ id, onBack }) {
         ))}
       </div>
 
+      {items.length === 0 && <p className="text-sm text-neutral-500 mb-3">{filter === 'all' ? 'Este reto está vacío: añade discos con el botón de arriba.' : 'Ninguno con ese filtro.'}</p>}
       <div className="space-y-1">
-        {items.map((it) => (
-          <div key={it.position} className="card px-3 py-2 flex items-center justify-between text-sm">
-            <span className="min-w-0 truncate">
+        {tandas.visibles.map((it) => (
+          <div key={it.position} className="card px-3 py-2 release-row text-sm">
+            <div className="release-main">
+            <span className="min-w-0 truncate clamp-mobile">
               <span className="text-neutral-600 mr-2">{it.position + 1}.</span>
               {it.artist_id ? (
                 <Link to={`/artista/${it.artist_id}`} className="hover:text-gold-400">{it.artist}</Link>
@@ -446,7 +512,8 @@ function Detail({ id, onBack }) {
               )}
               {it.year ? <span className="text-neutral-600"> · {it.year}</span> : ''}
             </span>
-            <div className="flex items-center gap-2 shrink-0 ml-2 text-xs">
+            </div>
+            <div className="release-actions text-xs">
               {it.owned ? (
                 <span className="text-gold-400 inline-flex items-center gap-1">
                   <Check size={13} /> tienes
@@ -478,7 +545,8 @@ function Detail({ id, onBack }) {
               <button
                 onClick={() => del(it.position)}
                 title="Quitar del reto"
-                className="text-neutral-600 hover:text-red-400 shrink-0"
+                aria-label={`Quitar ${it.album} del reto`}
+                className="text-neutral-600 hover:text-red-400 shrink-0 p-1"
               >
                 <X size={14} />
               </button>
@@ -486,6 +554,7 @@ function Detail({ id, onBack }) {
           </div>
         ))}
       </div>
+      <VerMas tandas={tandas} />
 
       {search != null && <SearchModal initialQuery={search} onClose={() => setSearch(null)} />}
     </div>

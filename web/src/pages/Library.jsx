@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocation, useNavigationType, useSearchParams } from 'react-router-dom';
 import { Disc, Layers, X, Loader2 } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, AlbumCard, Spinner, ErrorMsg, DuplicateGroupPanel, Button } from '../components.jsx';
 import { aviso } from '../avisos.jsx';
+import { guardarPosicion, posicionGuardada } from '../volver.js';
 
 // Campos de filtro que se guardan en la URL (?q=…&sort=…). Así, al entrar a un disco y volver
 // con «atrás» del navegador, se restaura tu búsqueda/filtros en vez de la vista global.
@@ -14,25 +15,44 @@ const FILTER_KEYS = ['q', 'genre', 'decade', 'year', 'format', 'lossless', 'stat
 const PAGINA = 500;
 const DEFAULTS = { q: '', genre: '', decade: '', year: '', format: '', lossless: '', state: '', sort: 'added', dupesOnly: '' };
 
+const filtrosDeUrl = (sp) => {
+  const init = { ...DEFAULTS };
+  for (const k of FILTER_KEYS) if (sp.get(k) != null) init[k] = sp.get(k);
+  return init;
+};
+// La clave con la que se recuerda por dónde ibas: los filtros, tal cual.
+const claveDe = (f) => `discoteca:${FILTER_KEYS.map((k) => f[k] || '').join('|')}`;
+
 export default function Library() {
   const [sp, setSp] = useSearchParams();
   const [filters, setFilters] = useState(null);
-  const [data, setData] = useState(null);
+  // Si VUELVES de una ficha con los mismos filtros (atrás del navegador o el enlace «← …» de
+  // la ficha), se retoma lo que ya tenías cargado y la altura a la que estabas (ver
+  // volver.js). Entrando por el menú no: ahí se espera la lista desde arriba. Solo al montar.
+  const tipoDeLlegada = useNavigationType();
+  const llegada = useLocation();
+  const [guardada] = useState(() =>
+    tipoDeLlegada === 'POP' || llegada.state?.volver ? posicionGuardada(claveDe(filtrosDeUrl(sp))) : null
+  );
+  const [data, setData] = useState(() => guardada?.dato.data ?? null);
   const [err, setErr] = useState(null);
   const [group, setGroup] = useState(null); // grupo de duplicados abierto (al pinchar ×N)
   // estado inicial de los filtros: desde la URL (para restaurar al volver con «atrás»)
-  const [f, setF] = useState(() => {
-    const init = { ...DEFAULTS };
-    for (const k of FILTER_KEYS) if (sp.get(k) != null) init[k] = sp.get(k);
-    return init;
-  });
+  const [f, setF] = useState(() => filtrosDeUrl(sp));
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
   const [combining, setCombining] = useState(false);
   const [cargandoMas, setCargandoMas] = useState(false);
   // El orden «aleatorio» necesita una semilla fija mientras dure la visita: sin ella cada
   // página se barajaría por su cuenta y verías discos repetidos al seguir bajando.
-  const [semilla] = useState(() => Math.floor(Math.random() * 1e9));
+  const [semilla] = useState(() => guardada?.dato.semilla ?? Math.floor(Math.random() * 1e9));
+  const raiz = useRef(null);
+  // Mientras los filtros sigan siendo los de lo restaurado no se vuelve a pedir la lista
+  // (pisaría las páginas recuperadas con las 500 primeras).
+  const claveRestaurada = useRef(guardada ? claveDe(f) : null);
+  // A qué filtros corresponde lo que hay en `data`. No vale mirar `f`: entre que cambias un
+  // filtro y llega su respuesta, `data` sigue siendo la lista del filtro anterior.
+  const claveDeLosDatos = useRef(guardada ? claveDe(f) : null);
   const centinela = useRef(null);
   // NO son estado: el estado se actualiza en el siguiente render y los eventos de scroll
   // llegan antes, así que con `cargandoMas` a secas se solapaban peticiones.
@@ -96,20 +116,65 @@ export default function Library() {
 
   // en modo selección la lista va PLANA (cada disco por separado, para poder combinarlos)
   useEffect(() => {
+    if (claveRestaurada.current && !selectMode && claveRestaurada.current === claveDe(f)) return undefined;
+    claveRestaurada.current = null;
     let cancelado = false;
+    const clave = selectMode ? null : claveDe(f);
     const t = setTimeout(() => {
       api
         .library(consulta())
         // con la biblioteca grande una respuesta tarda unos 200 ms: sin esta guardia, la
         // de una búsqueda ya abandonada podía llegar después y pisar a la buena.
-        .then((d) => !cancelado && setData(d))
+        .then((d) => {
+          if (cancelado) return;
+          claveDeLosDatos.current = clave;
+          setData(d);
+          setErr(null); // un fallo anterior no se queda pegado encima de una lista buena
+        })
         .catch((e) => !cancelado && setErr(e.message));
     }, 250);
     return () => {
       cancelado = true;
       clearTimeout(t);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [consulta]);
+
+  // Vuelve a la altura a la que estabas. Antes de pintar, para que no se vea el salto.
+  useLayoutEffect(() => {
+    if (!guardada) return undefined;
+    window.scrollTo(0, guardada.y);
+    // las carátulas aún no tienen alto en el primer fotograma: se repite en el siguiente
+    const id = requestAnimationFrame(() => window.scrollTo(0, guardada.y));
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Apunta por dónde vas (lo cargado y la altura) para poder retomarlo al volver.
+  const paraRecordar = useRef(null);
+  paraRecordar.current =
+    !selectMode && data && claveDeLosDatos.current ? { clave: claveDeLosDatos.current, dato: { data, semilla } } : null;
+  useEffect(() => {
+    const apuntar = () => {
+      // al irte, el navegador recoloca el scroll de la página nueva y avisa: eso no cuenta
+      if (!raiz.current || !paraRecordar.current) return;
+      guardarPosicion(paraRecordar.current.clave, paraRecordar.current.dato, window.scrollY);
+    };
+    apuntar();
+    window.addEventListener('scroll', apuntar, { passive: true });
+    return () => window.removeEventListener('scroll', apuntar);
+  }, [data, f, selectMode]);
+
+  // Tras tocar las copias de un disco (marcar la mejor, descartar, borrar) se vuelve a
+  // pedir lo que había en pantalla: la insignia ×N y los recuentos habían cambiado.
+  const recargar = async () => {
+    try {
+      const cuantos = Math.min(2000, Math.max(PAGINA, data?.albums.length || 0));
+      setData(await api.library(consulta({ limit: cuantos })));
+    } catch (e) {
+      aviso(e.message, 'error');
+    }
+  };
 
   // Siguiente página, al pulsar el botón o al asomar el centinela por abajo.
   const cargarMas = useCallback(async () => {
@@ -167,18 +232,34 @@ export default function Library() {
 
   // refleja los filtros en la URL (replace: no ensucia el historial con cada tecla). Al abrir
   // un disco se apila una entrada nueva; «atrás» vuelve a esta URL y restaura los filtros.
+  const propia = useRef(false); // el próximo cambio de URL lo he hecho yo
   useEffect(() => {
     const next = {};
     for (const k of FILTER_KEYS) if (f[k] && f[k] !== DEFAULTS[k]) next[k] = f[k];
+    if (new URLSearchParams(next).toString() === sp.toString()) return;
+    propia.current = true;
     setSp(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [f]);
+
+  // Y al revés: si la URL cambia desde fuera (el enlace «Discoteca» del menú, atrás o
+  // adelante dentro de la página), los filtros la siguen. Antes solo se leía al montar, así
+  // que el menú limpiaba la URL pero dejaba los campos y la parrilla filtrados.
+  useEffect(() => {
+    if (propia.current) {
+      propia.current = false;
+      return;
+    }
+    const deUrl = filtrosDeUrl(sp);
+    setF((prev) => (FILTER_KEYS.every((k) => prev[k] === deUrl[k]) ? prev : deUrl));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sp]);
 
   const set = (k) => (e) => setF((prev) => ({ ...prev, [k]: e.target.value }));
   const sel = 'bg-ink-850 border border-ink-800 rounded-lg px-2.5 py-1.5 text-sm';
 
   return (
-    <div>
+    <div ref={raiz}>
       <PageTitle
         icon={Disc}
         title="Discoteca"
@@ -196,12 +277,13 @@ export default function Library() {
           value={f.q}
           onChange={set('q')}
           placeholder="Buscar álbum o artista…"
+          aria-label="Buscar álbum o artista"
           className={`${sel} flex-1 min-w-[180px]`}
         />
         {/* Géneros CANÓNICOS, los mismos de la sección «Géneros». Antes era un campo libre
             contra las etiquetas crudas: elegir «Rock» dejaba fuera «rock», «Classic Rock» y
             «ロック», porque son cadenas distintas en los ficheros. */}
-        <select value={f.genre} onChange={set('genre')} className={`${sel} max-w-[14rem]`}>
+        <select value={f.genre} onChange={set('genre')} aria-label="Género" className={`${sel} max-w-[14rem]`}>
           <option value="">Género</option>
           {filters?.canonicalGenres?.map((g) => (
             <option key={g.value} value={g.value}>
@@ -209,7 +291,7 @@ export default function Library() {
             </option>
           ))}
         </select>
-        <select value={f.decade} onChange={set('decade')} className={sel}>
+        <select value={f.decade} onChange={set('decade')} aria-label="Década" className={sel}>
           <option value="">Década</option>
           {filters?.decades.map((d) => (
             <option key={d} value={d}>
@@ -222,6 +304,7 @@ export default function Library() {
           value={f.year}
           onChange={set('year')}
           placeholder="Año"
+          aria-label="Año"
           className={`${sel} w-24`}
           title="Filtrar por un año concreto (tiene prioridad sobre la década)"
         />
@@ -230,7 +313,7 @@ export default function Library() {
             <option key={y} value={y} />
           ))}
         </datalist>
-        <select value={f.format} onChange={set('format')} className={sel}>
+        <select value={f.format} onChange={set('format')} aria-label="Formato" className={sel}>
           <option value="">Formato</option>
           {filters?.formats.map((fm) => (
             <option key={fm} value={fm}>
@@ -238,19 +321,19 @@ export default function Library() {
             </option>
           ))}
         </select>
-        <select value={f.lossless} onChange={set('lossless')} className={sel}>
+        <select value={f.lossless} onChange={set('lossless')} aria-label="Calidad" className={sel}>
           <option value="">Calidad</option>
           <option value="1">Sin pérdida</option>
           <option value="0">Con pérdida</option>
         </select>
-        <select value={f.state} onChange={set('state')} className={sel}>
+        <select value={f.state} onChange={set('state')} aria-label="Estado" className={sel}>
           <option value="">Estado</option>
           <option value="matched">Identificado</option>
           <option value="orphan">Rareza</option>
           <option value="bootleg">Bootleg</option>
           <option value="unmatched">Sin identificar</option>
         </select>
-        <select value={f.sort} onChange={set('sort')} className={sel}>
+        <select value={f.sort} onChange={set('sort')} aria-label="Orden" className={sel}>
           <option value="added">Recientes</option>
           <option value="artist">Artista</option>
           <option value="title">Título</option>
@@ -261,6 +344,7 @@ export default function Library() {
         <button
           type="button"
           onClick={() => setF((p) => ({ ...p, dupesOnly: p.dupesOnly ? '' : '1' }))}
+          aria-pressed={!!f.dupesOnly}
           className={`${sel} ${f.dupesOnly ? 'border-gold-500/50 bg-gold-500/15 text-gold-300' : 'text-neutral-400'}`}
           title="Mostrar solo álbumes con copias duplicadas"
         >
@@ -309,7 +393,9 @@ export default function Library() {
       )}
 
       {selectMode && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 card px-4 py-2.5 flex items-center gap-3 shadow-lg border border-ink-700">
+        // En el móvil ocupa el ancho (con margen) y deja partir en dos renglones: centrada
+        // con left-1/2 se encogía contra media pantalla y los tres elementos no cabían.
+        <div className="fixed bottom-4 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-40 card px-4 py-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 shadow-lg border border-ink-700">
           <span className="text-sm text-neutral-300">
             {selected.size} seleccionado{selected.size === 1 ? '' : 's'}
           </span>
@@ -325,7 +411,7 @@ export default function Library() {
         </div>
       )}
 
-      {group && <DuplicateGroupPanel group={group} onClose={() => setGroup(null)} />}
+      {group && <DuplicateGroupPanel group={group} onClose={() => setGroup(null)} onChanged={recargar} />}
     </div>
   );
 }

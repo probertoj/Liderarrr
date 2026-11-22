@@ -4,19 +4,22 @@ import { HardDrive } from 'lucide-react';
 import { api, fmtBytes } from '../api.js';
 import { PageTitle, Stat, Spinner, ErrorMsg, DuplicateGroupPanel } from '../components.jsx';
 import { aviso } from '../avisos.jsx';
+import { CaratulasPendientes, CarpetasPerdidas } from '../mantenimiento.jsx';
 
 export default function Quality() {
   const [ov, setOv] = useState(null);
   const [dups, setDups] = useState(null);
   const [err, setErr] = useState(null);
   const [group, setGroup] = useState(null); // grupo de duplicados abierto (para limpiarlo)
-  useEffect(() => {
+  const cargar = (alFallar = (e) => setErr(e.message)) =>
     Promise.all([api.quality(), api.duplicates()])
       .then(([o, d]) => {
         setOv(o);
         setDups(d);
       })
-      .catch((e) => setErr(e.message));
+      .catch(alFallar);
+  useEffect(() => {
+    cargar();
   }, []);
 
   // abre el panel de limpieza del grupo (mismas acciones que en la Discoteca al pinchar ×N)
@@ -41,11 +44,18 @@ export default function Quality() {
         <Stat label="Pistas sin pérdida" value={ov.lossless.lossless || 0} sub={`de ${ov.lossless.total}`} />
         <Stat label="Con pérdida" value={ov.lossless.lossy || 0} />
         <Stat label="Sin ReplayGain" value={ov.noReplaygain} sub="volumen sin normalizar" />
-        <Stat label="Sin carátula" value={ov.noCover} />
+        {/* no es «sin carátula»: es sin fichero de imagen en la carpeta. La mayoría la lleva
+            incrustada en el audio y se ve igual. */}
+        <Stat label="Sin imagen en la carpeta" value={ov.noCover} sub="la carátula sale del audio o de fuera" />
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="card p-4">
+      <CarpetasPerdidas onChange={() => cargar((e) => aviso(e.message, 'error'))} />
+      <CaratulasPendientes />
+
+      {/* grid-cols-1 y min-w-0: sin ellos la columna única del móvil se ensanchaba hasta el
+          título más largo de las listas de abajo (1.257 px en una pantalla de 375). */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="card p-4 min-w-0">
           <h2 className="text-sm text-neutral-400 mb-3">Formatos</h2>
           <div className="space-y-1.5">
             {ov.byFormat.map((f) => (
@@ -59,35 +69,35 @@ export default function Quality() {
           </div>
         </div>
 
-        <div className="card p-4">
+        <div className="card p-4 min-w-0">
           <h2 className="text-sm text-neutral-400 mb-3">Formatos mezclados en un mismo álbum</h2>
           {ov.mixed.length === 0 ? (
             <p className="text-neutral-600 text-sm">Ninguno. Cada álbum es de un solo formato.</p>
           ) : (
             <div className="space-y-1.5 max-h-64 overflow-y-auto">
               {ov.mixed.map((m) => (
-                <Link key={m.id} to={`/album/${m.id}`} className="block text-sm hover:text-gold-400">
-                  <span className="truncate">{m.album_artist} — {m.title}</span>
-                  <span className="text-xs text-amber-400/80 ml-2">{m.formats}</span>
+                <Link key={m.id} to={`/album/${m.id}`} className="flex items-baseline justify-between gap-2 text-sm hover:text-gold-400">
+                  <span className="truncate min-w-0">{m.album_artist} — {m.title}</span>
+                  <span className="text-xs text-amber-400 shrink-0">{m.formats}</span>
                 </Link>
               ))}
             </div>
           )}
         </div>
 
-        <div className="card p-4">
+        <div className="card p-4 min-w-0">
           <h2 className="text-sm text-neutral-400 mb-3">Álbumes más pesados</h2>
           <div className="space-y-1.5 max-h-64 overflow-y-auto">
             {ov.heaviest.map((h) => (
               <Link key={h.id} to={`/album/${h.id}`} className="flex justify-between text-sm hover:text-gold-400">
-                <span className="truncate">{h.album_artist} — {h.title}</span>
+                <span className="truncate min-w-0">{h.album_artist} — {h.title}</span>
                 <span className="text-neutral-500 shrink-0 ml-2">{fmtBytes(h.size_bytes)}</span>
               </Link>
             ))}
           </div>
         </div>
 
-        <div className="card p-4">
+        <div className="card p-4 min-w-0">
           <h2 className="text-sm text-neutral-400 mb-3">Duplicados</h2>
           {!dups || dups.length === 0 ? (
             <p className="text-neutral-600 text-sm">Sin duplicados detectados.</p>
@@ -99,9 +109,9 @@ export default function Quality() {
                   <button
                     key={i}
                     onClick={() => openDup(d)}
-                    className="w-full text-left text-sm px-2 py-1 -mx-2 rounded hover:bg-ink-850/60 flex items-center justify-between"
+                    className="w-full text-left text-sm px-2 py-1 rounded hover:bg-ink-850/60 flex items-center justify-between"
                   >
-                    <span className="truncate">
+                    <span className="truncate min-w-0">
                       {d.album_artist} — {d.title}
                     </span>
                     <span className="text-xs text-sky-400 ml-2 shrink-0">×{d.copies}</span>
@@ -113,7 +123,16 @@ export default function Quality() {
         </div>
       </div>
 
-      {group && <DuplicateGroupPanel group={group} onClose={() => setGroup(null)} />}
+      {group && (
+        <DuplicateGroupPanel
+          group={group}
+          onClose={() => {
+            setGroup(null);
+            // al cerrar puede haber una copia menos: la lista de detrás se quedaba vieja
+            cargar((e) => aviso(e.message, 'error'));
+          }}
+        />
+      )}
     </div>
   );
 }

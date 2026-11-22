@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PackageOpen } from 'lucide-react';
 import { api } from '../api.js';
 import { PageTitle, Cover, Spinner, ErrorMsg } from '../components.jsx';
+import { useTandas, VerMas, cuenta } from '../tandas.jsx';
 
 // Álbumes a los que les falta alguna pista, ordenados por cuántas. El agujero que no se
 // ve hasta que le das al play: el dolor real de una discoteca digital.
@@ -10,8 +11,18 @@ export default function Incomplete() {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
   useEffect(() => {
-    api.incomplete().then(setRows).catch((e) => setErr(e.message));
+    let vivo = true;
+    api
+      .incomplete()
+      .then((r) => vivo && setRows(r))
+      .catch((e) => vivo && setErr(e.message));
+    return () => {
+      vivo = false;
+    };
   }, []);
+  // 1.318 fichas de golpe: de 200 en 200 (van ordenadas por cuántas pistas faltan, así
+  // que lo gordo está arriba).
+  const tandas = useTandas(rows, { tamano: 200 });
 
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!rows) return <Spinner />;
@@ -21,7 +32,7 @@ export default function Incomplete() {
       <PageTitle
         icon={PackageOpen}
         title="Álbumes incompletos"
-        sub={rows.length ? `${rows.length} álbumes a los que les falta alguna pista` : ''}
+        sub={rows.length ? `${cuenta(tandas)} álbumes a los que les falta alguna pista` : ''}
       />
       {rows.length === 0 ? (
         <div className="card p-8 text-center text-neutral-400">
@@ -29,11 +40,11 @@ export default function Incomplete() {
         </div>
       ) : (
         <div className="space-y-2">
-          {rows.map((a) => (
+          {tandas.visibles.map((a) => (
             <Link
               key={a.id}
               to={`/album/${a.id}`}
-              className="card flex items-center gap-3 p-2.5 hover:border-gold-500/40"
+              className="card flex items-center gap-3 p-2.5 min-w-0 hover:border-gold-500/40"
             >
               <div className="w-12 h-12 rounded overflow-hidden shrink-0">
                 <Cover id={a.id} size="sm" />
@@ -60,6 +71,7 @@ export default function Incomplete() {
               </div>
             </Link>
           ))}
+          <VerMas tandas={tandas} />
         </div>
       )}
     </div>

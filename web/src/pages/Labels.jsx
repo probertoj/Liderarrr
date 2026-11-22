@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Building2, ArrowLeft, ExternalLink, Check, Star, Loader2 } from 'lucide-react';
 import { api, pollLidarrQueue } from '../api.js';
 import { PageTitle, AlbumCard, Spinner, ErrorMsg, Button, ProgressBar, SearchModal, DuplicateGroupPanel, useLidarrEnabled } from '../components.jsx';
-import { aviso } from '../avisos.jsx';
+import { aviso, confirmar } from '../avisos.jsx';
 
 // Coincidencia laxa de nombre de sello (acentos/mayúsculas/signos) para saber si un
 // sello de la colección ya está entre los seguidos (que usan el nombre canónico de MB).
@@ -15,7 +15,10 @@ const labelNorm = (s) => String(s || '').normalize('NFD').toLowerCase().replace(
 export default function Labels() {
   const [rows, setRows] = useState(null);
   const [params, setParams] = useSearchParams();
-  const [open, setOpen] = useState(params.get('label'));
+  // El sello abierto ES la URL (?label=…), no un estado aparte: así volver de un disco —o el
+  // atrás del navegador— te deja en el sello que estabas mirando, y no en la lista entera.
+  const open = params.get('label');
+  const setOpen = (name) => setParams(name ? { label: name } : {});
   const [q, setQ] = useState('');
   const [err, setErr] = useState(null);
   const [followedNorms, setFollowedNorms] = useState([]);
@@ -34,10 +37,7 @@ export default function Labels() {
     return n && followedNorms.some((t) => t.includes(n) || n.includes(t));
   };
 
-  const back = () => {
-    setOpen(null);
-    if (params.get('label')) setParams({}, { replace: true });
-  };
+  const back = () => setOpen(null);
 
   if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!rows) return <Spinner />;
@@ -85,7 +85,7 @@ export default function Labels() {
                   {followed && <Star size={12} className="fill-current text-gold-400" />}
                   {l.name} <span className={followed ? 'text-gold-300/70' : 'text-neutral-600'}>{l.albums}</span>
                   {l.variants > 1 && (
-                    <span className="text-neutral-600" title="Variantes de nombre fusionadas (acentos/mayúsculas)">
+                    <span className="text-neutral-500" title="Variantes de nombre fusionadas (acentos/mayúsculas)">
                       {' '}· {l.variants} variantes
                     </span>
                   )}
@@ -105,14 +105,26 @@ function LabelDetail({ name, onBack }) {
   const [group, setGroup] = useState(null); // grupo de duplicados abierto (×N)
   const [followed, setFollowed] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const cargar = () =>
+    api
+      .label(name)
+      .then((a) => {
+        setAlbums(a);
+        setErr(null);
+      })
+      // sin esto, un fallo dejaba la rueda girando para siempre
+      .catch((e) => setErr(e.message));
   useEffect(() => {
-    api.label(name).then(setAlbums);
+    setAlbums(null);
+    cargar();
     // ¿ya lo sigo? cruce laxo por nombre contra los sellos seguidos (que usan el
     // nombre canónico de MusicBrainz, que puede diferir del de la etiqueta).
     api
       .trackedLabels()
       .then((ls) => setFollowed(ls.some((l) => labelNorm(l.name).includes(labelNorm(name)) || labelNorm(name).includes(labelNorm(l.name)))))
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);
 
   const follow = async () => {
@@ -158,7 +170,14 @@ function LabelDetail({ name, onBack }) {
       <LabelCompletism name={name} />
 
       <p className="text-sm text-neutral-500 mb-2">{albums?.length || 0} en tu colección</p>
-      {!albums ? (
+      {err ? (
+        <ErrorMsg>
+          No se pudieron cargar los discos de este sello: {err}{' '}
+          <button onClick={cargar} className="underline">
+            Reintentar
+          </button>
+        </ErrorMsg>
+      ) : !albums ? (
         <Spinner />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -168,7 +187,7 @@ function LabelDetail({ name, onBack }) {
         </div>
       )}
 
-      {group && <DuplicateGroupPanel group={group} onClose={() => setGroup(null)} />}
+      {group && <DuplicateGroupPanel group={group} onClose={() => setGroup(null)} onChanged={cargar} />}
     </div>
   );
 }
@@ -183,6 +202,7 @@ function LabelCompletism({ name }) {
   const [added, setAdded] = useState({});
   const [queue, setQueue] = useState(null);
   const [search, setSearch] = useState(null); // query del modal de búsqueda manual
+  const [busy, setBusy] = useState(null); // 'todos' o el rg_mbid que se está pidiendo
   const lidarrOn = useLidarrEnabled();
 
   // Reenganche: la cola de envío corre en el BACKEND, así que al volver a esta página
@@ -207,28 +227,65 @@ function LabelCompletism({ name }) {
 
   // Con Lidarr → envío encolado. Sin Lidarr → descarga nativa (grabBest por ítem; el
   // auto-import coloca lo que baje). Marca en verde lo que entra.
+  //
+  // Un envío cada vez (`busy`): antes ningún botón se desactivaba y un doble clic en
+  // «Descargar todos» mandaba cada disco que falta dos veces a los indexers y a qBittorrent.
+  // «Todos» pregunta antes, y al terminar dice cuántos entraron y cuáles no.
   const send = async (m, all) => {
-    const list = all ? data.missing : [m];
-    if (lidarrOn) {
-      const mark = {};
-      for (const x of list) mark[x.rg_mbid] = true;
-      setAdded((p) => ({ ...p, ...mark }));
-      try {
+    if (busy) return;
+    const list = (all ? data.missing : [m]).filter((x) => !added[x.rg_mbid]);
+    if (!list.length) return;
+    if (all) {
+      const ok = await confirmar(
+        lidarrOn
+          ? `¿Enviar a Lidarr los ${list.length} discos que te faltan de este sello?`
+          : `¿Descargar los ${list.length} discos que te faltan de este sello?\n\nSe busca cada uno en tus indexers, de uno en uno y respetando el límite de peticiones: puede tardar unos minutos.`,
+        { aceptar: lidarrOn ? 'Enviar todos' : 'Descargar todos' }
+      );
+      if (!ok) return;
+    }
+    setBusy(all ? 'todos' : m.rg_mbid);
+    try {
+      if (lidarrOn) {
         if (all) await api.lidarrAddBulk(list.map((x) => ({ rg_mbid: x.rg_mbid, artist_mbid: null })));
         else await api.lidarrAdd(m.rg_mbid, null);
+        const mark = {};
+        for (const x of list) mark[x.rg_mbid] = true;
+        setAdded((p) => ({ ...p, ...mark }));
         pollLidarrQueue(setQueue);
-      } catch (e) {
-        aviso(e.message, 'error');
+        return;
       }
-    } else {
+      const sinRelease = [];
+      const fallidos = [];
+      let pedidos = 0;
       for (const x of list) {
         try {
+          // eslint-disable-next-line no-await-in-loop
           const res = await api.grabBest(`${x.artist || ''} ${x.title}`.trim(), { rg_mbid: x.rg_mbid, artist: x.artist, album: x.title });
-          if (res.grabbed) setAdded((p) => ({ ...p, [x.rg_mbid]: true }));
-        } catch {
-          /* uno que falla no corta la tanda */
+          if (res.grabbed) {
+            pedidos++;
+            setAdded((p) => ({ ...p, [x.rg_mbid]: true }));
+          } else {
+            sinRelease.push(`${x.artist ? `${x.artist} — ` : ''}${x.title}${res.reason ? ` (${res.reason})` : ''}`);
+          }
+        } catch (e) {
+          // uno que falla no corta la tanda, pero se cuenta
+          fallidos.push(`${x.title}: ${e.message}`);
         }
       }
+      if (!all) {
+        if (sinRelease.length) aviso(`No se pudo descargar: ${sinRelease[0]}`, 'error');
+        else if (fallidos.length) aviso(fallidos[0], 'error');
+        return;
+      }
+      const lineas = [`${pedidos} de ${list.length} pedidos.`];
+      if (sinRelease.length) lineas.push(`Sin release válida (${sinRelease.length}): ${sinRelease.slice(0, 6).join('; ')}${sinRelease.length > 6 ? '…' : ''}`);
+      if (fallidos.length) lineas.push(`Con error (${fallidos.length}): ${fallidos.slice(0, 4).join('; ')}${fallidos.length > 4 ? '…' : ''}`);
+      aviso(lineas.join('\n'), sinRelease.length || fallidos.length ? (pedidos ? 'info' : 'error') : 'ok');
+    } catch (e) {
+      aviso(e.message, 'error');
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -279,8 +336,11 @@ function LabelCompletism({ name }) {
             <>
               <div className="flex items-center justify-between mt-3 mb-1">
                 <span className="text-sm text-neutral-400">Te faltan {data.missing.length}</span>
-                <Button variant="gold" onClick={() => send(null, true)}>
-                  {lidarrOn ? 'Enviar todos a Lidarr' : 'Descargar todos'}
+                <Button variant="gold" onClick={() => send(null, true)} disabled={!!busy}>
+                  <span className="inline-flex items-center gap-1.5">
+                    {busy === 'todos' && <Loader2 size={14} className="animate-spin" />}
+                    {busy === 'todos' ? 'Pidiendo…' : lidarrOn ? 'Enviar todos a Lidarr' : 'Descargar todos'}
+                  </span>
                 </Button>
               </div>
               {queue &&
@@ -339,8 +399,10 @@ function LabelCompletism({ name }) {
                     ) : (
                       <button
                         onClick={() => send(m, false)}
-                        className="text-xs px-2 py-1 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 shrink-0"
+                        disabled={!!busy}
+                        className="text-xs px-2 py-1 rounded border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 shrink-0 disabled:opacity-50 inline-flex items-center gap-1"
                       >
+                        {busy === m.rg_mbid && <Loader2 size={12} className="animate-spin" />}
                         {lidarrOn ? 'Lidarr' : 'Descargar'}
                       </button>
                     )}

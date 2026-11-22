@@ -341,6 +341,49 @@ export async function applyCover(albumId, { url, dataUrl } = {}) {
   return { ok: true, savedToFolder, cover: coverPath };
 }
 
+// CARÁTULAS DE ANTEMANO. La carátula de un disco sin imagen en su carpeta se resuelve la
+// primera vez que alguien la pide (se lee la incrustada en el audio y, si no, se busca
+// fuera): esa primera vez la pantalla enseña el hueco, y hay que volver para verla. Esto
+// las va dejando listas por tandas, de una en una y con una pausa, para no cargar ni al
+// NAS ni a los servicios de carátulas.
+export const coverWarmStatus = { running: false, total: 0, done: 0, found: 0, none: 0, startedAt: null, finishedAt: null, cancel: false };
+
+// Discos sin imagen en la carpeta, sin copia en caché y sin marca de «no hay». Barato: no
+// lee carpetas de música, solo mira dos ficheros de la caché propia por disco.
+export function coversPendientes(limit = 0) {
+  const ids = [];
+  for (const a of db.prepare("SELECT id FROM albums WHERE (cover IS NULL OR cover = '') AND match_state != 'dismissed' ORDER BY added_at DESC").iterate()) {
+    if (fs.existsSync(cachedImg(a.id)) || fs.existsSync(noneFile(a.id))) continue;
+    ids.push(a.id);
+    if (limit && ids.length >= limit) break;
+  }
+  return ids;
+}
+
+export async function warmCovers({ limit = 1500, pausaMs = 200 } = {}) {
+  if (coverWarmStatus.running) return coverWarmStatus;
+  const ids = coversPendientes(limit);
+  Object.assign(coverWarmStatus, { running: true, total: ids.length, done: 0, found: 0, none: 0, startedAt: Date.now(), finishedAt: null, cancel: false });
+  try {
+    for (const id of ids) {
+      if (coverWarmStatus.cancel) break;
+      try {
+        await resolveCoverSlow(id);
+      } catch {
+        /* una que falla no para a las demás */
+      }
+      if (fs.existsSync(cachedImg(id))) coverWarmStatus.found++;
+      else coverWarmStatus.none++;
+      coverWarmStatus.done++;
+      if (pausaMs) await new Promise((r) => setTimeout(r, pausaMs));
+    }
+  } finally {
+    coverWarmStatus.running = false;
+    coverWarmStatus.finishedAt = Date.now();
+  }
+  return coverWarmStatus;
+}
+
 // Reintentar todas las que faltan: borra las marcas "sin carátula" para que se
 // vuelvan a resolver (útil tras identificar la biblioteca).
 export function retryMissingCovers() {

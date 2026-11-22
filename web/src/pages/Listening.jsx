@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Headphones, TrendingUp, Star, EarOff, Search, Disc3, ListMusic } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { api } from '../api.js';
 import { PageTitle, Stat, Spinner, ErrorMsg, Button, SearchModal, QuickSearch, AddToChallengeButton } from '../components.jsx';
 import { aviso } from '../avisos.jsx';
+import { useChartTheme } from '../charts.js';
 
 // Ventanas de fecha para la brecha. `since` = ms (o null = todo el tiempo).
 const RANGES = [
@@ -47,6 +48,14 @@ export default function Listening() {
   const [importing, setImporting] = useState(false);
   const [range, setRange] = useState('all');
   const [search, setSearch] = useState(null);
+  const ch = useChartTheme();
+  const vivo = useRef(true);
+  useEffect(() => {
+    vivo.current = true;
+    return () => {
+      vivo.current = false;
+    };
+  }, []);
 
   const load = () => {
     api.listening().then(setOv).catch((e) => setErr(e.message));
@@ -61,8 +70,24 @@ export default function Listening() {
     const since = RANGES.find((r) => r.key === range)?.since() || null;
     setGap(null);
     setAlbumGap(null);
-    api.gap(since).then(setGap).catch(() => {});
-    api.albumGap(since).then(setAlbumGap).catch(() => {});
+    // «Todo el tiempo» es la consulta lenta: sin la guardia podía llegar después de «Última
+    // semana» y quedarse pintada con el selector marcando la semana.
+    let vigente = true;
+    api
+      .gap(since)
+      .then((g) => vigente && setGap(g))
+      .catch((e) => {
+        if (!vigente) return;
+        setGap([]); // sin esto la brecha se quedaba «cargando» para siempre
+        aviso(`No se pudo calcular la brecha: ${e.message}`, 'error');
+      });
+    api
+      .albumGap(since)
+      .then((g) => vigente && setAlbumGap(g))
+      .catch(() => vigente && setAlbumGap([]));
+    return () => {
+      vigente = false;
+    };
   }, [range]);
 
   const doImport = async (full) => {
@@ -72,15 +97,16 @@ export default function Listening() {
       let done = false;
       while (!done) {
         await new Promise((r) => setTimeout(r, 1500));
+        if (!vivo.current) return; // te has ido de la página: el sondeo no sigue solo
         const s = await api.scrobblesStatus();
         done = !s.running;
         if (s.error) throw new Error(s.error);
       }
-      load();
+      if (vivo.current) load();
     } catch (e) {
       aviso(e.message, 'error');
     } finally {
-      setImporting(false);
+      if (vivo.current) setImporting(false);
     }
   };
 
@@ -133,7 +159,9 @@ export default function Listening() {
       </div>
 
       {/* LA BRECHA — protagonista */}
-      <div className="card p-5 mb-6 border-gold-500/30">
+      {/* El borde dorado va por `style`: `.card` se declara después de Tailwind y le ganaba a
+          `border-gold-500/30`, así que esta tarjeta nunca llegó a destacar. */}
+      <div className="card p-5 mb-6" style={{ borderColor: 'color-mix(in srgb, var(--color-gold-500) 35%, transparent)' }}>
         <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
           <h2 className="font-display text-lg flex items-center gap-2">
             <TrendingUp size={18} className="text-gold-400" /> Brecha escucha↔propiedad
@@ -161,8 +189,8 @@ export default function Listening() {
           <p className="text-neutral-600 text-sm">Nada destacable: tienes lo que escuchas. 👏</p>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {gap.map((g) => (
-              <GapRow key={g.artist} g={g} />
+            {gap.map((g, i) => (
+              <GapRow key={`${g.artist}-${i}`} g={g} />
             ))}
           </div>
         )}
@@ -213,9 +241,10 @@ export default function Listening() {
         <h2 className="text-sm text-neutral-400 mb-3">Escuchas por año</h2>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={ov.byYear}>
-            <XAxis dataKey="year" tick={{ fill: '#888', fontSize: 12 }} />
-            <Tooltip contentStyle={{ background: '#191921', border: '1px solid #2c2c39', borderRadius: 8 }} />
-            <Bar dataKey="plays" fill="#d4a24a" radius={[4, 4, 0, 0]} />
+            {/* colores del tema (charts.js): el tooltip era oscuro fijo, con texto oscuro en el tema claro */}
+            <XAxis dataKey="year" tick={{ fill: ch.axis, fontSize: 12 }} />
+            <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
+            <Bar dataKey="plays" name="Escuchas" fill={ch.accent} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -261,7 +290,14 @@ function TopPlayed() {
   useEffect(() => {
     const since = RANGES.find((r) => r.key === range)?.since() || null;
     setData(null);
-    api.topPlayed(since, 12).then(setData).catch(() => setData({ artists: [], albums: [] }));
+    let vigente = true;
+    api
+      .topPlayed(since, 12)
+      .then((d) => vigente && setData(d))
+      .catch(() => vigente && setData({ artists: [], albums: [] }));
+    return () => {
+      vigente = false;
+    };
   }, [range]);
   const rangeLabel = RANGES.find((r) => r.key === range)?.label;
 
@@ -291,8 +327,8 @@ function TopPlayed() {
           <div>
             <h3 className="text-xs uppercase tracking-wide text-neutral-600 mb-2">Artistas</h3>
             <div className="space-y-1">
-              {data.artists.map((a) => (
-                <div key={a.artist} className="flex items-center justify-between text-sm px-1 py-0.5">
+              {data.artists.map((a, i) => (
+                <div key={`${a.artist}-${i}`} className="flex items-center justify-between text-sm px-1 py-0.5">
                   {a.artist_id ? (
                     <Link to={`/artista/${a.artist_id}`} className="hover:text-gold-400 truncate">
                       {a.artist}
@@ -320,7 +356,7 @@ function TopPlayed() {
                     {a.plays}
                     {!a.owned && <span className="text-amber-500/80"> · no lo tienes</span>}
                   </span>
-                  <span className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="shrink-0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto transition-opacity">
                     <AddToChallengeButton artist={a.artist} title={a.album} label="" className="text-neutral-500 hover:text-gold-400 p-0.5" />
                   </span>
                 </div>

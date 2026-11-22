@@ -253,6 +253,16 @@ function buildSteps() {
         return `${autoLidarrStatus.added} encargados de ${autoLidarrStatus.considered} candidatos`;
       },
     },
+    {
+      key: 'caratulas',
+      label: 'Dejar listas las carátulas que faltan',
+      enabled: () => getSetting('covers_warm_nightly') !== '0',
+      run: async () => {
+        const { warmCovers } = await import('./covers.js');
+        const r = await warmCovers({ limit: 1500 });
+        return r.total ? `${r.found} encontradas de ${r.done} que faltaban (${r.none} sin carátula en ningún sitio)` : 'no faltaba ninguna';
+      },
+    },
   ];
 }
 

@@ -6,9 +6,9 @@ import {
   Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud, ExternalLink, Wrench, Rocket, PartyPopper, Radio, Library as LibraryIcon, Shapes,
 } from 'lucide-react';
 import { api } from './api.js';
-import { Spinner, ErrorBoundary } from './components.jsx';
+import { Spinner, ErrorBoundary, useLidarrEnabled } from './components.jsx';
 import { recordarLista } from './volver.js';
-import { Avisos } from './avisos.jsx';
+import { Avisos, aviso } from './avisos.jsx';
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Library = lazy(() => import('./pages/Library.jsx'));
@@ -96,13 +96,26 @@ const NAV = [
 function RefreshButton() {
   const [running, setRunning] = useState(false);
   const [step, setStep] = useState(null);
+  const lidarrOn = useLidarrEnabled();
   useEffect(() => {
     if (!running) return;
+    let sinRespuesta = 0;
     const t = setInterval(async () => {
       const [s, id] = await Promise.all([
         api.refreshStatus().catch(() => null),
         api.identifyStatus().catch(() => null),
       ]);
+      // Si el servidor deja de contestar no se queda «Trabajando…» para siempre preguntando
+      // cada segundo y medio: a la quinta sin respuesta se suelta el botón y se dice.
+      if (!s) {
+        if (++sinRespuesta >= 5) {
+          setRunning(false);
+          setStep(null);
+          aviso('No se puede leer el estado del refresco: el servidor no contesta. Puede que siga trabajando; mira Diagnóstico.', 'error');
+        }
+        return;
+      }
+      sinRespuesta = 0;
       // la identificación es el paso largo: mostramos su progreso concreto
       if (id?.running && id.total) {
         setStep(`Identificando ${id.done.toLocaleString('es')}/${id.total.toLocaleString('es')}`);
@@ -120,11 +133,18 @@ function RefreshButton() {
     <button
       onClick={async () => {
         setRunning(true);
-        await api.refresh('manual').catch(() => {});
+        try {
+          await api.refresh('manual');
+        } catch (e) {
+          // No arrancó: antes se tragaba el fallo y el botón giraba sin fin.
+          setRunning(false);
+          setStep(null);
+          aviso(`No se pudo lanzar el refresco: ${e.message}`, 'error');
+        }
       }}
       disabled={running}
       className="w-full flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-gold-500/40 bg-gold-500/10 text-gold-300 hover:bg-gold-500/20 disabled:opacity-60"
-      title="Identifica contra MusicBrainz, importa tus escuchas de Last.fm y sincroniza Lidarr y las discografías (también recoge cambios del disco)."
+      title={`Identifica contra MusicBrainz, importa tus escuchas de Last.fm y sincroniza ${lidarrOn ? 'Lidarr y ' : ''}las discografías (también recoge cambios del disco).`}
     >
       <RefreshCw size={15} className={running ? 'animate-spin' : ''} />
       <span className="truncate">{running ? step || 'Trabajando…' : 'Identificar y sincronizar'}</span>

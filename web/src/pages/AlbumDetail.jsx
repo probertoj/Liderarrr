@@ -3,9 +3,9 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Music2, Sparkles, RotateCcw, Disc3, ExternalLink, Tag, AlertTriangle, Search, Download, Check, Send, Trash2, Pencil, X, Loader2, FolderInput, Image as ImageIcon, Upload, Users, Star, BookOpen, Layers, MoreHorizontal, Copy, Trophy, Database, Radio, Mic2, Clock, FileDown } from 'lucide-react';
 import { api, fmtBytes, pollLidarrQueue } from '../api.js';
 import { openMbReleaseEditor } from '../mb.js';
-import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, DuplicateCopies, AddToChallengeButton, WantButton, ReleaseYear, GenreChips, VetoButton } from '../components.jsx';
+import { Cover, ArtistPhoto, StateBadge, Spinner, ErrorMsg, Button, useLidarrEnabled, useEscape, DuplicateCopies, AddToChallengeButton, WantButton, ReleaseYear, GenreChips, VetoButton } from '../components.jsx';
 import { aviso, confirmar } from '../avisos.jsx';
-import { deDondeVienes } from '../volver.js';
+import { deDondeVienes, olvidarPosiciones } from '../volver.js';
 
 // orphan y bootleg son «de primera clase»: material fuera de catálogo (rarezas y
 // directos no oficiales) que cuenta en lo descriptivo pero no en el completismo. En toda
@@ -30,6 +30,7 @@ export default function AlbumDetail() {
   const [coverModal, setCoverModal] = useState(false);
   const [coverBust, setCoverBust] = useState(0);
   const [secMenu, setSecMenu] = useState(false); // menú «⋯» de opciones secundarias
+  useEscape(() => setSecMenu(false), secMenu);
   const [shownSec, setShownSec] = useState(() => new Set()); // secciones secundarias reveladas
   const lidarrOn = useLidarrEnabled();
 
@@ -66,29 +67,39 @@ export default function AlbumDetail() {
     setBusy(true);
     try {
       await api.albumState(id, state);
+      olvidarPosiciones(); // las listas guardadas ya no dicen la verdad sobre este disco
       await load();
     } catch (e) {
-      setErr(e.message);
+      // Un aviso, no `setErr`: si fallaba «Marcar como rareza», la ficha entera se cambiaba
+      // por una caja roja y solo se salía recargando.
+      aviso(`No se pudo cambiar el estado del disco: ${e.message}`, 'error');
     } finally {
       setBusy(false);
     }
   };
 
   // Borrado de disco: acción de limpieza/mantenimiento. Irreversible (sin Papelera) y
-  // con guardarraíles en el backend (solo dentro de music_dirs, nunca torrents/). Doble
-  // confirmación dura antes de tocar nada.
+  // con guardarraíles en el backend (solo dentro de music_dirs, nunca torrents/). Una
+  // confirmación, con la ruta que se va a borrar y el aviso del torrent, como la del panel
+  // de copias; el foco arranca en «Cancelar».
   const deleteFromDisk = async () => {
     if (
       !(await confirmar(
-        `¿Borrar del disco «${album.album_artist} — ${album.title}»?\n\nSe eliminan los ficheros de su carpeta en la biblioteca. Esto NO se puede deshacer.`,
+        `¿Borrar del disco «${album.album_artist} — ${album.title}»?\n\n${album.path ? `${album.path}\n\n` : ''}` +
+          'Se eliminan los ficheros de su carpeta en la biblioteca. Esto NO se puede deshacer (no va a la Papelera) y, ' +
+          'si esa copia está sembrándose en qBittorrent, puede romper el torrent.',
         { aceptar: 'Borrar del disco', peligro: true }
       ))
     )
       return;
     setBusy(true);
     try {
+      const nombre = `${album.album_artist} — ${album.title}`;
       await api.deleteAlbum(id);
-      navigate('/discoteca');
+      olvidarPosiciones();
+      aviso(`«${nombre}» borrado del disco.`, 'ok');
+      // De vuelta a la lista de la que venías (con sus filtros), no siempre a la Discoteca.
+      navigate(deDondeVienes().to);
     } catch (e) {
       aviso(e.message, 'error');
       setBusy(false);
@@ -146,7 +157,8 @@ export default function AlbumDetail() {
 
   return (
     <div>
-      <Link to={volver.to} className="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-gold-400 mb-4">
+      {/* state.volver: le dice a la lista que estás regresando, para que retome por dónde ibas */}
+      <Link to={volver.to} state={{ volver: true }} className="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-gold-400 mb-4">
         <ArrowLeft size={15} /> {volver.label}
       </Link>
 
@@ -387,6 +399,9 @@ export default function AlbumDetail() {
               <button
                 onClick={() => setSecMenu((v) => !v)}
                 title="Más opciones"
+                aria-label="Más opciones"
+                aria-haspopup="menu"
+                aria-expanded={secMenu}
                 className={`text-sm px-2.5 py-1.5 rounded-lg border inline-flex items-center gap-1.5 ${
                   secMenu ? 'border-gold-500/50 bg-gold-500/15 text-gold-300' : 'border-ink-700 bg-ink-850 hover:bg-ink-800'
                 }`}
@@ -396,7 +411,7 @@ export default function AlbumDetail() {
               {secMenu && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setSecMenu(false)} />
-                  <div className="absolute right-0 mt-1 z-40 w-56 card p-1 shadow-lg border border-ink-700">
+                  <div className="absolute right-0 mt-1 z-40 w-56 card p-1 shadow-lg border border-ink-700" role="menu">
                     {[
                       { key: 'disc', label: 'Multidisco', icon: Layers, show: true },
                       { key: 'versions', label: 'Versiones', icon: Disc3, show: true },
@@ -505,6 +520,7 @@ function CreditEditor({ album, names, onClose, onSaved }) {
   const [rows, setRows] = useState(initial.length ? initial : ['']);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  useEscape(onClose);
 
   const setRow = (i, v) => setRows((r) => r.map((x, j) => (j === i ? v : x)));
   const addRow = () => setRows((r) => [...r, '']);
@@ -528,7 +544,12 @@ function CreditEditor({ album, names, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="card w-full max-w-md mt-16 p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-sm text-neutral-300 flex items-center gap-2">
@@ -602,6 +623,14 @@ function CoverPickerModal({ album, onClose, onApplied }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
   const [applying, setApplying] = useState(null);
+  useEscape(onClose);
+
+  // La carátula quedó en la app pero no en la carpeta (biblioteca de solo lectura). Va como
+  // aviso flotante: antes se ponía en un texto del propio modal… que se cerraba en el mismo
+  // instante, así que nunca se llegaba a leer.
+  const avisarSiNoSeEscribio = (r) => {
+    if (!r.savedToFolder) aviso('Carátula guardada en la app, pero no se pudo escribir en la carpeta del disco (¿solo lectura?).', 'info');
+  };
 
   const search = async () => {
     setLoading(true);
@@ -627,7 +656,7 @@ function CoverPickerModal({ album, onClose, onApplied }) {
     setErr(null);
     try {
       const r = await api.applyCover(album.id, { url });
-      if (!r.savedToFolder) setErr('Guardada en la app, pero no se pudo escribir en la carpeta (¿solo lectura?).');
+      avisarSiNoSeEscribio(r);
       onApplied();
     } catch (e) {
       setErr(e.message);
@@ -648,7 +677,7 @@ function CoverPickerModal({ album, onClose, onApplied }) {
       setErr(null);
       try {
         const r = await api.applyCover(album.id, { dataUrl: reader.result });
-        if (!r.savedToFolder) setErr('Guardada en la app, pero no se pudo escribir en la carpeta (¿solo lectura?).');
+        avisarSiNoSeEscribio(r);
         onApplied();
       } catch (e2) {
         setErr(e2.message);
@@ -659,7 +688,12 @@ function CoverPickerModal({ album, onClose, onApplied }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="card w-full max-w-2xl mt-10 p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm text-neutral-300 flex items-center gap-2">
@@ -754,7 +788,17 @@ function TagWriter({ albumId }) {
   };
 
   const write = async () => {
-    if (!(await confirmar('Se escribirán los identificadores de MusicBrainz en los ficheros de este álbum. ¿Continuar?', { aceptar: 'Escribir' })))
+    // Los ficheros importados por hardlink comparten bytes con la descarga que siembras:
+    // el servidor los separa antes de escribir (para no romper el torrent), y eso ocupa sitio.
+    const enlazados = (data?.tracks || []).filter((t) => t.enlazado && t.changes.length).length;
+    const extra = enlazados
+      ? `\n\n${enlazados} de estos ficheros están enlazados a la descarga que siembras. Para no tocarla, se separan antes de escribir: el disco pasará a ocupar sitio dos veces (una en la biblioteca y otra en la descarga).`
+      : '';
+    if (
+      !(await confirmar(`Se escribirán los identificadores de MusicBrainz en los ficheros de este álbum.${extra}\n\n¿Continuar?`, {
+        aceptar: 'Escribir',
+      }))
+    )
       return;
     setWriting(true);
     try {
@@ -796,6 +840,7 @@ function TagWriter({ albumId }) {
           {done && (
             <div className="mb-3 text-sm text-emerald-400">
               ✓ Escrito en {done.written} de {done.total} ficheros
+              {done.separados > 0 && <span className="text-neutral-400"> · {done.separados} separados de la descarga</span>}
               {done.errors?.length > 0 && <span className="text-amber-400"> · {done.errors.length} con error</span>}
             </div>
           )}
@@ -1054,6 +1099,7 @@ function CombineModal({ album, onClose, onDone }) {
   const [sel, setSel] = useState(() => new Map()); // id -> {title} de lo seleccionado (para no perderlo al cambiar de lista)
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  useEscape(onClose);
 
   useEffect(() => {
     api
@@ -1070,14 +1116,19 @@ function CombineModal({ album, onClose, onDone }) {
       return;
     }
     setSearching(true);
+    // `vigente`: la respuesta de un texto que ya has cambiado no pisa a la del actual
+    let vigente = true;
     const t = setTimeout(() => {
       api
         .library({ q: term, flat: '1', limit: 40 })
-        .then((r) => setResults((r.albums || []).filter((a) => a.id !== album.id)))
-        .catch(() => setResults([]))
-        .finally(() => setSearching(false));
+        .then((r) => vigente && setResults((r.albums || []).filter((a) => a.id !== album.id)))
+        .catch(() => vigente && setResults([]))
+        .finally(() => vigente && setSearching(false));
     }, 250);
-    return () => clearTimeout(t);
+    return () => {
+      vigente = false;
+      clearTimeout(t);
+    };
   }, [q, album.id]);
 
   const toggle = (a) =>
@@ -1117,7 +1168,12 @@ function CombineModal({ album, onClose, onDone }) {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="card w-full max-w-lg mt-16 p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-sm text-neutral-300 flex items-center gap-2">
@@ -1356,11 +1412,17 @@ function TrackList({ album }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [album.id]);
 
+  // Cada petición de letra lleva su turno. Si abres la pista 3 (que va a LRCLIB y tarda) y
+  // enseguida la 4 (ya guardada), la respuesta de la 3 llega la última: sin el turno, su texto
+  // se pintaba debajo de la 4 y además apagaba el «buscando» de la otra.
+  const turno = useRef(0);
   const verLetra = async (t) => {
     if (abierta === t.id) {
+      turno.current++;
       setAbierta(null);
       return;
     }
+    const mio = ++turno.current;
     setAbierta(t.id);
     setLetra(null);
     setCargando(true);
@@ -1368,13 +1430,26 @@ function TrackList({ album }) {
       // si ya se buscó, viene de la BBDD; si no, se pide a LRCLIB en el momento
       const ya = estado[t.id]?.state;
       const l = ya ? await api.trackLyrics(t.id) : await api.fetchTrackLyrics(t.id);
+      if (!ya) cargarEstado(); // el micro de esa pista cambia aunque ya no la estés mirando
+      if (mio !== turno.current) return;
       setLetra(l);
-      if (!ya) cargarEstado();
     } catch {
-      setLetra({ state: 'error' });
+      if (mio === turno.current) setLetra({ state: 'error' });
     } finally {
-      setCargando(false);
+      if (mio === turno.current) setCargando(false);
     }
+  };
+  const reintentarLetra = (t) => {
+    const mio = ++turno.current;
+    setCargando(true);
+    api
+      .fetchTrackLyrics(t.id, true)
+      .then((l) => {
+        cargarEstado();
+        if (mio === turno.current) setLetra(l);
+      })
+      .catch(() => mio === turno.current && setLetra({ state: 'error' }))
+      .finally(() => mio === turno.current && setCargando(false));
   };
 
   const buscarTodas = async () => {
@@ -1477,11 +1552,16 @@ function TrackList({ album }) {
               <Fragment key={t.id}>
                 <tr className="border-b border-ink-850/60 last:border-0 hover:bg-ink-850/40">
                   <td className="py-2 px-4 text-neutral-600 w-10 text-right">{t.num || '·'}</td>
-                  <td className="py-2 pr-4">
-                    <div className="truncate">
-                      {t.title}
+                  {/* w-full + max-w-0: la celda se queda con el hueco que sobra y el título se
+                      corta con «…». Sin eso, `truncate` no recorta dentro de una tabla, y un
+                      título largo ensanchaba la columna y sacaba la duración de la pantalla. */}
+                  <td className="py-2 pr-4 w-full max-w-0">
+                    <div className="flex items-baseline gap-2 min-w-0">
+                      <span className="truncate" title={t.title}>
+                        {t.title}
+                      </span>
                       {ficha(t) !== dominante && (
-                        <span className="sm:hidden ml-2 text-[11px] pista-distinta whitespace-nowrap">{ficha(t)}</span>
+                        <span className="sm:hidden shrink-0 text-[11px] pista-distinta whitespace-nowrap">{ficha(t)}</span>
                       )}
                     </div>
                   </td>
@@ -1520,7 +1600,7 @@ function TrackList({ album }) {
                 {abierta === t.id && (
                   <tr className="border-b border-ink-850/60 last:border-0">
                     <td colSpan={5} className="px-4 pb-4 pt-1 bg-ink-900/60">
-                      <LyricsPanel cargando={cargando} letra={letra} onReintentar={() => api.fetchTrackLyrics(t.id, true).then(setLetra)} />
+                      <LyricsPanel cargando={cargando} letra={letra} onReintentar={() => reintentarLetra(t)} />
                     </td>
                   </tr>
                 )}
@@ -2053,7 +2133,7 @@ function IdentifySection({ album, onDone }) {
       </div>
       <p className="text-xs text-neutral-600 mt-1">
         Busca este disco en MusicBrainz, Last.fm y AcoustID para asignarle su MBID (lo que activa carátula oficial,
-        completismo y envío a Lidarr). Si nada casa, «Elegir a mano» abre un buscador de MusicBrainz.
+        completismo y descarga automática). Si nada casa, «Elegir a mano» abre un buscador de MusicBrainz.
       </p>
       {msg && <p className="text-sm text-neutral-400 mt-3">{msg}</p>}
       {err && <p className="text-sm text-red-400 mt-3">{err}</p>}
@@ -2558,8 +2638,7 @@ function SearchSection({ album }) {
         )}
       </h2>
       <p className="text-xs text-neutral-600 mt-1">
-        Busca en <b className="font-normal text-neutral-500">todos tus indexers</b> sin el filtro de Lidarr, con el motor
-        que elijas en Ajustes. Elige la release y se envía a tu cliente de descarga (Prowlarr al suyo; Jackett a
+        Busca en <b className="font-normal text-neutral-500">todos tus indexers</b> con el motor que elijas en Ajustes. Elige la release y se envía a tu cliente de descarga (Prowlarr al suyo; Jackett a
         qBittorrent). La búsqueda consulta los trackers en vivo: puede tardar.
       </p>
       <div className="flex gap-2 mt-3">

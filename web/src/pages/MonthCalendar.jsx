@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Search, Download, ExternalLink, Loader2, Check } from 'lucide-react';
 import { api } from '../api.js';
-import { Spinner, AddToChallengeButton, WantButton } from '../components.jsx';
+import { Spinner, ErrorMsg, AddToChallengeButton, WantButton } from '../components.jsx';
 import { aviso } from '../avisos.jsx';
 
 // Vista MES tipo Google Calendar: una rejilla mensual que junta TODAS las fuentes de
@@ -29,6 +29,12 @@ const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
 
 const nkey = (s) => String(s || '').normalize('NFD').toLowerCase().replace(/[^a-z0-9]+/g, '');
 const iso = (d) => d.toISOString().slice(0, 10);
+// «Hoy» es el día de TU reloj, no el de UTC: con toISOString(), en España entre las 00:00 y
+// la 01:00 o las 02:00 el día marcado era ayer (y el día 1, del mes anterior).
+const hoyLocal = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+};
 const monthsAgoIso = (n) => iso(new Date(Date.now() - n * 30 * 86400000));
 
 // Normaliza y deduplica los eventos de todas las fuentes. Un mismo disco puede venir de
@@ -70,7 +76,8 @@ export default function MonthCalendar({ onSearch }) {
     const n = new Date();
     return { y: n.getFullYear(), m: n.getMonth() };
   });
-  const [selected, setSelected] = useState(iso(new Date()));
+  const [selected, setSelected] = useState(hoyLocal);
+  const [fallidas, setFallidas] = useState([]); // fuentes que no contestaron
   const [grab, setGrab] = useState({}); // key -> 'busy' | 'done'
   // qué fuentes mostrar (elección del usuario, persistida). Se parte de DEFAULT_ON y se
   // fusiona con lo guardado, para que fuentes nuevas aparezcan con su valor por defecto.
@@ -94,19 +101,39 @@ export default function MonthCalendar({ onSearch }) {
 
   useEffect(() => {
     const since = monthsAgoIso(14); // ventana amplia; navegar de mes solo re-agrupa
+    // Una fuente caída no tumba el calendario, pero se APUNTA: antes cada una se convertía
+    // en lista vacía, y con el servidor parado salía un mes en blanco y «Sin lanzamientos».
+    const caidas = [];
+    let ultimoFallo = null;
+    const fuente = (nombre, promesa) =>
+      promesa.catch((e) => {
+        caidas.push(nombre);
+        ultimoFallo = e.message;
+        return [];
+      });
+    let vivo = true;
     Promise.all([
-      api.upcoming(true).catch(() => []),
-      api.recentReleases(since, true).catch(() => []),
-      api.labelReleases(since).catch(() => []),
-      api.radar(since, false).catch(() => []),
-      api.newReleases().catch(() => []),
-      api.newSongs(400, false).catch(() => []), // singles (retención 45 d en el servidor)
-      api.globalReleases(45, false, false).catch(() => []), // descubrimiento por afinidad
+      fuente('próximos', api.upcoming(true)),
+      fuente('estrenados', api.recentReleases(since, true)),
+      fuente('sellos', api.labelReleases(since)),
+      fuente('radar', api.radar(since, false)),
+      fuente('discos nuevos', api.newReleases()),
+      fuente('canciones nuevas', api.newSongs(400, false)), // singles (retención 45 d en el servidor)
+      fuente('descubre', api.globalReleases(45, false, false)), // descubrimiento por afinidad
     ])
-      .then(([upcoming, recent, labels, radar, novedades, singles, descubre]) =>
-        setEvents(mergeEvents({ upcoming, recent, labels, radar, novedades, singles, descubre }))
-      )
-      .catch((e) => setErr(e.message));
+      .then(([upcoming, recent, labels, radar, novedades, singles, descubre]) => {
+        if (!vivo) return;
+        if (caidas.length === 7) {
+          setErr(`No se pudo cargar el calendario: ${ultimoFallo}`);
+          return;
+        }
+        setFallidas(caidas);
+        setEvents(mergeEvents({ upcoming, recent, labels, radar, novedades, singles, descubre }));
+      })
+      .catch((e) => vivo && setErr(e.message));
+    return () => {
+      vivo = false;
+    };
   }, []);
 
   // agrupa por día (YYYY-MM-DD), mostrando solo los tipos activados. Un evento con varias
@@ -136,7 +163,7 @@ export default function MonthCalendar({ onSearch }) {
     });
   }, [cursor]);
 
-  const today = iso(new Date());
+  const today = hoyLocal();
   const go = (delta) => setCursor((c) => {
     const d = new Date(Date.UTC(c.y, c.m + delta, 1));
     return { y: d.getUTCFullYear(), m: d.getUTCMonth() };
@@ -166,13 +193,18 @@ export default function MonthCalendar({ onSearch }) {
     }
   };
 
-  if (err) return <div className="card p-4 text-red-300">{err}</div>;
+  if (err) return <ErrorMsg>{err}</ErrorMsg>;
   if (!events) return <Spinner label="Reuniendo todas las fuentes…" />;
 
   const selEvents = byDay[selected] || [];
 
   return (
     <div>
+      {fallidas.length > 0 && (
+        <p className="text-xs prueba-aviso mb-3" role="status">
+          Faltan fuentes en este calendario (no contestaron): {fallidas.join(', ')}. Lo demás está completo.
+        </p>
+      )}
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-1">
           <button onClick={() => go(-1)} className="p-1.5 rounded-lg border border-ink-800 bg-ink-850 hover:bg-ink-800" aria-label="Mes anterior">
@@ -315,7 +347,8 @@ export default function MonthCalendar({ onSearch }) {
                     {!e.is_owned && (
                       <WantButton artist={e.artist} title={e.title} releaseDate={e.date} origin="calendario" />
                     )}
-                    {grab[key] === 'done' ? (
+                    {/* lo que ya tienes no se ofrece para descargar (como en las pestañas de lista) */}
+                    {e.is_owned ? null : grab[key] === 'done' ? (
                       <span className="text-emerald-400 text-xs inline-flex items-center gap-1">
                         <Check size={13} /> pedido
                       </span>
@@ -329,7 +362,14 @@ export default function MonthCalendar({ onSearch }) {
                       </button>
                     )}
                     {e.url && (
-                      <a href={e.url} target="_blank" rel="noreferrer" className="text-xs text-gold-400 hover:underline inline-flex items-center gap-0.5">
+                      <a
+                        href={e.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Abrir en su web de origen"
+                        aria-label={`Abrir «${e.title}» en su web de origen`}
+                        className="text-xs text-gold-400 hover:underline inline-flex items-center gap-0.5"
+                      >
                         <ExternalLink size={12} />
                       </a>
                     )}

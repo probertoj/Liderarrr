@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Trash2, RotateCcw } from 'lucide-react';
 import { api, fmtBytes } from '../api.js';
 import { PageTitle, Spinner, ErrorMsg, Button } from '../components.jsx';
+import { aviso } from '../avisos.jsx';
 
 // Papelera: álbumes descartados (normalmente copias duplicadas desde la página de
 // artista). Siguen en tu disco — descartar nunca borra ficheros — y se pueden
@@ -12,18 +13,24 @@ export default function Trash() {
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(null);
 
-  const load = () => api.dismissed().then(setRows).catch((e) => setErr(e.message));
   useEffect(() => {
-    load();
+    api
+      .dismissed()
+      .then(setRows)
+      .catch((e) => setErr(e.message));
   }, []);
 
   const restore = async (id) => {
+    if (busy != null) return;
     setBusy(id);
     try {
       await api.restoreAlbum(id);
-      await load();
+      setRows(await api.dismissed());
+      aviso('Restaurado: vuelve a estar en tu discoteca.', 'ok');
     } catch (e) {
-      setErr(e.message);
+      // Antes un fallo aquí cambiaba la página entera por un cuadro rojo y se perdía la
+      // lista: ahora se avisa y todo sigue donde estaba.
+      aviso(e.message, 'error');
     } finally {
       setBusy(null);
     }
@@ -50,7 +57,7 @@ export default function Trash() {
       ) : (
         <div className="space-y-2">
           {rows.map((a) => (
-            <div key={a.id} className="card p-3 flex items-center gap-3">
+            <div key={a.id} className="card p-3 flex items-center gap-3 min-w-0">
               <div className="min-w-0 flex-1">
                 <Link to={`/album/${a.id}`} className="truncate hover:text-gold-400 block">
                   {a.title}
@@ -64,11 +71,11 @@ export default function Trash() {
                   </span>
                   <span>{fmtBytes(a.size_bytes)}</span>
                 </div>
-                <div className="text-[11px] text-neutral-700 truncate mt-0.5" title={a.path}>
+                <div className="text-[11px] text-neutral-600 truncate mt-0.5" title={a.path}>
                   {a.path}
                 </div>
               </div>
-              <Button variant="default" disabled={busy === a.id} onClick={() => restore(a.id)}>
+              <Button variant="default" className="shrink-0" disabled={busy != null} onClick={() => restore(a.id)}>
                 <span className="inline-flex items-center gap-1.5">
                   <RotateCcw size={14} /> {busy === a.id ? '…' : 'Restaurar'}
                 </span>

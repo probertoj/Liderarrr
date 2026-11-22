@@ -1,8 +1,18 @@
 @import 'tailwindcss';
 
 @theme {
+  /* Dorado: 200 y 300 se usaban en 112 sitios (text-gold-300 en botones, chips activos y
+     navegación) y NO existían aquí, así que Tailwind no generaba nada y ese texto salía
+     del color heredado. 300 = texto dorado sobre fondo dorado translúcido; 200 = el más
+     claro, para lo que va encima de eso. */
+  --color-gold-200: #eed5a3;
+  --color-gold-300: #e3bd74;
   --color-gold-400: #d4a24a;
   --color-gold-500: #b9852f;
+  /* Los dos grises de texto secundario no llegaban a 4,5:1 sobre las tarjetas oscuras
+     (500 daba 3,9 y 600 daba 2,4: los rótulos de la barra lateral). Se suben lo justo. */
+  --color-neutral-500: #8e8e8e;
+  --color-neutral-600: #848484;
   --color-ink-950: #0d0d10;
   --color-ink-900: #131318;
   --color-ink-850: #191921;
@@ -44,8 +54,44 @@
   --color-neutral-300: #2c2c2a; /* texto primario */
   --color-neutral-400: #454440;
   --color-neutral-500: #62615c;
-  --color-neutral-600: #74736d;
+  --color-neutral-600: #6b6a64; /* era #74736d: 4,1:1 sobre ink-850; ahora 4,7 */
   --color-neutral-700: #8d8c85;
+  /* 800 y 900 se usan de FONDO de pastilla («pendiente»): si no se voltean, queda texto
+     oscuro sobre pastilla oscura. */
+  --color-neutral-800: #e3e1d8;
+  --color-neutral-900: #f0eee7;
+
+  /* COLORES DE ACENTO. Mismo volteo que los grises: en oscuro los tonos 200-400 son
+     texto CLARO sobre fondo oscuro; sobre blanco no se leían (ámbar 1,6:1, dorado 2,3:1,
+     esmeralda 1,9:1, rojo 2,8:1). Aquí pasan a ser el tono OSCURO de su familia, todos
+     ≥4,5:1 sobre tarjeta, página e ink-850. Cuanto más bajo el número, más énfasis: en
+     claro eso es MÁS oscuro. Solo se tocan los tonos que se usan de texto; 500-700 (fondos
+     translúcidos, bordes, barras de progreso) se quedan como están. */
+  --color-gold-200: #5f3f0a;
+  --color-gold-300: #7c5310;
+  --color-gold-400: #8a5a0b;
+  --color-amber-200: #78350f;
+  --color-amber-300: #7c3a0d;
+  --color-amber-400: #92400e;
+  --color-emerald-300: #065f46;
+  --color-emerald-400: #047857;
+  --color-sky-300: #075985;
+  --color-sky-400: #0369a1;
+  --color-violet-300: #5b21b6;
+  --color-violet-400: #6d28d9;
+  --color-red-300: #991b1b;
+  --color-red-400: #b91c1c;
+  --color-rose-300: #9f1239;
+  --color-rose-400: #be123c;
+  /* Y al revés: 900 y 950 son FONDO de pastilla (bg-emerald-900/40 + texto 300). Oscuros
+     dejaban la pastilla gris sucio sobre blanco; pasan a ser el tinte pálido de la familia. */
+  --color-amber-900: #fde68a;
+  --color-amber-950: #fef3c7;
+  --color-emerald-900: #a7f3d0;
+  --color-emerald-950: #d1fae5;
+  --color-violet-900: #ddd6fe;
+  --color-rose-900: #fecdd3;
+  --color-red-950: #fecaca;
   --chart-axis: #8a8983;
   --chart-grid: rgba(0, 0, 0, 0.08);
   --chart-cursor: rgba(0, 0, 0, 0.05);
@@ -54,6 +100,51 @@
   --chart-tip-border: #e3e1d8;
   --chart-accent: #b9852f;
   --chart-2: #ca9b52;
+}
+
+/* En claro, la opacidad en el TEXTO de acento (text-emerald-400/70, text-gold-400/80…)
+   lo aclara otra vez hasta dejarlo por debajo de 4,5:1 —el 70 % de un verde oscuro sobre
+   blanco es un verde medio—. En oscuro la opacidad apaga un texto claro y no molesta; en
+   claro se anula y el color va entero. El selector mira el nombre de la clase («…-400/»)
+   para no tener que enumerar cada porcentaje. Los 500 (text-amber-500/80, text-gold-500/80)
+   van al 400 porque el 500 se queda claro: es color de fondo y de borde. */
+:root.light [class*='text-gold-200/'] {
+  color: var(--color-gold-200);
+}
+:root.light [class*='text-gold-300/'] {
+  color: var(--color-gold-300);
+}
+:root.light :is([class*='text-gold-400/'], [class*='text-gold-500/']) {
+  color: var(--color-gold-400);
+}
+:root.light [class*='text-amber-300/'] {
+  color: var(--color-amber-300);
+}
+:root.light :is([class*='text-amber-400/'], [class*='text-amber-500/']) {
+  color: var(--color-amber-400);
+}
+:root.light [class*='text-emerald-300/'] {
+  color: var(--color-emerald-300);
+}
+:root.light [class*='text-emerald-400/'] {
+  color: var(--color-emerald-400);
+}
+:root.light [class*='text-sky-400/'] {
+  color: var(--color-sky-400);
+}
+:root.light [class*='text-red-300/'] {
+  color: var(--color-red-300);
+}
+:root.light [class*='text-red-400/'] {
+  color: var(--color-red-400);
+}
+/* El dorado 400 también rellena barras de progreso y el logo: ahí tiene que seguir siendo
+   el dorado de siempre, no el tono oscuro de texto. */
+:root.light .bg-gold-400 {
+  background-color: #d4a24a;
+}
+:root.light .fill-gold-400 {
+  fill: #d4a24a;
 }
 
 html {

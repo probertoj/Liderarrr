@@ -24,7 +24,12 @@ export default function Corrections() {
     load();
   }, []);
 
+  // Mueve una carpeta del disco: pregunta antes, igual que «Mover todos» y que el mismo botón
+  // en la ficha del álbum. Antes este era el único de los tres que no preguntaba.
   const moveOne = async (a) => {
+    if (busy || bulk) return;
+    const quien = [a.album_artist, a.title].filter(Boolean).join(' — ') || 'este álbum';
+    if (!(await confirmar(`¿Ordenar en su carpeta «${quien}»?\n\nMueve su carpeta dentro de la biblioteca.`, { aceptar: 'Mover' }))) return;
     setBusy(a.id);
     try {
       const r = await api.refileAlbum(a.id);
@@ -45,7 +50,19 @@ export default function Corrections() {
     try {
       const r = await api.refileAllCorrections();
       load();
-      if (r.errors?.length) aviso(`Movidos ${r.moved} de ${r.candidates}. ${r.errors.length} con error.`, 'ok');
+      if (r.errors?.length) {
+        // Un resultado a medias no es un «ok» en verde: se dice cuáles no se movieron y por qué.
+        const cuales = r.errors
+          .slice(0, 8)
+          .map((x) => `· ${x.title || `álbum ${x.id}`}: ${x.error}`)
+          .join('\n');
+        aviso(
+          `Movidos ${r.moved} de ${r.candidates}. ${r.errors.length} no se ${r.errors.length === 1 ? 'pudo' : 'pudieron'} mover:\n${cuales}${r.errors.length > 8 ? `\n…y ${r.errors.length - 8} más` : ''}`,
+          'error'
+        );
+      } else {
+        aviso(`${r.moved} ${r.moved === 1 ? 'álbum movido' : 'álbumes movidos'} a su carpeta.`, 'ok');
+      }
     } catch (e) {
       aviso(e.message, 'error');
     } finally {
@@ -128,7 +145,7 @@ export default function Corrections() {
                   {busy === a.id ? <Loader2 size={13} className="animate-spin" /> : <FolderInput size={13} />} Mover
                 </button>
               ) : (
-                <span className="text-emerald-400/60 text-xs inline-flex items-center gap-1 shrink-0">
+                <span className="text-emerald-400 text-xs inline-flex items-center gap-1 shrink-0">
                   <Check size={13} /> en su carpeta
                 </span>
               )}
