@@ -440,6 +440,8 @@ app.put('/api/albums/:id/title', async (req, reply) => {
 app.get('/api/corrections', async () => correctedAlbums());
 app.post('/api/corrections/refile-all', async (req, reply) => {
   try {
+    // mueve carpetas en disco: exige la misma confirmación expresa que mover una sola
+    if (req.body?.confirm !== true) throw new Error('Movimiento no confirmado');
     return refileAll();
   } catch (err) {
     return reply.code(400).send({ error: String(err.message || err) });
@@ -1467,16 +1469,28 @@ app.post('/api/cover/:id/apply', async (req, reply) => {
 
 // --- copia de seguridad -----------------------------------------------------
 app.get('/api/backup/database', async (req, reply) => {
-  // Vuelca el WAL al fichero principal antes de descargarlo, para que la copia incluya
-  // las escrituras recientes (en modo WAL podrían estar solo en el sidecar -wal).
-  try {
-    db.pragma('wal_checkpoint(TRUNCATE)');
-  } catch {
-    /* si falla el checkpoint, se descarga igual lo que haya en el fichero principal */
-  }
   reply.header('Content-Disposition', 'attachment; filename="liderarrr.db"');
   reply.header('Content-Type', 'application/octet-stream');
-  return reply.send(fs.createReadStream(DB_PATH));
+  // Se exporta una INSTANTÁNEA (VACUUM INTO, como las copias de seguridad), no el fichero
+  // vivo: si un escaneo o el refresco nocturno escribían durante la descarga, lo que te
+  // llevabas podía salir a medio escribir. El temporal se borra al terminar de enviarse.
+  const tmp = path.join(DATA_DIR, `exportar-${Date.now()}.db`);
+  try {
+    db.prepare('VACUUM INTO ?').run(tmp);
+    const flujo = fs.createReadStream(tmp);
+    flujo.on('close', () => fs.rm(tmp, { force: true }, () => {}));
+    return reply.send(flujo);
+  } catch (e) {
+    fs.rmSync(tmp, { force: true });
+    // sin sitio para la instantánea: se manda el fichero principal, como antes
+    console.warn('[exportar] sin instantánea, se envía el fichero vivo:', String(e.message || e));
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch {
+      /* se descarga igual lo que haya en el fichero principal */
+    }
+    return reply.send(fs.createReadStream(DB_PATH));
+  }
 });
 
 // Restaurar/importar la base de datos: sube un .db (el que exportaste) y reemplaza la

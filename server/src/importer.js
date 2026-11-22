@@ -139,6 +139,11 @@ export function renderPath(template, { artist, album, year }) {
       .replace(/\s+/g, ' ')
       .replace(/^[\s\-–—_]+|[\s\-–—_]+$/g, '')
       .trim();
+    // Un segmento «.» o «..» (de una etiqueta rara) subiría de carpeta: fuera. Y un punto
+    // inicial suelto hace la carpeta oculta —el escáner no la vería nunca—, salvo que sea
+    // punto + cifra («.38 Special»), que es un nombre de verdad.
+    if (seg === '.' || seg === '..') seg = '';
+    else if (/^\.[^.\d]/.test(seg)) seg = seg.slice(1).trim();
     if (seg) segs.push(seg);
   }
   if (!segs.length) segs.push('Desconocido');

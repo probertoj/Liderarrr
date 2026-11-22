@@ -42,6 +42,16 @@ if (fs.existsSync(IMPORT_PATH)) {
     if (fs.existsSync(DB_PATH)) {
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       fs.copyFileSync(DB_PATH, `${DB_PATH}.bak-${stamp}`);
+      // Cada restauración dejaba aquí una copia entera de la base y nadie las quitaba: se
+      // quedan las 3 más recientes (el nombre lleva la fecha, así que ordenar es por nombre).
+      try {
+        const dir = path.dirname(DB_PATH);
+        const base = `${path.basename(DB_PATH)}.bak-`;
+        const viejas = fs.readdirSync(dir).filter((n) => n.startsWith(base)).sort().reverse().slice(3);
+        for (const n of viejas) fs.rmSync(path.join(dir, n), { force: true });
+      } catch {
+        /* podar es limpieza: si falla, la restauración sigue */
+      }
     }
     // Los sidecars WAL/SHM pertenecen a la base VIEJA: si sobreviven, SQLite los aplicaría
     // sobre la nueva al abrirla y la corromperían. Se eliminan.

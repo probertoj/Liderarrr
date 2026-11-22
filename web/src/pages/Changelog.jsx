@@ -9,6 +9,15 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '1.8.1',
+    title: 'Flecos del repaso',
+    items: [
+      '«Exportar base de datos» entrega una instantánea, como las copias de seguridad: antes mandaba el fichero en uso y podía salir a medio escribir.',
+      'Una etiqueta con «.» o «..» ya no puede sacar un disco de su carpeta al importarlo, ni crear una carpeta oculta que el escáner no vería.',
+      '«Mover todos» exige en el servidor la misma confirmación que mover una carpeta, y de las copias que deja cada restauración se conservan solo las tres últimas.',
+    ],
+  },
+  {
     version: '1.8.0',
     title: 'Repaso a fondo de la interfaz, y cuatro tareas de mantenimiento nuevas',
     items: [

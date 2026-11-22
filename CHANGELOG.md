@@ -7,6 +7,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [1.8.1] - 2026-11-22
+
+**Cuatro flecos que quedaban del repaso.**
+
+### Arreglado
+- **«Exportar base de datos» entrega una instantánea**, como las copias de seguridad. Antes
+  mandaba el fichero en uso: si un escaneo o el refresco nocturno escribían durante la
+  descarga, lo que te llevabas podía salir a medio escribir.
+- Una etiqueta con «.» o «..» como artista o álbum ya no puede sacar el disco de su carpeta al
+  importarlo, y un punto inicial suelto ya no crea una carpeta oculta que el escáner no vería.
+- «Mover todos» (Correcciones) exige en el servidor la misma confirmación expresa que mover
+  una sola carpeta.
+- Cada restauración de la base dejaba una copia entera de la anterior y nadie las quitaba: se
+  conservan las tres más recientes.
+
+---
+
 ## [1.8.0] - 2026-11-22
 
 **La otra mitad del repaso: la interfaz.** Se recorrieron las 25 páginas sobre una copia de una
