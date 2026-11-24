@@ -2,6 +2,7 @@ import { db } from './db.js';
 import * as mb from './musicbrainz.js';
 import { enrichArtistDiscography } from './discography.js';
 import { isVariousArtists } from './various.js';
+import { FRESCURA } from './cache-versions.js';
 
 // Artistas que sigues, con faceta (artist | producer | label). Alimentan los
 // huecos, el calendario de próximos y el auto-Lidarr. Equivalente a los favoritos
@@ -47,7 +48,7 @@ export async function followByMbid(mbid, facet = 'artist') {
     row = { id: Number(res.lastInsertRowid) };
   }
   followArtist(row.id, facet);
-  enrichArtistDiscography(row.id).catch(() => {});
+  enrichArtistDiscography(row.id, { maxAge: FRESCURA.seguidos }).catch(() => {});
   return { ok: true, artist_id: row.id };
 }
 

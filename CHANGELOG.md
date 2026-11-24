@@ -7,6 +7,32 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [2.0.1] - 2026-11-24
+
+**Los discos nuevos no aparecían, pulsaras lo que pulsaras.** Aviso de un usuario: el último
+álbum de un artista estaba en MusicBrainz y no en su ficha, y «Discografía» no lo traía. La
+lista de discos de cada artista se guardaba 30 días y tanto el botón como el refresco de cada
+noche releían esa copia en vez de volver a preguntar: un disco recién publicado podía tardar
+hasta cinco semanas en llegar.
+
+### Arreglado
+- **«Discografía» pregunta a MusicBrainz en el momento** y dice qué ha pasado: «trae 1
+  lanzamiento nuevo: …» o «no hay nada nuevo».
+- **Los artistas que sigues se vuelven a consultar cada noche;** el resto de tu colección,
+  una vez por semana, repartido entre las noches para no cargar a MusicBrainz.
+- Lo mismo con los **sellos seguidos**: el icono de refrescar pregunta de verdad, y el
+  refresco nocturno renueva su catálogo cada tres noches (antes, cada 30 días).
+- La ficha decía «Aún no se ha calculado la discografía» de cualquier artista **sin álbumes
+  de estudio** (solo EP y singles), aunque estuviera calculada. Ahora lo dice como es.
+
+### Añadido
+- La ficha de artista enseña **cuándo se consultó MusicBrainz por última vez**.
+
+Tras actualizar, lo que sigues se pone al día en el primer refresco nocturno; el resto, a lo
+largo de la semana. Si te corre prisa un artista, su botón «Discografía» lo trae ya.
+
+---
+
 ## [2.0.0] - 2026-11-24
 
 **Lanzamientos, rehecho.** La pantalla estaba organizada por *de dónde viene cada dato*: nueve

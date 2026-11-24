@@ -9,6 +9,17 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '2.0.1',
+    title: 'El botón «Discografía» pregunta de verdad a MusicBrainz',
+    items: [
+      'Los discos nuevos no aparecían, pulsaras lo que pulsaras: la lista de discos de cada artista se guardaba 30 días y ni el botón «Discografía» ni el refresco nocturno volvían a preguntar a MusicBrainz.',
+      '«Discografía» pregunta ahora en el momento y dice qué ha pasado: «trae 1 lanzamiento nuevo: …» o «no hay nada nuevo».',
+      'Los artistas que sigues se consultan cada noche; el resto de tu colección, una vez por semana, repartido entre las noches.',
+      'Sellos seguidos: el icono de refrescar pregunta de verdad, y su catálogo se renueva cada tres noches.',
+      'La ficha decía «Aún no se ha calculado la discografía» de artistas sin álbumes de estudio (solo EP y singles), aunque sí lo estuviera. Y ahora enseña cuándo se consultó MusicBrainz por última vez.',
+    ],
+  },
+  {
     version: '2.0.0',
     title: 'Lanzamientos, rehecho: tres preguntas en vez de nueve pestañas',
     items: [

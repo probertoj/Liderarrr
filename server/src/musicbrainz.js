@@ -269,14 +269,17 @@ export async function artistByMbid(mbid) {
 }
 
 // Discografía completa (release groups) de un artista. Pagina de 100 en 100.
-export async function artistReleaseGroups(mbid) {
+// `maxAge` (ms): cuánto se fía de la copia guardada. Sin él, los 30 días del servicio; el
+// botón «Discografía» y el refresco nocturno pasan uno corto (FRESCURA en cache-versions.js).
+export async function artistReleaseGroups(mbid, { maxAge } = {}) {
   if (!mbid) return [];
   const out = [];
   let offset = 0;
   for (;;) {
     const data = await mbCached(
       `artist-rgs:${mbid}:${offset}`,
-      `/release-group?artist=${enc(mbid)}&limit=100&offset=${offset}`
+      `/release-group?artist=${enc(mbid)}&limit=100&offset=${offset}`,
+      maxAge
     );
     const page = data['release-groups'] || [];
     for (const rg of page) {
@@ -524,7 +527,7 @@ export async function releaseGroupReleases(rgMbid) {
 // caso de uso. Por eso el tope es alto: solo debe excluir majors de verdad (decenas
 // de miles). Coste: hasta maxReleases/100 páginas a 1,1 s c/u (~55 s el peor caso,
 // cacheado después). Sube el tope si un indie legítimo aún salta como "demasiado grande".
-export async function labelReleaseGroups(labelMbid, { maxReleases = 5000 } = {}) {
+export async function labelReleaseGroups(labelMbid, { maxReleases = 5000, maxAge } = {}) {
   if (!labelMbid) return { tooBig: false, total: 0, releaseGroups: [] };
   const rgs = new Map();
   let offset = 0;
@@ -532,7 +535,8 @@ export async function labelReleaseGroups(labelMbid, { maxReleases = 5000 } = {})
   for (;;) {
     const data = await mbCached(
       `label-rels:${labelMbid}:${offset}`,
-      `/release?label=${enc(labelMbid)}&inc=release-groups+artist-credits&limit=100&offset=${offset}`
+      `/release?label=${enc(labelMbid)}&inc=release-groups+artist-credits&limit=100&offset=${offset}`,
+      maxAge
     );
     total = data['release-count'] || 0;
     if (total > maxReleases) return { tooBig: true, total, releaseGroups: [] };

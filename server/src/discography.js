@@ -2,6 +2,7 @@ import { db } from './db.js';
 import * as mb from './musicbrainz.js';
 import { matchKey } from './matchkey.js';
 import { isVariousArtists, variousArtistIds } from './various.js';
+import { FRESCURA } from './cache-versions.js';
 
 // "La caza": cruza la discografía que MusicBrainz conoce de un artista con lo que
 // TIENES en el disco, y calcula el completismo. Un artista sin MBID no se puede
@@ -39,7 +40,9 @@ ON CONFLICT(artist_id) DO UPDATE SET studio_total=excluded.studio_total,
 `);
 
 // Rellena release_groups + artist_stats para un artista. Devuelve sus stats o null.
-export async function enrichArtistDiscography(artistId) {
+// `maxAge`: cuánto se fía de la copia guardada de MusicBrainz (ver FRESCURA). Devuelve también
+// `nuevos`: lo que MusicBrainz trae ahora y no estaba la última vez, para poder decirlo.
+export async function enrichArtistDiscography(artistId, { maxAge } = {}) {
   const artist = db.prepare('SELECT id, name, mbid FROM artists WHERE id = ?').get(artistId);
   if (!artist?.mbid) return null;
   // El cajón de recopilatorios no tiene discografía que completar: son decenas de miles de
@@ -47,7 +50,18 @@ export async function enrichArtistDiscography(artistId) {
   // calendario. Ver various.js.
   if (isVariousArtists(artist)) return null;
 
-  const rgs = await mb.artistReleaseGroups(artist.mbid);
+  const rgs = await mb.artistReleaseGroups(artist.mbid, { maxAge });
+
+  // Lo que ya se conocía, para saber qué es nuevo. La primera vez no hay «nuevo»: es todo.
+  const yaCalculada = !!db.prepare('SELECT 1 FROM artist_stats WHERE artist_id = ?').get(artistId);
+  const conocidos = new Set(
+    db.prepare('SELECT rg_mbid FROM release_groups WHERE artist_id = ?').all(artistId).map((r) => r.rg_mbid)
+  );
+  const nuevos = yaCalculada
+    ? rgs
+        .filter((rg) => !conocidos.has(rg.rg_mbid))
+        .map((rg) => ({ rg_mbid: rg.rg_mbid, title: rg.title, first_release: rg.first_release || null, primary_type: rg.primary_type || null }))
+    : [];
 
   // álbumes que tienes de este artista, para casar por rg_mbid o por título. Incluye los
   // acreditados a él como co-artista (splits/colaboraciones vía album_artists), no solo
@@ -110,7 +124,7 @@ export async function enrichArtistDiscography(artistId) {
     });
   });
   tx();
-  return { artist_id: artistId, studio_total: studioTotal, studio_owned: studioOwned, missing, upcoming };
+  return { artist_id: artistId, studio_total: studioTotal, studio_owned: studioOwned, missing, upcoming, total: rgs.length, nuevos };
 }
 
 export const discographyStatus = {
@@ -126,24 +140,42 @@ export const discographyStatus = {
 // Enriquece la discografía de todos los artistas relevantes: los que SIGUES y,
 // opcionalmente, todos los que tienen MBID. Trabajo lento (respeta el límite de
 // MB); va en segundo plano, nunca en la petición del usuario.
-export async function enrichAllDiscographies({ onlyTracked = false, maxAgeDays = 7 } = {}) {
-  if (discographyStatus.running) return discographyStatus;
-  const cutoff = Date.now() - maxAgeDays * 86400000;
-  const sql = onlyTracked
-    ? `SELECT DISTINCT ar.id FROM artists ar
-       JOIN tracked_artists t ON t.artist_id = ar.id
-       LEFT JOIN artist_stats s ON s.artist_id = ar.id
-       WHERE ar.mbid IS NOT NULL AND (s.fetched_at IS NULL OR s.fetched_at < ?)`
-    : `SELECT ar.id FROM artists ar
-       LEFT JOIN artist_stats s ON s.artist_id = ar.id
-       WHERE ar.mbid IS NOT NULL AND (s.fetched_at IS NULL OR s.fetched_at < ?)
-       ORDER BY (SELECT COUNT(*) FROM albums a WHERE a.artist_id = ar.id) DESC`;
+//
+// Cada cuánto se vuelve a preguntar a MusicBrainz por un artista: los que SIGUES, cada noche
+// (es de quienes esperas disco nuevo); el resto de la colección, cada `maxAgeDays`. Con
+// `repartir` (el refresco nocturno) ese resto no se pide todo la misma noche: una sexta parte
+// cada vez, los más antiguos primero, para no soltarle a MusicBrainz miles de peticiones de
+// golpe una vez por semana. Lo que nunca se ha calculado va siempre.
+export function artistasPorActualizar({ onlyTracked = false, maxAgeDays = 7, repartir = false, ahora = Date.now() } = {}) {
+  const corteResto = ahora - maxAgeDays * 86400000;
+  const corteSeguidos = ahora - 20 * 3600 * 1000; // «cada noche», con holgura si el refresco se adelanta
   const va = variousArtistIds();
-  const ids = db
-    .prepare(sql)
-    .all(cutoff)
-    .map((r) => r.id)
-    .filter((id) => !va.has(id)); // el cajón de recopilatorios no se enriquece
+  const filas = db
+    .prepare(
+      `SELECT ar.id, s.fetched_at AS visto,
+              EXISTS (SELECT 1 FROM tracked_artists t WHERE t.artist_id = ar.id) AS seguido,
+              (SELECT COUNT(*) FROM albums a WHERE a.artist_id = ar.id) AS discos
+       FROM artists ar LEFT JOIN artist_stats s ON s.artist_id = ar.id
+       WHERE ar.mbid IS NOT NULL`
+    )
+    .all()
+    .filter((r) => !va.has(r.id)); // el cajón de recopilatorios no se enriquece
+
+  const seguidos = filas.filter((r) => r.seguido && (r.visto == null || r.visto < corteSeguidos));
+  if (onlyTracked) return seguidos.map((r) => ({ id: r.id, seguido: true }));
+
+  const resto = filas.filter((r) => !r.seguido);
+  const sinCalcular = resto.filter((r) => r.visto == null).sort((a, b) => b.discos - a.discos);
+  let caducados = resto.filter((r) => r.visto != null && r.visto < corteResto).sort((a, b) => a.visto - b.visto);
+  if (repartir) caducados = caducados.slice(0, Math.max(200, Math.ceil(resto.length / 6)));
+  return [...seguidos, ...sinCalcular, ...caducados].map((r) => ({ id: r.id, seguido: !!r.seguido }));
+}
+
+export async function enrichAllDiscographies({ onlyTracked = false, maxAgeDays = 7, repartir = false } = {}) {
+  if (discographyStatus.running) return discographyStatus;
+  const pendientes = artistasPorActualizar({ onlyTracked, maxAgeDays, repartir });
+  const ids = pendientes.map((p) => p.id);
+  const seguido = new Set(pendientes.filter((p) => p.seguido).map((p) => p.id));
 
   Object.assign(discographyStatus, {
     running: true,
@@ -161,7 +193,7 @@ export async function enrichAllDiscographies({ onlyTracked = false, maxAgeDays =
         const name = db.prepare('SELECT name FROM artists WHERE id = ?').get(id)?.name;
         discographyStatus.current = name;
         try {
-          await enrichArtistDiscography(id);
+          await enrichArtistDiscography(id, { maxAge: seguido.has(id) ? FRESCURA.seguidos : FRESCURA.resto });
         } catch (err) {
           // un artista que falle (MB caído, MBID malo) no debe parar al resto
           console.warn('[discography]', name, String(err.message || err));
@@ -247,5 +279,8 @@ export function artistCompleteness(artistId) {
     upcoming: upcoming.length,
   };
   const pct = studioRgs.length ? Math.round((studioOwned / studioRgs.length) * 100) : null;
-  return { stats, pct, missing, missingEps, missingSingles, upcoming, all: rgs };
+  // ¿Se ha cruzado ya con MusicBrainz, y cuándo? Sin esto la ficha decía «aún no se ha
+  // calculado» de cualquier artista SIN álbumes de estudio (solo EP y singles), aunque sí.
+  const visto = db.prepare('SELECT fetched_at FROM artist_stats WHERE artist_id = ?').get(artistId)?.fetched_at || null;
+  return { stats, pct, missing, missingEps, missingSingles, upcoming, all: rgs, calculada: visto != null || rgs.length > 0, visto };
 }

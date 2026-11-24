@@ -49,8 +49,16 @@ export default function ArtistDetail() {
   const refreshDisco = async () => {
     setBusy(true);
     try {
-      await api.refreshArtistDisco(id);
+      const r = await api.refreshArtistDisco(id);
       await load();
+      // Decir qué ha pasado: sin esto, cuando MusicBrainz no trae nada nuevo, no se sabía si
+      // el botón había hecho algo.
+      if (r?.error) aviso(r.error, 'error');
+      else if (r?.nuevos?.length) {
+        const n = r.nuevos.length;
+        const titulos = r.nuevos.slice(0, 3).map((x) => `«${x.title}»`).join(', ');
+        aviso(`MusicBrainz trae ${n} ${n === 1 ? 'lanzamiento nuevo' : 'lanzamientos nuevos'}: ${titulos}${n > 3 ? '…' : ''}`, 'ok');
+      } else aviso('Consultado MusicBrainz ahora mismo: no hay nada nuevo de este artista.', 'info');
     } catch (e) {
       // Un aviso, no `setErr`: un timeout de MusicBrainz cambiaba la ficha entera por una
       // caja roja y solo se salía recargando.
@@ -177,7 +185,7 @@ export default function ArtistDetail() {
               </span>
             </Button>
           ) : artist.is_various ? null : (
-            <Button onClick={refreshDisco} disabled={busy}>
+            <Button onClick={refreshDisco} disabled={busy} title="Vuelve a preguntar a MusicBrainz por los discos de este artista">
               <span className="inline-flex items-center gap-1.5">
                 <RefreshCw size={14} className={busy ? 'animate-spin' : ''} /> Discografía
               </span>
@@ -243,7 +251,9 @@ export default function ArtistDetail() {
         <div className="card p-4 my-5 max-w-lg">
           {comp.pct == null ? (
             <p className="text-sm text-neutral-500">
-              Aún no se ha calculado la discografía. Pulsa «Discografía» para cruzarla con MusicBrainz.
+              {comp.calculada
+                ? 'MusicBrainz no tiene álbumes de estudio de este artista (solo EP, singles u otros), así que no hay porcentaje que enseñar.'
+                : 'Aún no se ha calculado la discografía. Pulsa «Discografía» para cruzarla con MusicBrainz.'}
             </p>
           ) : (
             <>
@@ -253,6 +263,13 @@ export default function ArtistDetail() {
                 {comp.stats?.upcoming ? ` · ${comp.stats.upcoming} por estrenar` : ''}
               </p>
             </>
+          )}
+          {comp.visto && (
+            <p className="text-xs text-neutral-500 mt-2">
+              MusicBrainz consultado el{' '}
+              {new Date(comp.visto).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.
+              «Discografía» vuelve a preguntar.
+            </p>
           )}
         </div>
       )}

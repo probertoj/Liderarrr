@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import * as mb from './musicbrainz.js';
 import { hoyLocal } from './fechas.js';
+import { FRESCURA } from './cache-versions.js';
 
 // Sellos seguidos (0.6 fase 2). Sigues un sello por su MBID de MusicBrainz y la app
 // resalta sus estrenos aunque no sigas al artista. El catálogo de cada sello se
@@ -32,7 +33,7 @@ export async function followLabel({ mbid, name, disambiguation, country } = {}) 
     country: country || null,
     added_at: Date.now(),
   });
-  refreshLabel(mbid).catch(() => {});
+  refreshLabel(mbid, { maxAge: FRESCURA.sellos }).catch(() => {});
   return { ok: true, label_mbid: mbid };
 }
 
@@ -53,9 +54,11 @@ export function unfollowLabel(mbid) {
 
 // Recalcula el catálogo de un sello desde MusicBrainz y lo vuelca a la caché.
 // Un major que supera el tope se marca too_big (sin catálogo, como en el completismo).
-export async function refreshLabel(mbid) {
+// `maxAge`: cuánto se fía de la copia guardada (ver FRESCURA). El icono de refrescar pasa
+// el del botón; antes releía la copia de hasta 30 días y no hacía nada.
+export async function refreshLabel(mbid, { maxAge } = {}) {
   if (!mbid) return { ok: false };
-  const res = await mb.labelReleaseGroups(mbid);
+  const res = await mb.labelReleaseGroups(mbid, { maxAge });
   const now = Date.now();
   if (res.tooBig) {
     db.prepare('UPDATE tracked_labels SET refreshed_at = ?, too_big = 1 WHERE label_mbid = ?').run(now, mbid);
@@ -85,14 +88,18 @@ export async function refreshLabel(mbid) {
 export async function refreshAllLabels() {
   const labels = db.prepare('SELECT label_mbid FROM tracked_labels').all();
   let done = 0;
-  for (const l of labels) {
-    try {
-      await refreshLabel(l.label_mbid);
-      done++;
-    } catch {
-      /* un sello que tropieza no tumba a los demás */
+  // Carril lento de MusicBrainz: un catálogo son decenas de páginas y no debe hacer cola
+  // delante de tus clics.
+  await mb.runBackground(async () => {
+    for (const l of labels) {
+      try {
+        await refreshLabel(l.label_mbid, { maxAge: FRESCURA.sellos });
+        done++;
+      } catch {
+        /* un sello que tropieza no tumba a los demás */
+      }
     }
-  }
+  });
   return { total: labels.length, done };
 }
 

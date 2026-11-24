@@ -140,7 +140,7 @@ function buildSteps() {
       label: 'Calcular discografías y completismo',
       enabled: () => true,
       run: async () => {
-        const r = await enrichAllDiscographies({ onlyTracked: false });
+        const r = await enrichAllDiscographies({ onlyTracked: false, repartir: true });
         if (r.error) throw new Error(r.error);
         return `${discographyStatus.done} artistas al día`;
       },

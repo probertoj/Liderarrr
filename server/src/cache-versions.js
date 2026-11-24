@@ -22,6 +22,23 @@ export const CACHE_MAX_AGE = {
   lf: 7 * DAY,
 };
 
+// Los 30 días de arriba valen para lo que no cambia (los créditos de un disco, las ediciones
+// de un álbum de 1994). Para LO QUE SALE NUEVO no: la lista de discos de un artista o de un
+// sello se guardaba 30 días y ni el botón «Discografía» la volvía a pedir, así que un disco
+// recién publicado tardaba hasta cinco semanas en aparecer, pulsaras lo que pulsaras.
+// Quien pide esas listas dice cuánto se fía de la copia:
+const HORA = 3600 * 1000;
+export const FRESCURA = {
+  // has pulsado el botón: se pregunta de verdad (un minuto de margen contra el doble clic)
+  boton: 60 * 1000,
+  // artistas que sigues: el refresco de cada noche vuelve a preguntar
+  seguidos: 12 * HORA,
+  // el resto de tu colección: una vez por semana, repartido entre las noches
+  resto: 6 * 24 * HORA,
+  // catálogo de un sello seguido: son muchas páginas, cada tres noches
+  sellos: 60 * HORA,
+};
+
 // SQL que selecciona las filas de ext_cache ya superadas: o son de una versión
 // vieja del prefijo, o han caducado por edad.
 export function staleCacheSql() {
