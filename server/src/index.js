@@ -21,6 +21,7 @@ import {
 import { discosDesaparecidos, olvidarDisco, olvidarTodos, marcarDesaparecidos } from './missing.js';
 import { limpiarMbidInvalidos } from './mbid.js';
 import { registerQualityLists } from './qualitylists.js';
+import { lanzamientos, descartarLanzamiento, restaurarLanzamiento } from './lanzamientos.js';
 import { warmCovers, coverWarmStatus, coversPendientes } from './covers.js';
 import { runScan, scanStatus, purgeJunkFromDb } from './scanner.js';
 import { purgeVariousArtists } from './various.js';
@@ -627,10 +628,38 @@ app.post('/api/discography/refresh', async (req) => {
   return { started: true };
 });
 app.get('/api/discography/status', async () => discographyStatus);
+// Lanzamientos: una sola lista fundida por disco (ver lanzamientos.js).
+const TIPOS_LANZ = new Set(['album', 'ep', 'single', 'otro']);
+app.get('/api/lanzamientos', async (req) => {
+  const qy = req.query || {};
+  const tipos = String(qy.tipos || 'album,ep').split(',').filter((t) => TIPOS_LANZ.has(t));
+  return lanzamientos({
+    vista: ['porvenir', 'recientes', 'descubrir', 'todo'].includes(qy.vista) ? qy.vista : 'porvenir',
+    alcance: qy.alcance === 'coleccion' ? 'coleccion' : 'sigo',
+    tipos: tipos.length ? tipos : ['album', 'ep'],
+    reediciones: qy.reediciones === '1',
+    dias: Number(qy.dias) || null,
+    conTuyos: qy.tuyos === '1',
+  });
+});
+app.post('/api/lanzamientos/descartar', async (req, reply) => {
+  try {
+    return descartarLanzamiento(req.body?.refs);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
+app.post('/api/lanzamientos/restaurar', async (req, reply) => {
+  try {
+    return restaurarLanzamiento(req.body?.refs);
+  } catch (err) {
+    return reply.code(400).send({ error: String(err.message || err) });
+  }
+});
 app.get('/api/discover/gaps', async (req) => gaps({ onlyTracked: req.query?.all !== '1' }));
 app.get('/api/discover/upcoming', async (req) => upcoming({ onlyTracked: req.query?.all !== '1' }));
 app.get('/api/discover/recent', async (req) =>
-  recentlyReleased({ since: req.query?.since || null, onlyTracked: req.query?.all === '1' })
+  recentlyReleased({ since: req.query?.since || null, onlyTracked: req.query?.all !== '1' })
 );
 app.get('/api/discover/dismissed', async () => dismissedList());
 app.post('/api/discover/dismiss', async (req) => dismissGap(req.body?.rg_mbid, req.body?.title));

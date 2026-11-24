@@ -13,6 +13,7 @@ const LISTAS = [
   [/^\/artistas$/, 'Artistas'],
   [/^\/resumen$/, 'Resumen'],
   [/^\/proximos$/, 'Lanzamientos'],
+  [/^\/lo-quiero$/, 'Lo quiero'],
   [/^\/huecos$/, 'Huecos'],
   [/^\/incompletos$/, 'Álbumes incompletos'],
   [/^\/calidad$/, 'Calidad y disco'],

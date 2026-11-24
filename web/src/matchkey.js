@@ -4,11 +4,16 @@
 const EDITION_RE =
   /(deluxe|expanded|remaster|anniversary|edition|reissue|re-?master|mono|stereo|bonus|special|version|explicit|flac|mp3|vinyl|\d{2,3}\s*bit|\d{2,3}(\.\d)?\s*khz|hi-?res|24-?96|16-?44)/i;
 
+const NO_LATINA = /[^\P{L}\p{Script=Latin}]/u;
+
+// Idéntica a la del servidor: solo a-z y 0-9 para nombres en alfabeto latino; si hay letras
+// de otro alfabeto se conservan, y lo que es solo símbolos se queda tal cual.
 export function normName(s) {
-  return String(s || '')
-    .normalize('NFD')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '');
+  const txt = String(s || '').normalize('NFD').toLowerCase();
+  const latino = txt.replace(/[^a-z0-9]+/g, '');
+  if (latino && !NO_LATINA.test(txt)) return latino;
+  const amplio = txt.replace(/\p{M}+/gu, '').replace(/[^\p{L}\p{N}]+/gu, '');
+  return amplio || latino || txt.replace(/\s+/g, '');
 }
 
 export function cleanTitleForMatch(title) {

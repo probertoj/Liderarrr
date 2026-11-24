@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import * as mb from './musicbrainz.js';
+import { hoyLocal } from './fechas.js';
 
 // Sellos seguidos (0.6 fase 2). Sigues un sello por su MBID de MusicBrainz y la app
 // resalta sus estrenos aunque no sigas al artista. El catálogo de cada sello se
@@ -117,7 +118,7 @@ export function isFollowedLabel(mbid) {
 // tienes, lo encargado en Lidarr y si sigues al artista.
 export function labelReleases({ since = null } = {}) {
   const cutoff = since || `${new Date().getFullYear()}-01-01`;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = hoyLocal();
   return db
     .prepare(
       `SELECT lrg.rg_mbid, lrg.title, lrg.artist_credit AS artist, lrg.artist_mbid, lrg.first_release,

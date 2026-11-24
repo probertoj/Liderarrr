@@ -419,3 +419,41 @@ body {
     flex-wrap: wrap;
   }
 }
+
+/* Lanzamientos: el motivo por el que un disco está en la lista («Sigues al artista»,
+   «Sello Merge», «Lo recomienda X»). Lo que es tuyo va en dorado; lo que te proponen, neutro. */
+.lanz-motivo {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #c9c9c9;
+  white-space: nowrap;
+}
+.lanz-tuyo {
+  background: rgba(212, 162, 74, 0.16);
+  color: #ebc57e;
+}
+.lanz-hoy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: #b9852f;
+  color: #14141a;
+  font-weight: 600;
+}
+:root.light .lanz-motivo {
+  background: rgba(0, 0, 0, 0.06);
+  color: #4a4944;
+}
+:root.light .lanz-tuyo {
+  background: #f6e7c8;
+  color: #6b4708;
+}
+:root.light .lanz-hoy {
+  background: #8a5a0b;
+  color: #ffffff;
+}

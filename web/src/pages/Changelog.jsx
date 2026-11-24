@@ -9,6 +9,19 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '2.0.0',
+    title: 'Lanzamientos, rehecho: tres preguntas en vez de nueve pestañas',
+    items: [
+      'Lanzamientos, rehecho. Estaba organizada por de dónde viene cada dato: nueve pestañas, el mismo disco repetido en varias y hasta siete botones por fila, que dejaban al título 126 píxeles.',
+      'Ahora son tres vistas: Por venir, Recién salido (lo que ya salió y te falta) y Descubrir (lo que te recomiendan de artistas que no tienes).',
+      'Una fila, un disco: las siete fuentes se funden, y cada fila dice por qué está ahí («Sigues al artista», «Sello Merge», «Lo recomienda calltheranger»).',
+      'Una acción principal (♥ Lo quiero) y el resto en un menú «⋯». «No me interesa» se puede deshacer.',
+      'El calendario pasa a ser una forma de ver, con los mismos filtros: de quién (lo que sigues o toda tu colección), tipo y desde cuándo.',
+      '«Lo quiero» tiene su propia página en el menú, y «Fuentes» reúne en un panel los sellos y curadores que sigues.',
+      'Arreglado de paso: qué está por salir se decide por la fecha en el momento (un disco ya publicado seguía días en «Próximos»), las fechas de solo año, la hora UTC de madrugada y la casilla «Todos los artistas», que estaba al revés.',
+    ],
+  },
+  {
     version: '1.9.3',
     title: 'Un disco que ya tienes en FLAC no es un candidato a upgrade',
     items: [

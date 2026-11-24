@@ -53,6 +53,14 @@ export const api = {
   coversWarmCancel: () => req('/covers/warm/cancel', { method: 'POST' }),
   // discos cuya carpeta ya no está
   // qué álbumes son: por frecuencia de muestreo, sin ReplayGain o sin imagen en la carpeta
+  // Lanzamientos: una lista ya fundida por disco (vista, alcance, tipos, ventana)
+  lanzamientos: (p = {}) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(p)) if (v != null && v !== '' && v !== false) q.set(k, v === true ? '1' : String(v));
+    return req(`/lanzamientos?${q}`);
+  },
+  lanzamientosDescartar: (refs) => req('/lanzamientos/descartar', { method: 'POST', body: { refs } }),
+  lanzamientosRestaurar: (refs) => req('/lanzamientos/restaurar', { method: 'POST', body: { refs } }),
   qualityLists: () => req('/quality/lists'),
   qualityList: (kind, rate) => req(`/quality/list?${new URLSearchParams(rate ? { kind, rate } : { kind })}`),
   missing: () => req('/missing'),

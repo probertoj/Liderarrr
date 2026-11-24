@@ -5,6 +5,7 @@ import { pressingConcernsLists } from './rosyoverdrive.js';
 import { reviewsLists } from './ravensingstheblues.js';
 import { tierListToLists, parseTierList } from './hipersonica.js';
 import { appendToChallenge } from './challenges.js';
+import { hoyLocal } from './fechas.js';
 
 // Radar de novedades curadas (0.6 fase 3). Sigues a curadores de buymusic.club
 // (usuarios que publican semanalmente lo mejor de Bandcamp) y sus selecciones
@@ -220,7 +221,7 @@ function libraryIndex() {
 // unownedOnly oculta lo que ya tienes.
 export function radarFeed({ since = null, unownedOnly = false } = {}) {
   const cutoff = since || `${new Date().getFullYear()}-01-01`;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = hoyLocal();
   const idx = libraryIndex();
   const rows = db
     .prepare(

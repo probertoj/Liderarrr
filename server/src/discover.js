@@ -3,6 +3,7 @@ import { matchKey } from './matchkey.js';
 import { lidarrConfig } from './lidarr.js';
 import { activeRequestRgs } from './downloads.js';
 import { excludeVariousSql } from './various.js';
+import { hoyLocal } from './fechas.js';
 
 // «en Lidarr» solo vale si Lidarr sigue conectado (si no, su tabla queda vieja tras
 // «liberar de Lidarr»). El estado nativo «pedido» sale del registro de descargas.
@@ -105,12 +106,12 @@ export function upcoming({ onlyTracked = true } = {}) {
        FROM release_groups rg
        JOIN artists ar ON ar.id = rg.artist_id
        ${trackedJoin}
-       WHERE rg.is_upcoming = 1
+       WHERE rg.first_release > @hoy
          AND rg.rg_mbid NOT IN (SELECT rg_mbid FROM dismissed_albums)
          ${sinVarios}
        ORDER BY rg.first_release`
     )
-    .all();
+    .all({ hoy: hoyLocal() });
   const isOwned = ownedMatcher();
   const lid = lidarrConnected();
   const reqs = activeRequestRgs();
@@ -122,7 +123,7 @@ export function upcoming({ onlyTracked = true } = {}) {
 // Marca lo que ya tienes (is_owned), lo encargado en Lidarr y si sigues al artista.
 export function recentlyReleased({ since = null, onlyTracked = false } = {}) {
   const cutoff = since || `${new Date().getFullYear()}-01-01`;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = hoyLocal();
   const trackedJoin = onlyTracked ? 'JOIN tracked_artists t ON t.artist_id = rg.artist_id' : '';
   const sinVarios = excludeVariousSql();
   const rows = db
@@ -137,7 +138,7 @@ export function recentlyReleased({ since = null, onlyTracked = false } = {}) {
        FROM release_groups rg
        JOIN artists ar ON ar.id = rg.artist_id
        ${trackedJoin}
-       WHERE rg.is_upcoming = 0 AND rg.primary_type = 'Album'
+       WHERE rg.primary_type = 'Album'
          AND (rg.secondary_types IS NULL OR rg.secondary_types = '[]')
          AND rg.first_release >= @cutoff AND rg.first_release <= @today
          AND rg.rg_mbid NOT IN (SELECT rg_mbid FROM dismissed_albums)

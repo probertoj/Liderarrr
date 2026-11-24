@@ -7,6 +7,49 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [2.0.0] - 2026-11-24
+
+**Lanzamientos, rehecho.** La pantalla estaba organizada por *de dónde viene cada dato*: nueve
+pestañas (MusicBrainz por venir, MusicBrainz ya salido, Deezer discos, Deezer canciones, afines,
+sellos, curadores…), el mismo disco repetido en varias y hasta siete botones por fila, que
+dejaban al título 126 píxeles. Ahora responde a lo que uno se pregunta.
+
+### Cambiado
+- **Tres vistas:** *Por venir*, *Recién salido* (lo que ya salió y te falta) y *Descubrir* (lo
+  que te recomiendan de artistas que no tienes). Cada una con su recuento.
+- **Una fila, un disco.** Las siete fuentes se funden: el mismo disco que llega por
+  MusicBrainz, por Deezer y por un curador es una sola fila. Una colaboración ya no sale una
+  vez por artista.
+- **Cada fila dice por qué está ahí:** «Sigues al artista», «Sello Merge», «En tu colección»,
+  «Lo recomienda calltheranger». Antes había que deducirlo de la pestaña.
+- **Una acción principal** (♥ Lo quiero) y el resto en un menú «⋯»: descargar ahora, buscar a
+  mano, añadir a un reto, seguir al artista, enlaces y «No me interesa».
+- **El calendario es una forma de ver**, no una pestaña más, y respeta los mismos filtros.
+- **Filtros comunes:** de quién (lo que sigues o toda tu colección), tipo (álbumes y EP por
+  defecto; singles, directos y reediciones a un clic) y desde cuándo.
+- **«Lo quiero» tiene su propia página** en el menú. Dos de cada tres deseos no venían del
+  calendario. Los que ya están en tu disco van plegados.
+- **«Fuentes»** reúne en un panel los sellos y curadores que sigues y los botones de «buscar
+  ahora», que antes ocupaban la cabecera de cada lista.
+- **«No me interesa» se puede deshacer**, y quita el disco de todas las fuentes de una vez.
+
+### Arreglado
+- **Qué está por salir se decide por la fecha, en el momento.** Se leía una marca guardada que
+  solo se recalcula cada semana: un disco ya publicado seguía días en «Próximos».
+- Una fecha de solo año («2026») ya no cuenta como publicada: sale como «fecha por confirmar».
+- Fechas disparatadas de Deezer (un año 4018) ya no encabezan la lista.
+- La casilla «Todos los artistas» estaba al revés en los estrenados.
+- El «hoy» del servidor iba en hora UTC: de madrugada, la frontera iba un día por detrás.
+- La nota de un curador («Meh», «No») se enseña; antes el disco salía como recomendación sin más.
+- «Descargar» ya no se ofrece en lo que tienes ni dos veces para el mismo disco.
+- El corazón de «Lo quiero» no se encendía con artistas en otro alfabeto (la web llevaba una
+  copia antigua de cómo se comparan los nombres).
+- El Radar pintaba 1.316 filas de golpe; ahora las listas van por tandas.
+
+Lo que **no** cambia: de dónde salen los datos ni cuándo se actualizan (cada noche).
+
+---
+
 ## [1.9.3] - 2026-11-22
 
 **«Candidatos a upgrade» miraba cada copia por separado.** Una copia en MP3 salía como

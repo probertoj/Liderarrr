@@ -1,7 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle,
+  LayoutDashboard, Disc, Users, HardDrive, PackageOpen, HelpCircle, Heart,
   Sparkles, Settings as SettingsIcon, Menu, X, RefreshCw, Star, Compass, CalendarClock,
   Headphones, Trophy, ArrowUpCircle, Building2, Sun, Moon, Stethoscope, Trash2, DownloadCloud, ExternalLink, Wrench, Rocket, PartyPopper, Radio, Library as LibraryIcon, Shapes,
 } from 'lucide-react';
@@ -24,7 +24,8 @@ const Rarities = lazy(() => import('./pages/Rarities.jsx'));
 const Bootlegs = lazy(() => import('./pages/Bootlegs.jsx'));
 const Tracked = lazy(() => import('./pages/Tracked.jsx'));
 const Discover = lazy(() => import('./pages/Discover.jsx'));
-const Calendar = lazy(() => import('./pages/Calendar.jsx'));
+const Lanzamientos = lazy(() => import('./pages/Lanzamientos.jsx'));
+const LoQuiero = lazy(() => import('./pages/LoQuiero.jsx'));
 const Listening = lazy(() => import('./pages/Listening.jsx'));
 const Challenges = lazy(() => import('./pages/Challenges.jsx'));
 const Upgrades = lazy(() => import('./pages/Upgrades.jsx'));
@@ -60,6 +61,7 @@ const NAV = [
       { to: '/seguidos', label: 'Seguidos', Icon: Star },
       { to: '/huecos', label: 'Huecos', Icon: Compass },
       { to: '/proximos', label: 'Lanzamientos', Icon: CalendarClock },
+      { to: '/lo-quiero', label: 'Lo quiero', Icon: Heart },
       { to: '/importar', label: 'Importar descargas', Icon: DownloadCloud },
     ],
   },
@@ -390,7 +392,8 @@ export default function App() {
             <Route path="/calidad" element={<Quality />} />
             <Route path="/seguidos" element={<Tracked />} />
             <Route path="/huecos" element={<Discover />} />
-            <Route path="/proximos" element={<Calendar />} />
+            <Route path="/proximos" element={<Lanzamientos />} />
+            <Route path="/lo-quiero" element={<LoQuiero />} />
             <Route path="/importar" element={<Imports />} />
             <Route path="/correcciones" element={<Corrections />} />
             <Route path="/escuchas" element={<Listening />} />
