@@ -9,6 +9,13 @@ import { PageTitle } from '../components.jsx';
 
 const RELEASES = [
   {
+    version: '2.0.2',
+    title: 'Lanzamientos abre en el calendario',
+    items: [
+      'Lanzamientos abre en el calendario: es lo primero que se quiere ver. Las tres listas (Por venir, Recién salido, Descubrir) siguen a un clic, y el botón «Calendario» pasa a ir delante de ellas.',
+    ],
+  },
+  {
     version: '2.0.1',
     title: 'El botón «Discografía» pregunta de verdad a MusicBrainz',
     items: [

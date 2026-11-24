@@ -7,6 +7,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 
 ---
 
+## [2.0.2] - 2026-11-24
+
+### Cambiado
+- **Lanzamientos abre en el calendario.** Es lo primero que se quiere ver: qué cae y cuándo.
+  Las tres listas (Por venir, Recién salido, Descubrir) siguen a un clic, con sus recuentos, y
+  el botón «Calendario» pasa a ir delante de ellas.
+
+---
+
 ## [2.0.1] - 2026-11-24
 
 **Los discos nuevos no aparecían, pulsaras lo que pulsaras.** Aviso de un usuario: el último

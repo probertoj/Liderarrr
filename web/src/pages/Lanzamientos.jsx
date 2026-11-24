@@ -395,7 +395,9 @@ export default function Lanzamientos() {
 
   // Todo el estado de lo que estás viendo vive en la dirección: al volver de una ficha estás
   // donde estabas, y se puede guardar en marcadores.
-  const vista = ['recientes', 'descubrir', 'mes'].includes(sp.get('v')) ? sp.get('v') : 'porvenir';
+  // Se entra por el CALENDARIO: es lo primero que se quiere ver (qué cae y cuándo); las tres
+  // listas están a un clic. Sin `?v=` —o con el `?v=mes` de un enlace antiguo— es el mes.
+  const vista = ['porvenir', 'recientes', 'descubrir'].includes(sp.get('v')) ? sp.get('v') : 'mes';
   const alcance = sp.get('a') === 'coleccion' ? 'coleccion' : 'sigo';
   const tipos = (sp.get('t') || 'album,ep').split(',').filter((t) => TIPOS.some((x) => x.k === t));
   const reediciones = sp.get('r') === '1';
@@ -563,18 +565,18 @@ export default function Lanzamientos() {
       </PageTitle>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3">
+        <button type="button" onClick={() => pon({ v: null, d: null, c: null })} aria-pressed={vista === 'mes'} className={`text-sm px-3 py-1.5 rounded-lg border border-ink-700 ${vista === 'mes' ? 'bg-ink-800 text-neutral-100' : 'bg-ink-900 text-neutral-400 hover:bg-ink-850'}`}
+        >
+          <CalendarClock size={14} className="inline mr-1" /> Calendario
+        </button>
         <div className="inline-flex" role="tablist" aria-label="Qué quieres ver">
           {VISTAS.map((v) => (
-            <button key={v.k} type="button" role="tab" aria-selected={vista === v.k} onClick={() => pon({ v: v.k === 'porvenir' ? null : v.k, d: null, c: null })} className={seg(vista === v.k)}>
+            <button key={v.k} type="button" role="tab" aria-selected={vista === v.k} onClick={() => pon({ v: v.k, d: null, c: null })} className={seg(vista === v.k)}>
               {v.label}
               {datos?.cuentas && <span className="text-neutral-500"> · {datos.cuentas[v.k]}</span>}
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => pon({ v: vista === 'mes' ? null : 'mes', d: null, c: null })} aria-pressed={vista === 'mes'} className={`text-sm px-3 py-1.5 rounded-lg border border-ink-700 ${vista === 'mes' ? 'bg-ink-800 text-neutral-100' : 'bg-ink-900 text-neutral-400 hover:bg-ink-850'}`}
-        >
-          <CalendarClock size={14} className="inline mr-1" /> Calendario
-        </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-5">
